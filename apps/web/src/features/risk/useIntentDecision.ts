@@ -31,6 +31,8 @@ export type RiskDecisionScan = {
   readonly intentIds: string[];
   /** How many recent audit events were inspected to find the decisions. */
   readonly scanned: number;
+  /** Creation time of the oldest event the scan inspected, or null before the first page. */
+  readonly oldestAt: string | null;
   /** True when the scan reached the start of the journal instead of its page budget. */
   readonly exhausted: boolean;
   readonly status: 'loading' | 'ready' | 'error';
@@ -39,18 +41,33 @@ export type RiskDecisionScan = {
 };
 
 const PAGE_SIZE = 100;
-const MAX_PAGES = 5;
+/**
+ * The worker writes snapshot and evaluation events every ten seconds, so a decision
+ * from an hour ago sits roughly 700 events back. Twenty pages covers about three
+ * hours of that background traffic; the scan stops as soon as it has enough ids.
+ */
+const MAX_PAGES = 20;
 const SCAN_INTERVAL_MS = 30_000;
 
+function oldestOf(events: readonly AuditEvent[]): string | null {
+  let oldest: string | null = null;
+  for (const event of events) {
+    if (oldest === null || event.createdAt < oldest) {
+      oldest = event.createdAt;
+    }
+  }
+  return oldest;
+}
+
 /**
- * The worker writes snapshot and evaluation events every ten seconds, so the most
- * recent journal page rarely contains a risk decision. Walk back a bounded number
- * of pages and report exactly how far the scan went; never claim "none" without it.
+ * Walk back a bounded number of journal pages and report exactly how far the scan
+ * went, including the time window it covered. Never claim "none" without it.
  */
 export function useRiskDecisionScan(maxIntents: number): RiskDecisionScan {
   const [state, setState] = useState<Omit<RiskDecisionScan, 'refresh'>>({
     intentIds: [],
     scanned: 0,
+    oldestAt: null,
     exhausted: false,
     status: 'loading',
     error: null,
@@ -66,12 +83,18 @@ export function useRiskDecisionScan(maxIntents: number): RiskDecisionScan {
         const ids: string[] = [];
         let cursor: number | null = null;
         let scanned = 0;
+        let oldestAt: string | null = null;
         let exhausted = false;
 
         for (let page = 0; page < MAX_PAGES; page += 1) {
           const endpoint = endpoints.journal(PAGE_SIZE, cursor ?? undefined);
           const response = await apiGet(endpoint.path, endpoint.schema, controller.signal);
           scanned += response.data.events.length;
+
+          const pageOldest = oldestOf(response.data.events);
+          if (pageOldest !== null) {
+            oldestAt = pageOldest;
+          }
           for (const id of intentIdsFromJournal(response.data.events, maxIntents)) {
             if (!ids.includes(id)) {
               ids.push(id);
@@ -90,7 +113,7 @@ export function useRiskDecisionScan(maxIntents: number): RiskDecisionScan {
         if (cancelled) {
           return;
         }
-        setState({ intentIds: ids, scanned, exhausted, status: 'ready', error: null });
+        setState({ intentIds: ids, scanned, oldestAt, exhausted, status: 'ready', error: null });
       } catch (cause) {
         if (cancelled || controller.signal.aborted) {
           return;
@@ -120,4 +143,18 @@ export function useRiskDecisionScan(maxIntents: number): RiskDecisionScan {
   const refresh = useCallback(() => setTick((value) => value + 1), []);
 
   return { ...state, refresh };
+}
+
+/** Human description of the journal window a scan actually covered. */
+export function scanWindowText(scan: RiskDecisionScan, now: number): string {
+  if (scan.status !== 'ready') {
+    return '';
+  }
+  if (scan.oldestAt === null) {
+    return 'the journal is empty';
+  }
+  const startedAt = Date.parse(scan.oldestAt);
+  const minutes = Number.isFinite(startedAt) ? Math.max(0, Math.round((now - startedAt) / 60_000)) : null;
+  const span = minutes === null ? 'the most recent events' : minutes >= 60 ? `the last ${Math.round(minutes / 6) / 10} h` : `the last ${minutes} min`;
+  return `${span} of the journal (${scan.scanned} events${scan.exhausted ? ', journal start reached' : ''})`;
 }

@@ -23,7 +23,7 @@ tests are labelled "intercepted transport, clearly test-only".
 | Command | Result |
 |---|---|
 | `pnpm -r typecheck` | PASS (3 packages) |
-| `pnpm -r test` | PASS — API 42 passed / 4 skipped (real-RPC tests need `RUN_RPC_TESTS=1`), contract 17, web 32 |
+| `pnpm -r test` | PASS — API 42 passed / 4 skipped (real-RPC tests need `RUN_RPC_TESTS=1`), contract 17, web 37 |
 | `pnpm -r build` | PASS — web 389.59 kB JS / 114.56 kB gzip, 12.88 kB CSS / 3.06 kB gzip |
 | `npx playwright test` (apps/web) | 19 passed |
 
@@ -38,7 +38,9 @@ tests are labelled "intercepted transport, clearly test-only".
   `9499950000`, one open position.
 - `/api/v1/journal`: real `strategy.evaluation.recorded` and
   `market.snapshot.persisted` events, plus `risk.decision.recorded` after a
-  PAPER intent was created.
+  PAPER intent was created. That decision (`ee40f216…`, 08:33:50Z, APPROVED,
+  15/15 rules PASS, 0.243290 WETH approved) is rendered on `/risk` with real
+  per-rule observed/threshold values, and summarised on Overview.
 
 Screenshots are the exact frames the Playwright run captured; the header values
 in them match the payloads above at capture time (blocks advance every second,
@@ -54,7 +56,9 @@ so later runs show later blocks).
    `PAPER — no real money`.
 4. Journal lists a real audit event type returned by the API.
 5. Risk page shows either real per-rule evidence or an explicit empty state;
-   it never renders a decision it does not have.
+   it never renders a decision it does not have. In this run it shows the real
+   15-rule APPROVED decision recorded at 08:33:50Z, found 800+ journal events
+   back, with the covered window printed next to it.
 6. Offline/error state keeps prior values labelled and offers retry.
 7. An empty evaluation list renders as Empty, not Error.
 8. A stale snapshot is labelled `Stale` and cannot look healthy.
@@ -93,6 +97,26 @@ per-rule evidence grid (min column width) and a long rule identifier.
   `aria-live` for copy feedback, `prefers-reduced-motion` disables animation.
 - Status is always label + icon + color, never color alone.
 
+## Second live pass (11:43Z) — two defects found and fixed
+
+The first run scanned only 500 journal events for risk decisions. Re-checking
+the live app showed that the decision created at 08:33Z sat 800 events back,
+because the worker writes two events every ten seconds, so `/risk` printed
+"0 in 500 recent events" while a real decision existed. Fixes:
+
+- The scan now walks up to 20 pages (2 000 events, about three hours of worker
+  traffic) and stops as soon as it has the ids it needs. On the live API it
+  reaches the journal start: `1 · the last 3.8 h of the journal (1295 events,
+  journal start reached)`.
+- The covered window is printed in time, not only as a count, so "none found"
+  is never read as "there is none".
+- The rule evidence now prefixes the backend's `reason` with `fails if:` on a
+  PASS rule, because the backend sends the failing condition there and it read
+  like a failure under a green PASS badge.
+
+`apps/web/test/risk-scan.test.ts` covers the journal filter, the id limit, the
+duplicate collapse, and the window wording (5 of the 37 web tests).
+
 ## Contract adoption
 
 `apps/web` imports `@trident/api-contract` schemas and parses every response
@@ -116,3 +140,14 @@ zero.
    only as 320 px reflow.
 3. Gas estimate rendering is exercised with contract-valid fixtures in unit
    tests; the backend does not emit `PaperFill` yet.
+4. **Intent action cannot be completed live today**, for two separate reasons:
+   the response-shape gap above, and because every evaluation in the last 50
+   (`GET /api/v1/candidates?limit=50`) is `HOLD`, which the UI correctly
+   disables with "This evaluation is HOLD; the strategy did not propose a
+   trade." The success path is therefore proven by unit tests against
+   contract-valid payloads, not by a click in the browser.
+5. **Journal scan depth is bounded.** `/api/v1/journal` has no type filter, so
+   finding a decision means paging back through worker events. Beyond roughly
+   three hours of traffic (or the page budget) a decision is no longer
+   reachable from the UI. A `type=` filter on the journal endpoint would remove
+   the limit.

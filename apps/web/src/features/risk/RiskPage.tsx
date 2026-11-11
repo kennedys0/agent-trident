@@ -7,7 +7,7 @@ import { Panel } from '../../components/Panel.js';
 import { StateView, isOfflineError } from '../../components/StateView.js';
 import { SubjectHeader } from '../../components/SubjectHeader.js';
 import { RiskDecisionView } from './RiskDecisionView.js';
-import { useIntentDecision, useRiskDecisionScan } from './useIntentDecision.js';
+import { scanWindowText, useIntentDecision, useRiskDecisionScan } from './useIntentDecision.js';
 
 function RiskDecisionCard({ intentId }: { readonly intentId: string }): ReactNode {
   const decision = useIntentDecision(intentId);
@@ -43,6 +43,7 @@ export function RiskPage(): ReactNode {
   const { health, online } = useStatus();
   const scan = useRiskDecisionScan(5);
   const killSwitch = readFlag(health.meta, 'killSwitchEngaged');
+  const windowText = scanWindowText(scan, Date.now());
 
   return (
     <>
@@ -74,9 +75,7 @@ export function RiskPage(): ReactNode {
           <div className="row">
             <span className="row__label">Decisions found</span>
             <span className="row__value mono">
-              {scan.status === 'loading'
-                ? 'scanning the journal…'
-                : `${scan.intentIds.length} in ${scan.scanned} recent events`}
+              {scan.status === 'loading' ? 'scanning the journal…' : `${scan.intentIds.length} · ${windowText}`}
             </span>
           </div>
         </div>
@@ -107,7 +106,7 @@ export function RiskPage(): ReactNode {
           <StateView
             kind="empty"
             title="No risk decisions in the scanned journal window"
-            text={`No PAPER intent was created in the ${scan.scanned} most recent audit events${scan.exhausted ? ', and the journal starts there' : ''}. Risk evidence appears only after an intent is created from an evaluation.`}
+            text={`No PAPER intent was created in ${windowText}. Risk evidence appears only after an intent is created from an evaluation.`}
             testId="risk-empty"
           />
         ) : (

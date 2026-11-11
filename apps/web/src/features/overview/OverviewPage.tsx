@@ -12,7 +12,7 @@ import { SnapshotBadge } from '../../components/SnapshotBadge.js';
 import { StateView, isOfflineError } from '../../components/StateView.js';
 import { CandidateDecisionView } from '../candidates/CandidateDecisionView.js';
 import { RiskDecisionSummary } from '../risk/RiskDecisionView.js';
-import { useIntentDecision, useRiskDecisionScan } from '../risk/useIntentDecision.js';
+import { scanWindowText, useIntentDecision, useRiskDecisionScan } from '../risk/useIntentDecision.js';
 import { PortfolioView } from '../portfolio/PortfolioView.js';
 
 export function OverviewPage(): ReactNode {
@@ -190,7 +190,7 @@ export function OverviewPage(): ReactNode {
               <StateView
                 kind="empty"
                 title="No risk decision in the scanned window"
-                text={`The risk gate records evidence only when a PAPER intent is created from an evaluation. None was found in the ${riskScan.scanned} most recent audit events.`}
+                text={`The risk gate records evidence only when a PAPER intent is created from an evaluation. None was found in ${scanWindowText(riskScan, now)}.`}
                 testId="risk-empty"
               />
             ) : decision.isLoading ? (

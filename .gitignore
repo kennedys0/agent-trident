@@ -15,4 +15,4 @@ test-results/
 .DS_Store
 
 
-e2e/artifacts/
+apps/web/e2e/artifacts/

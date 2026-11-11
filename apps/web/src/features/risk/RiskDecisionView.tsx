@@ -98,7 +98,10 @@ export function RiskDecisionView({ decision }: { readonly decision: RiskDecision
                 threshold: <strong>{evidence(rule.threshold)}</strong>
               </span>
             </div>
-            {rule.status === 'PASS' && rule.reason === undefined ? null : <p className="meta">{rule.reason}</p>}
+            {/* On a PASS rule the backend's `reason` is the condition that would have failed it. */}
+            {rule.reason === undefined ? null : (
+              <p className="meta">{rule.status === 'PASS' ? `fails if: ${rule.reason}` : rule.reason}</p>
+            )}
           </article>
         ))}
       </div>
