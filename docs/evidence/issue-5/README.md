@@ -140,6 +140,12 @@ refused request.
 - Screenshot: `intent-reorg-manual-review.png`. The `ENTRIES STOPPED` badge is
   visible in the same view, so the reorg halt is shown, not merely implied by
   the refused intent.
+- The manual-review panel is scanned by axe in both themes. Its computed
+  metadata foreground inherits the fixed status-ink token and measures at
+  `6.02:1` against the danger background (WCAG AA requires `4.5:1`).
+- In the refreshed dark-mode evidence, `Refresh` and `All candidates` are
+  enabled secondary controls with computed opacity `1`; disabled controls keep
+  the separate `0.55` treatment.
 
 Unit coverage: `apps/web/test/views.test.tsx` "stops at manual review on a reorg
 409 and never retries" asserts the badge, the reorg copy, the absence of
@@ -226,7 +232,8 @@ truthful".
 20. Route screenshots for candidates, candidate detail, risk, portfolio,
     journal, more.
 21. axe scan of Overview: 0 serious/critical violations.
-22. axe scan of candidate detail, risk, portfolio, journal: 0 serious/critical.
+22. axe scan of candidate detail, risk, portfolio, journal, plus the manual-review
+    panel in light and dark themes: 0 serious/critical.
 23. Keyboard: first Tab focuses the skip link, second Tab focuses `Overview`
     navigation.
 24. No button whose name starts with "Live"; the build states there is no LIVE

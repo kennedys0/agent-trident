@@ -930,13 +930,17 @@ code,
   border: var(--border-width) solid var(--ink);
   border-radius: var(--radius);
   background: var(--wait);
-  color: #121212;
+  color: var(--status-ink);
   font-weight: 600;
   font-size: var(--text-meta);
 }
 
 .banner--danger {
   background: var(--danger);
+}
+
+.banner--danger .meta {
+  color: var(--status-ink);
 }
 
 .banner--info {

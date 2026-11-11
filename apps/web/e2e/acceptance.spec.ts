@@ -21,6 +21,27 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   }, theme);
 }
 
+async function contrastRatio(page: Page, foreground: string, background: string): Promise<number> {
+  return page.evaluate(
+    ({ foregroundColor, backgroundColor }) => {
+      const luminance = (color: string): number => {
+        const channels = color.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+        if (channels === undefined || channels.length !== 3) throw new Error(`Unsupported CSS color: ${color}`);
+        return channels.reduce((sum, channel, index) => {
+          const normalized = channel / 255;
+          const linear = normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+          return sum + linear * ([0.2126, 0.7152, 0.0722][index] ?? 0);
+        }, 0);
+      };
+      const foregroundLuminance = luminance(foregroundColor);
+      const backgroundLuminance = luminance(backgroundColor);
+      return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+        (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+    },
+    { foregroundColor: foreground, backgroundColor: background },
+  );
+}
+
 test.describe('real backend', () => {
   test('overview renders live chain data, not placeholders', async ({ page, request }) => {
     const health = await (await request.get('/health')).json();
@@ -301,6 +322,30 @@ test.describe('truthful states (intercepted transport, clearly test-only)', () =
     await expect(page.getByTestId('intent-disabled-reason')).toContainText(/manual review/i);
     // One refusal only: no automatic retry loop.
     expect(intentPosts).toBe(1);
+
+    for (const theme of ['light', 'dark'] as const) {
+      if (theme === 'dark') await page.getByTestId('theme-toggle').click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      const colors = await review.evaluate((element) => {
+        const meta = element.querySelector<HTMLElement>('.meta');
+        if (meta === null) throw new Error('Manual-review metadata is missing');
+        return {
+          foreground: getComputedStyle(meta).color,
+          bannerForeground: getComputedStyle(element).color,
+          background: getComputedStyle(element).backgroundColor,
+        };
+      });
+      expect(colors.foreground).toBe(colors.bannerForeground);
+      expect(await contrastRatio(page, colors.foreground, colors.background)).toBeGreaterThanOrEqual(4.5);
+
+      const axe = await new AxeBuilder({ page })
+        .include('[data-testid="intent-manual-review"]')
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      const serious = axe.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
+      expect(serious, `${theme}: ${JSON.stringify(serious.map((violation) => violation.id))}`).toHaveLength(0);
+    }
+    await page.getByTestId('theme-toggle').click();
     await shot(page, 'intent-reorg-manual-review');
   });
 
@@ -483,6 +528,15 @@ test.describe('responsive and accessibility evidence', () => {
     await expect(page.locator('.brand-mark__img:visible')).toHaveAttribute('src', '/brand/logo-white-transparent.png');
     await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute('content', '#18181b');
     await expect(page.locator('.brand-mark__img:visible')).toHaveCount(1);
+
+    const secondaryButtons = [
+      page.getByRole('button', { name: 'Refresh' }).first(),
+      page.getByRole('link', { name: 'All candidates' }).first(),
+    ];
+    for (const button of secondaryButtons) {
+      await expect(button).toBeEnabled();
+      await expect(button).toHaveCSS('opacity', '1');
+    }
     await shot(page, 'brand-sidebar-1280-dark', false);
 
     // Favicon and social card are wired to shipped files that actually resolve.
