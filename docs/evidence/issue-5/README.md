@@ -1,8 +1,10 @@
 # Issue #5 — PAPER operational UI: evidence
 
-Run date: 2026-11-11 (UTC). Branch `feat/issue-5-operational-ui`, base
-`feat/issue-2-paper-backend` at `7f8c0c2`, plus the contract amendment
-`0fb7be6` from PR #7 (cherry-picked as file content, not history).
+Run date: 2026-11-11 (UTC). Branch `feat/issue-5-operational-ui`, rebased onto
+`feat/issue-2-paper-backend` at `53ed588`, which is itself stacked on the
+contract amendment `0fb7be6` from PR #7. The contract package is a real
+dependency here, not a copy: `53ed588` contains `packages/api-contract` at
+`0fb7be6`, so the UI and the API are validated against the same schemas.
 
 Everything below was produced on this machine against a real backend process
 and the real Robinhood Chain mainnet RPC. Nothing in `apps/web` fakes market
@@ -14,39 +16,91 @@ tests are labelled "intercepted transport, clearly test-only".
 - Node 24.22.2, pnpm 9.12.3, Playwright 1.65 (chromium headless shell).
 - API: `node apps/api/dist/server.js` with `EXECUTION_MODE=PAPER`,
   `RPC_URL=https://rpc.mainnet.chain.robinhood.com`, `EXPECTED_CHAIN_ID=4663`,
-  `DATABASE_PATH=/tmp/opencode/trident-web/data/trident.sqlite`, port 8099.
+  `PORT=8099`. The database path changed per phase (below).
 - Web: `pnpm --filter @trident/web build` then `pnpm preview` on
   `127.0.0.1:4173`, proxying `/api` and `/health` to the API on 8099.
 
-## Gates
+## Gates (at the rebased tree)
 
 | Command | Result |
 |---|---|
 | `pnpm -r typecheck` | PASS (3 packages) |
-| `pnpm -r test` | PASS — API 42 passed / 4 skipped (real-RPC tests need `RUN_RPC_TESTS=1`), contract 17, web 37 |
-| `pnpm -r build` | PASS — web 389.59 kB JS / 114.56 kB gzip, 12.88 kB CSS / 3.06 kB gzip |
-| `npx playwright test` (apps/web) | 19 passed |
+| `pnpm -r test` | PASS — contract 17, API 44 passed / 4 skipped (real-RPC tests need `RUN_RPC_TESTS=1`), web 38 |
+| `pnpm -r build` | PASS — web 390.77 kB JS / 114.99 kB gzip, 13.24 kB CSS / 3.14 kB gzip |
+| `npx playwright test` (apps/web) | 22 passed |
 
-## Live API data observed at 09:09Z
+## Live intent evidence — three honest phases
 
-- `/health`: `mode PAPER`, `chainId 4663`, `rpcStatus HEALTHY`, head block
-  `111587151`, latency 131 ms, `killSwitchEngaged false`.
-- `/api/v1/markets/weth-usdg/snapshot`: status `COMPLETE`, block `111587085`,
-  hash `0x80527fb6…177a7`, source `uniswap-v3-pool+quoter`, price
-  `2058811445504168297707` at scale `18`, `sourceTime` from the block.
-- `/api/v1/portfolio`: mode `PAPER`, equity `10000838679` (6 decimals), cash
-  `9499950000`, one open position.
-- `/api/v1/journal`: real `strategy.evaluation.recorded` and
-  `market.snapshot.persisted` events, plus `risk.decision.recorded` after a
-  PAPER intent was created. That decision (`ee40f216…`, 08:33:50Z, APPROVED,
-  15/15 rules PASS, 0.243290 WETH approved) is rendered on `/risk` with real
-  per-rule observed/threshold values, and summarised on Overview.
+The market decides which states are reachable, so each phase used its own
+paper database and the UI was driven by a real browser click. The raw SQLite
+files and logs are in `/tmp/opencode/trident-web/` on the run machine.
 
-Screenshots are the exact frames the Playwright run captured; the header values
-in them match the payloads above at capture time (blocks advance every second,
-so later runs show later blocks).
+### 1. Executed (approved) intent — `intent-result-filled.png`
 
-## Browser acceptance (19 tests)
+Fresh paper portfolio (`trident-final.sqlite`, 10 000 USDG opening cash, no
+position), so the strategy proposed `BUY` and the button was enabled.
+
+- Evaluation `871bd48e…` `BUY`, snapshot `COMPLETE`, proposed 0.239034 WETH.
+- Click → confirm → backend `201` with `intent`, `riskDecision`, `order`, `fill`.
+- Rendered: `APPROVED`, intent `FILLED`, order `b1bb7321-baf2-4485-b69f-abdcd096cd85`,
+  fill time `2026-11-11 17:52:15Z`, approved size `0.239009 WETH`, maximum quote
+  cost `500.05 USDG`, filled `0.239009 WETH`, price `2,091.96 USDG/WETH`,
+  fee `0.050000 USDG`, 15/15 rules `PASS`.
+- Fill row shows the fill time, not a second copy of the order id: the contract
+  `PaperFill` has no `id` of its own.
+- Gas: `AVAILABLE`, `91596` units at `20024000` wei/gas = `1834118304000` wei,
+  provenance "QuoterV2 quoteExactInputSingle gasEstimate simulated at block
+  111888863 + baseFeePerGas at block 111888863; priority fee not included".
+  The quote-currency cost row says the backend has no sourced ETH/USDG
+  conversion; it never prints `0`.
+- No `CONTRACT_MISMATCH` in the browser or the console.
+
+### 2. Rejected intent — `intent-result-rejected.png`
+
+Fresh paper portfolio (`trident-reject.sqlite`), kill switch engaged through
+`POST /api/v1/system/halt`.
+
+- Mode badge `ENTRIES STOPPED`, header exposes `Resume new entries`.
+- Click → confirm → backend `200` with `intent`, `riskDecision`, `order: null`,
+  `fill: null`.
+- Rendered: `REJECTED`, intent `REJECTED`, `Order: None — rejected`,
+  `Fill: None — rejected`, reason `R02_kill_switch: Kill switch is engaged; new
+  entries are blocked`, R02 `FAIL`, the other 14 rules still `PASS`, and no gas
+  row at all (there is no fill to describe).
+- No `CONTRACT_MISMATCH`.
+
+### 3. HOLD evaluation — `intent-disabled-hold.png`
+
+The long-running paper portfolio (`trident.sqlite`) currently holds WETH, so the
+strategy reports `HOLD` on every evaluation in the window. All 20 entries from
+`GET /api/v1/candidates?limit=20` were `HOLD`.
+
+- `Create PAPER intent` is disabled and the page states
+  "Disabled: This evaluation is HOLD; the strategy did not propose a trade."
+- The button is not hidden and no result is invented; there is no success state
+  without a backend decision.
+
+### Replay
+
+A replayed execution is proven at unit level (`apps/web/test/views.test.tsx`):
+a `200` body with `meta.replayed: true` renders `REPLAYED — no new fill` plus
+the stored order and fill. It cannot be produced by a browser click because the
+UI mints a new idempotency key per submission — that is the intended behaviour,
+so the replay path is exercised where it belongs, in the client contract tests.
+
+## Live API data observed during this run
+
+- `/health`: `mode PAPER`, `chainId 4663`, `rpcStatus HEALTHY`, head blocks
+  between `111888302` and `111893128`, latency 92–562 ms.
+- `/api/v1/markets/weth-usdg/snapshot`: status `COMPLETE`, price around
+  `2090–2092 USDG/WETH`, `sourceTime` from the pinned block, block hash and
+  `block:` shown on the candidate page from the same payload.
+- `/api/v1/portfolio`: mode `PAPER`, real equity, one open WETH position in the
+  long-running database, none in the fresh ones.
+- `/api/v1/journal`: real `strategy.evaluation.recorded`,
+  `market.snapshot.persisted`, `risk.decision.recorded` and ledger events.
+
+## Browser acceptance (22 tests)
 
 1. Overview renders the head block, the pinned snapshot block, the latest
    action, and the strategy id from the same HTTP responses it consumed.
@@ -55,22 +109,25 @@ so later runs show later blocks).
 3. Portfolio is labelled `SIMULATED`, shows a real equity value, and states
    `PAPER — no real money`.
 4. Journal lists a real audit event type returned by the API.
-5. Risk page shows either real per-rule evidence or an explicit empty state;
-   it never renders a decision it does not have. In this run it shows the real
-   15-rule APPROVED decision recorded at 08:33:50Z, found 800+ journal events
-   back, with the covered window printed next to it.
-6. Offline/error state keeps prior values labelled and offers retry.
-7. An empty evaluation list renders as Empty, not Error.
-8. A stale snapshot is labelled `Stale` and cannot look healthy.
-9. Loading is announced with `aria-busy` and shows no invented numbers.
-10–14. Overview at 320, 375, 768, 1024, 1280 px, light and dark.
-15. Route screenshots for candidates, candidate detail, risk, portfolio,
+5. **Intent action follows the live evaluation** — disabled with the exact
+   reason when the evaluation is not tradable, otherwise a real click that ends
+   `FILLED` or `REJECTED` with explicit order/fill and no contract mismatch.
+   This is the test that produced the three screenshots above.
+6. Risk page shows either real per-rule evidence or an explicit empty state.
+7. Offline/error state keeps prior values labelled and offers retry.
+8. An empty evaluation list renders as Empty, not Error.
+9. A stale snapshot is labelled `Stale` and cannot look healthy.
+10. Loading is announced with `aria-busy` and shows no invented numbers.
+11–15. Overview at 320, 375, 768, 1024, 1280 px, light and dark.
+16. Official brand mark follows the theme, with favicon and social metadata.
+17. Brand mark leads the top bar at 320 px with zero overflow.
+18. Route screenshots for candidates, candidate detail, risk, portfolio,
     journal, more.
-16. axe scan of Overview: 0 serious/critical violations.
-17. axe scan of candidate detail, risk, portfolio, journal: 0 serious/critical.
-18. Keyboard: first Tab focuses the skip link, second Tab focuses `Overview`
+19. axe scan of Overview: 0 serious/critical violations.
+20. axe scan of candidate detail, risk, portfolio, journal: 0 serious/critical.
+21. Keyboard: first Tab focuses the skip link, second Tab focuses `Overview`
     navigation.
-19. No button whose name starts with "Live"; the build states there is no LIVE
+22. No button whose name starts with "Live"; the build states there is no LIVE
     control.
 
 ## Viewports
@@ -84,8 +141,7 @@ so later runs show later blocks).
 | 1280 | 0 px | 240 px sidebar |
 
 Measured with `document.documentElement.scrollWidth - window.innerWidth` in
-both themes. Two real overflows were found and fixed during this run: the
-per-rule evidence grid (min column width) and a long rule identifier.
+both themes.
 
 ## Accessibility
 
@@ -95,59 +151,81 @@ per-rule evidence grid (min column width) and a long rule identifier.
   visible `:focus-visible` ring (3 px `--focus`), 48 px targets on coarse
   pointers, `aria-current="page"` navigation, `role="alert"` for errors,
   `aria-live` for copy feedback, `prefers-reduced-motion` disables animation.
-- Status is always label + icon + color, never color alone.
+- Status is always label + icon + color, never color alone. Gas `UNAVAILABLE`
+  is a labelled badge with the backend's reason, not a zero.
 
-## Second live pass (11:43Z) — two defects found and fixed
+## Brand assets
 
-The first run scanned only 500 journal events for risk decisions. Re-checking
-the live app showed that the decision created at 08:33Z sat 800 events back,
-because the worker writes two events every ten seconds, so `/risk` printed
-"0 in 500 recent events" while a real decision existed. Fixes:
+Source: `Trident.zip` (SHA-256 `ba3b37f5…94ca06`, 8 entries). Extraction was
+done in Python with an explicit path allow-list, so no entry could escape the
+target directory; every shipped file was then re-hashed against the archive.
 
-- The scan now walks up to 20 pages (2 000 events, about three hours of worker
-  traffic) and stops as soon as it has the ids it needs. On the live API it
-  reaches the journal start: `1 · the last 3.8 h of the journal (1295 events,
-  journal start reached)`.
-- The covered window is printed in time, not only as a count, so "none found"
-  is never read as "there is none".
-- The rule evidence now prefixes the backend's `reason` with `fails if:` on a
-  PASS rule, because the backend sends the failing condition there and it read
-  like a failure under a green PASS badge.
+Shipped in `apps/web/public`:
 
-`apps/web/test/risk-scan.test.ts` covers the journal filter, the id limit, the
-duplicate collapse, and the window wording (5 of the 37 web tests).
+| File | Role |
+|---|---|
+| `brand/logo-black-transparent.png` | mark on the light canvas |
+| `brand/logo-white-transparent.png` | mark on the dark canvas |
+| `brand/seo-light.png` | Open Graph / Twitter card, 2000×2000, light card |
+| `brand/seo-green.png` | alternate social card on the Robinhood green, shipped for campaigns but not referenced yet |
+| `favicon.ico` | supplied 32×32 icon, linked with `sizes="32x32"` |
+
+The background-baked logo variants are deliberately not shipped: the interface
+supplies its own surfaces, and a baked background would show a rectangle in
+dark mode. `brand/README.md` records provenance and the source-to-destination
+map.
+
+Behaviour (covered by tests 16 and 17):
+
+- The mark sits in a 1:1 box with `object-fit: contain`, so the 1024×1440 ink
+  is never stretched and the layout does not jump between variants.
+- Two `<img>` elements are toggled by `[data-theme]` CSS; the hidden one leaves
+  the layout and the accessibility tree. The wrapper carries
+  `role="img" aria-label="TRIDENT"`, so the mark is announced once.
+- Placement: sidebar brand beside the `PAPER` label at ≥1024 px (`brand-sidebar-1280-light.png`,
+  `brand-sidebar-1280-dark.png`); below 1024 px the sidebar is hidden and the
+  mark leads the top bar (`brand-mobile-320-light.png`, zero overflow at 320 px).
+- `theme-color` follows the active theme, read from the `--canvas` token, so the
+  browser toolbar is retinted without duplicating a hex value.
+- `index.html` carries the icon link, a description, Open Graph and Twitter card
+  metadata with `og:image:alt`.
 
 ## Contract adoption
 
 `apps/web` imports `@trident/api-contract` schemas and parses every response
 with them. A payload that drifts becomes a visible `CONTRACT_MISMATCH` error
 instead of a silently wrong number. The intent action posts only
-`{evaluationId, idempotencyKey}` and reads the amended `IntentExecution`
-(`intent`, `riskDecision`, `order`, `fill`), branching on `fill === null`, and
-renders `gasEstimate` as `AVAILABLE`/`UNAVAILABLE` with provenance — never as
-zero.
+`{evaluationId, idempotencyKey}`; the previous `meta.orderId` / `meta.fillId`
+assumptions are gone. The result view branches on `fill === null` and on
+`riskDecision.verdict`, and renders `gasEstimate` as `AVAILABLE`/`UNAVAILABLE`
+with provenance — never as zero.
 
 ## Known gaps (not fixed here)
 
-1. **Backend response shape.** PR #8 at `7f8c0c2` still returns
-   `{intent, riskDecision}` with `meta.orderId`/`meta.fillId`; the amended
-   contract requires `order` and `fill` in `data`. A live `POST /api/v1/intents`
-   on 2026-11-11T08:33Z returned `status FILLED` and 15/15 PASS but no
-   `order`/`fill` keys. The UI therefore surfaces an explicit contract-mismatch
-   message on that action until PR #8 adopts `0fb7be6`. Read paths, risk
-   evidence, and portfolio are unaffected.
-2. No real-device, Firefox, WebKit, or screen-reader run. 200% zoom is covered
-   only as 320 px reflow.
-3. Gas estimate rendering is exercised with contract-valid fixtures in unit
-   tests; the backend does not emit `PaperFill` yet.
-4. **Intent action cannot be completed live today**, for two separate reasons:
-   the response-shape gap above, and because every evaluation in the last 50
-   (`GET /api/v1/candidates?limit=50`) is `HOLD`, which the UI correctly
-   disables with "This evaluation is HOLD; the strategy did not propose a
-   trade." The success path is therefore proven by unit tests against
-   contract-valid payloads, not by a click in the browser.
-5. **Journal scan depth is bounded.** `/api/v1/journal` has no type filter, so
-   finding a decision means paging back through worker events. Beyond roughly
-   three hours of traffic (or the page budget) a decision is no longer
+1. `GET /api/v1/intents/:id` is still outside the contract (`MIGRATION.md`
+   records this). The web client parses it with a local, narrow schema
+   (`intent` + nullable `riskDecision`), so a future backend change there will
+   not be caught by the shared contract.
+2. **Journal scan depth is bounded.** `/api/v1/journal` has no `type` filter, so
+   finding a risk decision means paging back through worker events. Beyond
+   roughly three hours of traffic (or the page budget) a decision is no longer
    reachable from the UI. A `type=` filter on the journal endpoint would remove
    the limit.
+3. `gasQuoteCost` is absent because there is no sourced ETH/USDG price; the UI
+   states that instead of converting with an invented rate.
+4. Open Graph images use site-relative paths because the deployment origin is
+   still undecided; a crawler needs absolute URLs at deploy time.
+5. No real-device, Firefox, WebKit, or screen-reader run. 200% zoom is covered
+   only as 320 px reflow.
+6. The long-running paper database holds a position, so `BUY` is only reachable
+   on a fresh paper portfolio; the executed-intent evidence above states which
+   database produced it.
+7. **Backend returns 500 when an evaluation already has an intent.** During this
+   run the candidate list still offered an older `BUY` evaluation whose intent
+   existed, so a second click reached `POST /api/v1/intents` and Fastify logged
+   `UNIQUE constraint failed: order_intents.evaluation_id` as an unhandled
+   request error. The UI then shows the backend's message ("Internal error") and
+   claims no success, but a typed `409` (or the stored execution, which the
+   idempotency contract already allows) would be correct. The browser test now
+   clicks the newest evaluation only, which is the one a user can still act on;
+   the gap belongs to `apps/api`.

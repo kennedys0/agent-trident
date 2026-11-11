@@ -91,6 +91,53 @@ test.describe('real backend', () => {
     await expect(page.getByText(firstType).first()).toBeVisible();
   });
 
+  test('the intent action follows the live evaluation: honest when disabled, a real fill when tradable', async ({ page, request }) => {
+    const candidates = await (await request.get('/api/v1/candidates?limit=20')).json();
+    type CandidatePayload = { evaluation: { id: string; action: string; snapshotStatus: string } };
+    const entries = candidates.data as CandidatePayload[];
+    expect(entries.length, 'the API must expose at least one evaluation').toBeGreaterThan(0);
+    // The newest evaluation is what a user sees first, and the only one the backend
+    // can still derive an intent from: older tradable entries may already be consumed.
+    const target = entries[0]!;
+    const tradable =
+      (target.evaluation.action === 'BUY' || target.evaluation.action === 'SELL') && target.evaluation.snapshotStatus === 'COMPLETE';
+
+    await page.goto(`/candidates/${target.evaluation.id}`);
+    await expect(page.getByRole('heading', { name: 'Candidate' })).toBeVisible();
+    await waitForChain(page);
+
+    const action = page.getByTestId('create-intent');
+    if (!tradable) {
+      await expect(action).toBeDisabled();
+      await expect(page.getByTestId('intent-disabled-reason')).toContainText(`This evaluation is ${target.evaluation.action}`);
+      await shot(page, 'intent-disabled-hold');
+      return;
+    }
+
+    await expect(action).toBeEnabled();
+    await action.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByTestId('confirm-dialog-confirm').click();
+
+    await expect(page.getByTestId('intent-result')).toBeVisible({ timeout: 30_000 });
+    // The amended contract must parse without a mismatch and with explicit order/fill.
+    await expect(page.getByTestId('intent-error')).toHaveCount(0);
+    await expect(page.getByTestId('intent-status')).toHaveText(/FILLED|REJECTED/);
+    const status = (await page.getByTestId('intent-status').textContent())?.trim();
+    if (status === 'FILLED') {
+      await expect(page.getByTestId('intent-order')).not.toHaveText('None — rejected');
+      await expect(page.getByTestId('intent-fill')).not.toHaveText('None — rejected');
+      // The fill row shows the fill time, not a second copy of the order id.
+      expect(await page.getByTestId('intent-fill').textContent()).not.toBe(await page.getByTestId('intent-order').textContent());
+      await expect(page.getByTestId('gas-estimate')).toBeVisible();
+      await expect(page.getByTestId('gas-estimate')).not.toContainText(/\b0 wei\b/);
+    } else {
+      await expect(page.getByTestId('intent-order')).toHaveText('None — rejected');
+      await expect(page.getByTestId('gas-estimate')).toHaveCount(0);
+    }
+    await shot(page, `intent-result-${String(status).toLowerCase()}`);
+  });
+
   test('risk page never shows a decision it does not have', async ({ page }) => {
     await page.goto('/risk');
     await expect(page.getByRole('heading', { name: 'Risk' })).toBeVisible();
@@ -206,6 +253,7 @@ test.describe('responsive and accessibility evidence', () => {
     expect(natural).toEqual({ width: 2000, height: 2000 });
     const box = await page.locator('.brand-mark').first().boundingBox();
     expect(box === null ? 0 : Math.abs(box.width - box.height)).toBeLessThanOrEqual(0.5);
+    await shot(page, 'brand-sidebar-1280-light', false);
 
     // Dark canvas swaps in the white variant and retints the browser toolbar.
     await page.getByTestId('theme-toggle').click();
@@ -213,6 +261,7 @@ test.describe('responsive and accessibility evidence', () => {
     await expect(page.locator('.brand-mark__img:visible')).toHaveAttribute('src', '/brand/logo-white-transparent.png');
     await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute('content', '#18181b');
     await expect(page.locator('.brand-mark__img:visible')).toHaveCount(1);
+    await shot(page, 'brand-sidebar-1280-dark', false);
 
     // Favicon and social card are wired to shipped files that actually resolve.
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.ico');
