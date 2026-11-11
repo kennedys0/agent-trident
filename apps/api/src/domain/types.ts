@@ -1,3 +1,5 @@
+import type { Evaluation as ContractEvaluation } from '@trident/api-contract';
+
 export type AssetId = 'WETH' | 'USDG';
 
 export type AssetIdentity = {
@@ -13,7 +15,7 @@ export type Venue = {
   readonly factory: `0x${string}`;
   readonly quoterV2: `0x${string}`;
   readonly swapRouter02: `0x${string}`;
-  readonly provenance: string;
+  readonly provenance: readonly string[];
 };
 
 export type PoolIdentity = {
@@ -25,9 +27,13 @@ export type PoolIdentity = {
   readonly tickSpacing: number;
 };
 
-export type SnapshotStatus = 'COMPLETE' | 'INCOMPLETE' | 'STALE';
-
-export type MarketSnapshot = {
+/**
+ * Engine-side observation. It is deliberately richer than the wire contract:
+ * `sqrtPriceX96` and `tick` are provenance evidence and the reason the price can
+ * be recomputed, so they stay in storage even though the contract payload does
+ * not carry them.
+ */
+export type PoolSnapshot = {
   readonly id: string;
   readonly poolId: `0x${string}`;
   readonly chainId: 4663;
@@ -48,7 +54,10 @@ export type MarketSnapshot = {
   readonly observedAt: string;
 };
 
-export type StrategyAction = 'BUY' | 'SELL' | 'HOLD' | 'WAIT' | 'AVOID';
+/** The action vocabulary is owned by the contract, not re-declared here. */
+export type StrategyAction = ContractEvaluation['action'];
+
+export type SnapshotStatus = 'COMPLETE' | 'INCOMPLETE' | 'STALE';
 
 export type StrategyConfig = {
   readonly strategyId: 'weth-usdg-momentum-v1';
@@ -62,10 +71,10 @@ export type StrategyConfig = {
   readonly stopLossBps: number;
 };
 
-export type Evaluation = {
+export type EvaluationRecord = {
   readonly id: string;
   readonly snapshotId: string;
-  readonly strategyId: StrategyConfig['strategyId'];
+  readonly strategyId: string;
   readonly configVersion: number;
   readonly inputHash: string;
   readonly action: StrategyAction;
@@ -87,7 +96,11 @@ export type RiskRule = {
 
 export type RiskVerdict = 'APPROVED' | 'REJECTED';
 
-export type RiskDecision = {
+/**
+ * Engine-side verdict. `rules` is the audit evidence the risk gate produces;
+ * the wire contract carries the same facts folded into `reasons`.
+ */
+export type RiskOutcome = {
   readonly verdict: RiskVerdict;
   readonly policyVersion: string;
   readonly rules: readonly RiskRule[];
@@ -95,13 +108,15 @@ export type RiskDecision = {
   readonly approvedAmountOut: string | null;
 };
 
-export type PortfolioView = {
+export type IntentSide = 'BUY' | 'SELL';
+
+/** Engine-side portfolio projection; the wire form is the contract `Portfolio`. */
+export type PortfolioState = {
   readonly cashUsdg: string;
   readonly positions: readonly { assetId: AssetId; quantity: string }[];
   readonly realizedPnlUsdg: string;
   readonly unrealizedPnlUsdg: string | null;
+  readonly costBasisUsdg: string;
   readonly portfolioVersion: string;
   readonly asOf: string;
 };
-
-export type IntentSide = 'BUY' | 'SELL';

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PRICE_SCALE, spotPriceScaled } from './price.js';
-import type { MarketSnapshot, PoolIdentity, SnapshotStatus } from './types.js';
+import type { PoolSnapshot, PoolIdentity, SnapshotStatus } from './types.js';
 
 export type SnapshotInput = {
   readonly pool: PoolIdentity;
@@ -22,7 +22,7 @@ export type SnapshotInput = {
  * `observedAt` is when this process read it; both are kept so staleness is a
  * derived fact rather than an assumption.
  */
-export function buildSnapshot(input: SnapshotInput, id: string = randomUUID()): MarketSnapshot {
+export function buildSnapshot(input: SnapshotInput, id: string = randomUUID()): PoolSnapshot {
   const quoteIsToken1 = input.pool.token1.id === 'USDG';
   const baseDecimals = quoteIsToken1 ? input.pool.token0.decimals : input.pool.token1.decimals;
   const quoteDecimals = quoteIsToken1 ? input.pool.token1.decimals : input.pool.token0.decimals;
@@ -59,12 +59,12 @@ export function buildSnapshot(input: SnapshotInput, id: string = randomUUID()): 
 }
 
 /** Freshness is recomputed at read time; a stored COMPLETE row can become STALE. */
-export function effectiveStatus(snapshot: MarketSnapshot, now: Date, freshnessSeconds: number): SnapshotStatus {
+export function effectiveStatus(snapshot: PoolSnapshot, now: Date, freshnessSeconds: number): SnapshotStatus {
   if (snapshot.status === 'INCOMPLETE') return 'INCOMPLETE';
   const ageSeconds = (now.getTime() - new Date(snapshot.observedAt).getTime()) / 1000;
   return ageSeconds > freshnessSeconds ? 'STALE' : snapshot.status;
 }
 
-export function ageSeconds(snapshot: MarketSnapshot, now: Date): number {
+export function ageSeconds(snapshot: PoolSnapshot, now: Date): number {
   return Math.max(0, Math.floor((now.getTime() - new Date(snapshot.observedAt).getTime()) / 1000));
 }

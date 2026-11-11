@@ -4,12 +4,12 @@ import { appendAudit, getPortfolio, getPosition, insertEvaluation, insertSnapsho
 import { buildSnapshot } from '../domain/snapshot.js';
 import { averageCostScaled } from '../domain/price.js';
 import { evaluateStrategy } from '../domain/strategy.js';
-import type { Evaluation, MarketSnapshot, PoolIdentity, StrategyConfig } from '../domain/types.js';
+import type { EvaluationRecord, PoolSnapshot, PoolIdentity, StrategyConfig } from '../domain/types.js';
 import type { ChainClient } from '../chain/client.js';
 
 export type MarketService = {
-  takeSnapshot(observedAt?: Date): Promise<MarketSnapshot>;
-  evaluate(snapshot: MarketSnapshot): Evaluation;
+  takeSnapshot(observedAt?: Date): Promise<PoolSnapshot>;
+  evaluate(snapshot: PoolSnapshot): EvaluationRecord;
 };
 
 export function createMarketService(input: {

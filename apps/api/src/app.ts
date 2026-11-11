@@ -9,6 +9,7 @@ import {
   getLatestSnapshot,
   getPortfolio,
   getRiskDecisionByIntent,
+  getSnapshotById,
   isKillSwitchEngaged,
   KILL_SWITCH_KEY,
   listEvaluations,
@@ -22,6 +23,7 @@ import type { MarketService } from './services/market.js';
 import { createIntentFromEvaluation, executeIntent } from './services/execution.js';
 import type { QuotePort } from './services/ports.js';
 import { USDG, VERIFIED_FEE, VERIFIED_VENUE, WETH } from './chain/venue.js';
+import { toCandidate, toHealth, toJournal, toPortfolio, toSnapshot, toVenue } from './api/contract.js';
 
 export type HealthProbe = () => Promise<{ chainId: number; headBlock: number; latencyMs: number }>;
 
@@ -92,31 +94,25 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     try {
       const probe = await deps.probe();
       const chainIdOk = probe.chainId === 4663;
-      const body = {
-        data: {
-          mode: deps.config.mode,
-          chainId: probe.chainId,
+      const data = toHealth({
+        mode: deps.config.mode,
+        chainId: probe.chainId,
+        headBlock: probe.headBlock,
+        lagSeconds: null,
+      });
+      return reply.status(chainIdOk ? 200 : 503).send({
+        data,
+        meta: meta(requestId, {
           expectedChainId: 4663,
           chainOk: chainIdOk,
-          headBlock: probe.headBlock,
           rpcLatencyMs: probe.latencyMs,
           killSwitchEngaged: isKillSwitchEngaged(deps.db),
-        },
-        meta: meta(requestId),
-      };
-      return reply.status(chainIdOk ? 200 : 503).send(body);
+        }),
+      });
     } catch {
       return reply.status(503).send({
-        data: {
-          mode: deps.config.mode,
-          chainId: null,
-          expectedChainId: 4663,
-          chainOk: false,
-          headBlock: null,
-          rpcLatencyMs: null,
-          killSwitchEngaged: isKillSwitchEngaged(deps.db),
-        },
-        meta: meta(requestId),
+        data: toHealth({ mode: deps.config.mode, chainId: null, headBlock: null, lagSeconds: null }),
+        meta: meta(requestId, { expectedChainId: 4663, chainOk: false, rpcLatencyMs: null, killSwitchEngaged: isKillSwitchEngaged(deps.db) }),
       });
     }
   });
@@ -124,27 +120,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.get('/api/v1/venues', async (request, reply) => {
     const requestId = requestIdOf(request);
     return reply.send({
-      data: {
-        venues: [
-          {
-            venueId: VERIFIED_VENUE.id,
-            chainId: 4663,
-            factory: VERIFIED_VENUE.factory,
-            quoterV2: VERIFIED_VENUE.quoterV2,
-            swapRouter02: VERIFIED_VENUE.swapRouter02,
-            provenance: VERIFIED_VENUE.provenance,
-            assets: [WETH, USDG],
-            pool: {
-              id: deps.pool.id,
-              fee: deps.pool.fee,
-              tickSpacing: deps.pool.tickSpacing,
-              token0: deps.pool.token0.id,
-              token1: deps.pool.token1.id,
-            },
-          },
-        ],
-      },
-      meta: meta(requestId),
+      data: { venues: [toVenue(VERIFIED_VENUE, deps.pool)] },
+      meta: meta(requestId, {
+        venueId: VERIFIED_VENUE.id,
+        quoterV2: VERIFIED_VENUE.quoterV2,
+        swapRouter02: VERIFIED_VENUE.swapRouter02,
+        tickSpacing: deps.pool.tickSpacing,
+        assets: [WETH, USDG],
+      }),
     });
   });
 
@@ -153,14 +136,29 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const stored = getLatestSnapshot(deps.db, deps.pool.id);
     if (!stored) throw new AppError('NOT_FOUND', 'No market snapshot has been recorded yet');
     const status = effectiveStatus(stored, new Date(), deps.strategyConfig.maxStalenessSeconds);
-    return reply.send({ data: { ...stored, status }, meta: meta(requestId) });
+    return reply.send({
+      data: toSnapshot(stored, deps.pool, status),
+      meta: meta(requestId, {
+        snapshotId: stored.id,
+        priceScaled: stored.priceScaled,
+        priceScale: stored.priceScale,
+        sqrtPriceX96: stored.sqrtPriceX96,
+        tick: stored.tick,
+        poolLiquidity: stored.liquidity,
+        status,
+      }),
+    });
   });
 
   app.get('/api/v1/candidates', async (request, reply) => {
     const requestId = requestIdOf(request);
     const limit = Math.min(50, Math.max(1, Number((request.query as { limit?: string }).limit ?? 20)));
+    const candidates = listEvaluations(deps.db, limit).flatMap((evaluation) => {
+      const snapshot = getSnapshotById(deps.db, evaluation.snapshotId);
+      return snapshot === null ? [] : [toCandidate(evaluation, snapshot, deps.pool)];
+    });
     return reply.send({
-      data: listEvaluations(deps.db, limit),
+      data: { candidates },
       meta: meta(requestId, { strategyId: deps.strategyConfig.strategyId, configVersion: deps.strategyConfig.version }),
     });
   });
@@ -169,7 +167,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const requestId = requestIdOf(request);
     const body = intentBodySchema.parse(request.body);
     const evaluation = getEvaluation(deps.db, body.evaluationId);
-    if (!evaluation) throw new AppError('NOT_FOUND', 'Evaluation not found');
+    if (!evaluation) throw new AppError('NOT_FOUND', 'EvaluationRecord not found');
 
     const intent = createIntentFromEvaluation(deps.db, {
       evaluation,
@@ -213,10 +211,22 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const requestId = requestIdOf(request);
     const stored = getLatestSnapshot(deps.db, deps.pool.id);
     const status = stored ? effectiveStatus(stored, new Date(), deps.strategyConfig.maxStalenessSeconds) : 'UNAVAILABLE';
-    const portfolio = getPortfolio(deps.db, stored ? stored.priceScaled : null, stored ? stored.priceScale : 18);
+    const state = getPortfolio(deps.db, stored ? stored.priceScaled : null, stored ? stored.priceScale : 18);
+    const { portfolio, unpricedPosition } = toPortfolio(state, {
+      pool: deps.pool,
+      snapshotId: stored ? stored.id : null,
+      priceScaled: stored ? stored.priceScaled : null,
+      priceScale: stored ? stored.priceScale : 18,
+    });
     return reply.send({
-      data: { ...portfolio, mode: 'PAPER', simulated: true, priceStatus: status, priceAsOf: stored?.sourceTime ?? null },
-      meta: meta(requestId),
+      data: portfolio,
+      meta: meta(requestId, {
+        simulated: true,
+        priceStatus: status,
+        priceAsOf: stored?.sourceTime ?? null,
+        unpricedPosition,
+        portfolioVersion: state.portfolioVersion,
+      }),
     });
   });
 
@@ -226,7 +236,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const limit = Math.min(200, Math.max(1, Number(query.limit ?? 50)));
     const before = query.before === undefined ? undefined : Number(query.before);
     const rows = listJournal(deps.db, limit, Number.isFinite(before) ? before : undefined);
-    return reply.send({ data: rows, meta: meta(requestId) });
+    return reply.send({ data: toJournal(rows, limit), meta: meta(requestId) });
   });
 
   app.post('/api/v1/system/halt', async (request, reply) => {

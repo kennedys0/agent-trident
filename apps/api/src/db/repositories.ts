@@ -3,18 +3,18 @@ import { nowIso, type Db } from './index.js';
 import { quoteValueOf } from '../domain/price.js';
 import type {
   AssetIdentity,
-  Evaluation,
-  MarketSnapshot,
+  EvaluationRecord,
+  PoolSnapshot,
   PoolIdentity,
-  PortfolioView,
-  RiskDecision,
+  PortfolioState,
+  RiskOutcome,
   StrategyConfig,
   Venue,
 } from '../domain/types.js';
 
 type Row = Record<string, unknown>;
 
-function mapSnapshot(row: Row): MarketSnapshot {
+function mapSnapshot(row: Row): PoolSnapshot {
   return {
     id: row['id'] as string,
     poolId: row['pool_id'] as `0x${string}`,
@@ -28,21 +28,21 @@ function mapSnapshot(row: Row): MarketSnapshot {
     reserve1: row['reserve1'] as string,
     priceScaled: row['price_scaled'] as string,
     priceScale: Number(row['price_scale']),
-    source: row['source'] as MarketSnapshot['source'],
-    status: row['status'] as MarketSnapshot['status'],
+    source: row['source'] as PoolSnapshot['source'],
+    status: row['status'] as PoolSnapshot['status'],
     sourceTime: row['source_time'] as string,
     observedAt: row['observed_at'] as string,
   };
 }
 
-function mapEvaluation(row: Row): Evaluation {
+function mapEvaluation(row: Row): EvaluationRecord {
   return {
     id: row['id'] as string,
     snapshotId: row['snapshot_id'] as string,
-    strategyId: row['strategy_id'] as Evaluation['strategyId'],
+    strategyId: row['strategy_id'] as EvaluationRecord['strategyId'],
     configVersion: Number(row['config_version']),
     inputHash: row['input_hash'] as string,
-    action: row['action'] as Evaluation['action'],
+    action: row['action'] as EvaluationRecord['action'],
     signalStrength: Number(row['signal_strength']),
     proposedAmountIn: (row['proposed_amount_in'] as string | null) ?? null,
     invalidation: row['invalidation'] as string,
@@ -64,7 +64,7 @@ export function seedReferenceData(
   }
   db.prepare(
     'INSERT INTO venues (id, chain_id, name, factory_address, quoter_address, router_address, provenance, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET factory_address = excluded.factory_address, quoter_address = excluded.quoter_address, router_address = excluded.router_address',
-  ).run(input.venue.id, input.venue.chainId, 'Uniswap v3', input.venue.factory, input.venue.quoterV2, input.venue.swapRouter02, input.venue.provenance, at);
+  ).run(input.venue.id, input.venue.chainId, 'Uniswap v3', input.venue.factory, input.venue.quoterV2, input.venue.swapRouter02, JSON.stringify(input.venue.provenance), at);
   db.prepare(
     'INSERT INTO pools (id, venue_id, token0_id, token1_id, fee, tick_spacing, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING',
   ).run(input.pool.id, input.pool.venueId, input.pool.token0.id, input.pool.token1.id, input.pool.fee, input.pool.tickSpacing, at);
@@ -118,7 +118,7 @@ export function postLedgerEntries(db: Db, entries: readonly LedgerEntryInput[]):
   }
 }
 
-export function insertSnapshot(db: Db, snapshot: MarketSnapshot): MarketSnapshot {
+export function insertSnapshot(db: Db, snapshot: PoolSnapshot): PoolSnapshot {
   db.prepare(
     `INSERT INTO market_snapshots (id, pool_id, chain_id, block_number, block_hash, sqrt_price_x96, tick, liquidity, reserve0, reserve1, price_scaled, price_scale, source, status, source_time, observed_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -147,19 +147,19 @@ export function insertSnapshot(db: Db, snapshot: MarketSnapshot): MarketSnapshot
   return stored;
 }
 
-export function getSnapshotByBlock(db: Db, poolId: string, blockNumber: number): MarketSnapshot | null {
+export function getSnapshotByBlock(db: Db, poolId: string, blockNumber: number): PoolSnapshot | null {
   const row = db
     .prepare('SELECT * FROM market_snapshots WHERE pool_id = ? AND block_number = ?')
     .get(poolId, blockNumber) as Row | undefined;
   return row ? mapSnapshot(row) : null;
 }
 
-export function getSnapshotById(db: Db, id: string): MarketSnapshot | null {
+export function getSnapshotById(db: Db, id: string): PoolSnapshot | null {
   const row = db.prepare('SELECT * FROM market_snapshots WHERE id = ?').get(id) as Row | undefined;
   return row ? mapSnapshot(row) : null;
 }
 
-export function getLatestSnapshot(db: Db, poolId: string): MarketSnapshot | null {
+export function getLatestSnapshot(db: Db, poolId: string): PoolSnapshot | null {
   const row = db
     .prepare('SELECT * FROM market_snapshots WHERE pool_id = ? ORDER BY block_number DESC LIMIT 1')
     .get(poolId) as Row | undefined;
@@ -168,8 +168,8 @@ export function getLatestSnapshot(db: Db, poolId: string): MarketSnapshot | null
 
 export function insertEvaluation(
   db: Db,
-  evaluation: Omit<Evaluation, 'id' | 'createdAt'>,
-): Evaluation {
+  evaluation: Omit<EvaluationRecord, 'id' | 'createdAt'>,
+): EvaluationRecord {
   db.prepare(
     `INSERT INTO strategy_evaluations (id, snapshot_id, strategy_id, config_version, input_hash, action, signal_strength, proposed_amount_in, invalidation, reasons_json, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -193,12 +193,12 @@ export function insertEvaluation(
   return mapEvaluation(row);
 }
 
-export function listEvaluations(db: Db, limit = 20): Evaluation[] {
+export function listEvaluations(db: Db, limit = 20): EvaluationRecord[] {
   const rows = db.prepare('SELECT * FROM strategy_evaluations ORDER BY created_at DESC LIMIT ?').all(limit) as Row[];
   return rows.map(mapEvaluation);
 }
 
-export function getEvaluation(db: Db, id: string): Evaluation | null {
+export function getEvaluation(db: Db, id: string): EvaluationRecord | null {
   const row = db.prepare('SELECT * FROM strategy_evaluations WHERE id = ?').get(id) as Row | undefined;
   return row ? mapEvaluation(row) : null;
 }
@@ -276,7 +276,7 @@ export function setIntentStatus(db: Db, id: string, status: IntentRecord['status
 
 export function insertRiskDecision(
   db: Db,
-  input: { intentId: string; decision: RiskDecision; portfolioVersion: string },
+  input: { intentId: string; decision: RiskOutcome; portfolioVersion: string },
 ): string {
   const id = randomUUID();
   db.prepare(
@@ -297,14 +297,14 @@ export function insertRiskDecision(
   return row['id'] as string;
 }
 
-export function getRiskDecisionByIntent(db: Db, intentId: string): (RiskDecision & { id: string }) | null {
+export function getRiskDecisionByIntent(db: Db, intentId: string): (RiskOutcome & { id: string }) | null {
   const row = db.prepare('SELECT * FROM risk_decisions WHERE intent_id = ?').get(intentId) as Row | undefined;
   if (!row) return null;
   return {
     id: row['id'] as string,
-    verdict: row['verdict'] as RiskDecision['verdict'],
+    verdict: row['verdict'] as RiskOutcome['verdict'],
     policyVersion: row['policy_version'] as string,
-    rules: JSON.parse(row['rules_json'] as string) as RiskDecision['rules'],
+    rules: JSON.parse(row['rules_json'] as string) as RiskOutcome['rules'],
     approvedAmountIn: (row['approved_amount_in'] as string | null) ?? null,
     approvedAmountOut: (row['approved_amount_out'] as string | null) ?? null,
   };
@@ -372,7 +372,7 @@ export function getPortfolio(
   priceScale: number,
   baseDecimals = 18,
   quoteDecimals = 6,
-): PortfolioView {
+): PortfolioState {
   const cashRow = db
     .prepare("SELECT COALESCE(SUM(CASE WHEN direction = 'DEBIT' THEN CAST(amount AS INTEGER) ELSE -CAST(amount AS INTEGER) END), 0) AS cash FROM ledger_entries WHERE account = 'CASH' AND asset_id = 'USDG'")
     .get() as Row;
@@ -397,6 +397,7 @@ export function getPortfolio(
     positions: quantity > 0n ? [{ assetId: 'WETH', quantity: quantity.toString() }] : [],
     realizedPnlUsdg: String(realizedRow['realized']),
     unrealizedPnlUsdg: unrealized,
+    costBasisUsdg: costBasis.toString(),
     portfolioVersion: `ledger:${countLedgerEntries(db)}`,
     asOf: nowIso(),
   };

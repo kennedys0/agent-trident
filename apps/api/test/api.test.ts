@@ -6,6 +6,14 @@ import { insertSnapshot } from '../src/db/repositories.js';
 import { DEFAULT_STRATEGY_CONFIG } from '../src/domain/strategy.js';
 import { createFakeQuotePort, makeDb, makeSnapshot, seedEvaluation, TEST_POOL } from './helpers.js';
 import type { MarketService } from '../src/services/market.js';
+import {
+  candidateSchema,
+  healthSchema,
+  journalPageSchema,
+  marketSnapshotSchema,
+  portfolioSchema,
+  venueSchema,
+} from '@trident/api-contract';
 
 const config: Config = {
   mode: 'PAPER',
@@ -55,14 +63,18 @@ describe('HTTP API', () => {
     const body = response.json();
     expect(body.data.chainId).toBe(4663);
     expect(body.data.mode).toBe('PAPER');
+    expect(body.data.rpcStatus).toBe('HEALTHY');
     expect(body.meta.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    // The payload is the ratified contract, not a lookalike.
+    expect(() => healthSchema.parse(body.data)).not.toThrow();
   });
 
   it('returns 503 when the chain probe reports the wrong chain id', async () => {
     const server = makeApp({ probe: async () => ({ chainId: 46630, headBlock: 1, latencyMs: 5 }) });
     const response = await server.inject({ method: 'GET', url: '/health' });
     expect(response.statusCode).toBe(503);
-    expect(response.json().data.chainOk).toBe(false);
+    expect(response.json().data.rpcStatus).toBe('DEGRADED');
+    expect(response.json().meta.chainOk).toBe(false);
   });
 
   it('exposes the verified venue and pool allowlist', async () => {
@@ -70,9 +82,11 @@ describe('HTTP API', () => {
     const response = await server.inject({ method: 'GET', url: '/api/v1/venues' });
     const body = response.json();
     expect(response.statusCode).toBe(200);
-    expect(body.data.venues[0].pool.id).toBe(TEST_POOL.id);
+    expect(body.data.venues[0].pool).toBe(TEST_POOL.id);
     expect(body.data.venues[0].chainId).toBe(4663);
-    expect(body.data.venues[0].assets).toHaveLength(2);
+    expect(body.data.venues[0].provenance.length).toBeGreaterThan(0);
+    expect(body.meta.assets).toHaveLength(2);
+    expect(() => venueSchema.parse(body.data.venues[0])).not.toThrow();
   });
 
   it('returns 404 for a market snapshot before any observation exists', async () => {
@@ -92,6 +106,10 @@ describe('HTTP API', () => {
     expect(body.data.status).toBe('COMPLETE');
     expect(body.data.chainId).toBe(4663);
     expect(body.data.blockHash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(() => marketSnapshotSchema.parse(body.data)).not.toThrow();
+    expect(body.data.blockNumber).toBe(String(111_408_300));
+    // Provenance that the wire contract cannot carry stays in meta.
+    expect(body.meta.sqrtPriceX96).toBe('3596635876533259452022784');
   });
 
   it('rejects an intent with an unknown evaluation', async () => {
@@ -137,14 +155,24 @@ describe('HTTP API', () => {
 
     const portfolio = await server.inject({ method: 'GET', url: '/api/v1/portfolio' });
     expect(portfolio.statusCode).toBe(200);
-    expect(portfolio.json().data.simulated).toBe(true);
+    expect(portfolio.json().meta.simulated).toBe(true);
     expect(portfolio.json().data.positions).toHaveLength(1);
+    expect(portfolio.json().data.mode).toBe('PAPER');
+    expect(() => portfolioSchema.parse(portfolio.json().data)).not.toThrow();
+
+    const candidates = await server.inject({ method: 'GET', url: '/api/v1/candidates?limit=5' });
+    expect(candidates.statusCode).toBe(200);
+    for (const candidate of candidates.json().data.candidates as unknown[]) {
+      expect(() => candidateSchema.parse(candidate)).not.toThrow();
+    }
 
     const journal = await server.inject({ method: 'GET', url: '/api/v1/journal?limit=10' });
     expect(journal.statusCode).toBe(200);
-    const actions = (journal.json().data as { action: string }[]).map((row) => row.action);
-    expect(actions).toContain('paper.fill.recorded');
-    expect(actions).toContain('risk.decision.recorded');
+    const journalBody = journal.json().data;
+    expect(() => journalPageSchema.parse(journalBody)).not.toThrow();
+    const types = (journalBody.events as { type: string }[]).map((event) => event.type);
+    expect(types).toContain('paper.fill.recorded');
+    expect(types).toContain('risk.decision.recorded');
   });
 
   it('engages and reports the persisted kill switch', async () => {
@@ -152,7 +180,7 @@ describe('HTTP API', () => {
     const halt = await server.inject({ method: 'POST', url: '/api/v1/system/halt', payload: { engaged: true } });
     expect(halt.statusCode).toBe(200);
     const health = await server.inject({ method: 'GET', url: '/health' });
-    expect(health.json().data.killSwitchEngaged).toBe(true);
+    expect(health.json().meta.killSwitchEngaged).toBe(true);
   });
 
   it('returns a structured 404 envelope for unknown routes', async () => {

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import type { MarketSnapshot, SnapshotStatus, StrategyAction, StrategyConfig } from './types.js';
+import type { PoolSnapshot, SnapshotStatus, StrategyAction, StrategyConfig } from './types.js';
 
 export type StrategyInput = {
-  readonly snapshot: MarketSnapshot;
+  readonly snapshot: PoolSnapshot;
   readonly snapshotStatus: SnapshotStatus;
   readonly snapshotAgeSeconds: number;
   readonly config: StrategyConfig;

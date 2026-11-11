@@ -1,5 +1,5 @@
 import { priceImpactBps } from './price.js';
-import type { IntentSide, MarketSnapshot, RiskDecision, RiskRule, SnapshotStatus, StrategyConfig } from './types.js';
+import type { IntentSide, PoolSnapshot, RiskOutcome, RiskRule, SnapshotStatus, StrategyConfig } from './types.js';
 
 export const RISK_POLICY_VERSION = 'paper-risk-v1';
 /** The public RPC only serves state about this many blocks behind the head. */
@@ -11,7 +11,7 @@ export type RiskInput = {
   readonly amountIn: string;
   /** Intent value expressed in USDG base units, so BUY and SELL are comparable. */
   readonly notionalQuote: string;
-  readonly snapshot: MarketSnapshot | null;
+  readonly snapshot: PoolSnapshot | null;
   readonly snapshotStatus: SnapshotStatus | 'UNAVAILABLE';
   readonly snapshotAgeSeconds: number | null;
   readonly quoteBlockNumber: number | null;
@@ -35,7 +35,7 @@ function rule(name: string, status: RiskRule['status'], observed: string, thresh
  * Fail-closed risk gate. It is the only approver: any FAIL or UNAVAILABLE rule
  * rejects the intent, so missing or stale evidence can never reach execution.
  */
-export function evaluateRisk(input: RiskInput): RiskDecision {
+export function evaluateRisk(input: RiskInput): RiskOutcome {
   const rules: RiskRule[] = [];
 
   rules.push(rule('R01_mode_paper_only', input.mode === 'PAPER' ? 'PASS' : 'FAIL', input.mode, 'PAPER'));

@@ -12,8 +12,10 @@ export const VERIFIED_VENUE: Venue = {
   factory: '0x1f7d7550b1b028f7571e69a784071f0205fd2efa',
   quoterV2: '0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7',
   swapRouter02: '0xcaf681a66d020601342297493863e78c959e5cb2',
-  provenance:
-    'https://docs.uniswap.org/docs/protocols/v3/deployments/v3-robinhood-chain-deployments and https://docs.robinhood.com/chain/contracts',
+  provenance: [
+    'https://docs.uniswap.org/docs/protocols/v3/deployments/v3-robinhood-chain-deployments',
+    'https://docs.robinhood.com/chain/contracts',
+  ],
 };
 
 export const WETH: AssetIdentity = {

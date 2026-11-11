@@ -83,3 +83,15 @@ export function averageCostScaled(
   if (quantityBase <= 0n) throw new PriceError('quantity must be positive');
   return (costQuoteBase * quoteDivisor(baseDecimals, quoteDecimals, scale)) / quantityBase;
 }
+
+/** Inverse of `quoteValueOf`: the base-asset quantity a quote amount buys. */
+export function quoteToBaseQty(
+  amountQuote: bigint,
+  priceScaled: bigint,
+  baseDecimals: number,
+  quoteDecimals: number,
+  scale = PRICE_SCALE,
+): bigint {
+  if (priceScaled <= 0n) throw new PriceError('price must be positive');
+  return (amountQuote * quoteDivisor(baseDecimals, quoteDecimals, scale)) / priceScaled;
+}

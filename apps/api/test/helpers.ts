@@ -3,7 +3,7 @@ import { seedOpeningCash, seedReferenceData, seedStrategyConfig, insertSnapshot,
 import { WETH, USDG, VERIFIED_VENUE } from '../src/chain/venue.js';
 import { DEFAULT_STRATEGY_CONFIG } from '../src/domain/strategy.js';
 import { buildSnapshot } from '../src/domain/snapshot.js';
-import type { Evaluation, MarketSnapshot, PoolIdentity } from '../src/domain/types.js';
+import type { EvaluationRecord, PoolSnapshot, PoolIdentity } from '../src/domain/types.js';
 import type { QuotePort, QuoteRequest } from '../src/services/ports.js';
 
 export const TEST_POOL: PoolIdentity = {
@@ -34,7 +34,7 @@ export function makeDb(): Db {
 /** Deterministic fake quoter output for 500 USDG at the observed price. */
 export const FAKE_BUY_OUT = (500_000_000n * 10n ** 18n) / USDG_PER_WETH_BASE;
 
-export function makeSnapshot(overrides: Partial<{ observedAt: Date; blockNumber: number; liquidity: bigint; reserve0: bigint; reserve1: bigint }> = {}): MarketSnapshot {
+export function makeSnapshot(overrides: Partial<{ observedAt: Date; blockNumber: number; liquidity: bigint; reserve0: bigint; reserve1: bigint }> = {}): PoolSnapshot {
   return buildSnapshot({
     pool: TEST_POOL,
     blockNumber: overrides.blockNumber ?? 111_408_300,
@@ -50,13 +50,13 @@ export function makeSnapshot(overrides: Partial<{ observedAt: Date; blockNumber:
   });
 }
 
-export function seedEvaluation(db: Db, snapshot: MarketSnapshot, action: Evaluation['action'] = 'BUY', amount = '500000000'): Evaluation {
+export function seedEvaluation(db: Db, snapshot: PoolSnapshot, action: EvaluationRecord['action'] = 'BUY', amount = '500000000'): EvaluationRecord {
   insertSnapshot(db, snapshot);
   return insertEvaluation(db, {
     snapshotId: snapshot.id,
     strategyId: DEFAULT_STRATEGY_CONFIG.strategyId,
     configVersion: DEFAULT_STRATEGY_CONFIG.version,
-    inputHash: 'test-input-hash',
+    inputHash: 'a'.repeat(64),
     action,
     signalStrength: 80,
     proposedAmountIn: action === 'BUY' || action === 'SELL' ? amount : null,

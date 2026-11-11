@@ -25,7 +25,7 @@ import { postBuy, postSell } from '../domain/ledger.js';
 import { executionPriceScaled, quoteValueOf } from '../domain/price.js';
 import { evaluateRisk } from '../domain/risk.js';
 import { effectiveStatus } from '../domain/snapshot.js';
-import type { AssetIdentity, Evaluation, PoolIdentity, RiskDecision, StrategyConfig } from '../domain/types.js';
+import type { AssetIdentity, EvaluationRecord, PoolIdentity, RiskOutcome, StrategyConfig } from '../domain/types.js';
 import { WETH, USDG } from '../chain/venue.js';
 import type { QuotePort } from './ports.js';
 
@@ -34,7 +34,7 @@ const INTENT_TTL_SECONDS = 60;
 
 export type IntentView = {
   readonly intent: IntentRecord;
-  readonly riskDecision: RiskDecision | null;
+  readonly riskDecision: RiskOutcome | null;
   readonly orderId: string | null;
   readonly fillId: string | null;
   readonly replayed: boolean;
@@ -46,13 +46,13 @@ function assetById(id: string): AssetIdentity {
 
 export function createIntentFromEvaluation(
   db: Db,
-  input: { evaluation: Evaluation; idempotencyKey: string; now?: Date; correlationId: string; mode: 'OBSERVE' | 'PAPER' },
+  input: { evaluation: EvaluationRecord; idempotencyKey: string; now?: Date; correlationId: string; mode: 'OBSERVE' | 'PAPER' },
 ): IntentRecord {
   const existing = getIntentByIdempotencyKey(db, input.idempotencyKey);
   if (existing) return existing;
 
   if ((input.evaluation.action !== 'BUY' && input.evaluation.action !== 'SELL') || input.evaluation.proposedAmountIn === null) {
-    throw new AppError('INTENT_NOT_ACTIONABLE', `Evaluation action ${input.evaluation.action} cannot produce a paper intent`);
+    throw new AppError('INTENT_NOT_ACTIONABLE', `EvaluationRecord action ${input.evaluation.action} cannot produce a paper intent`);
   }
   const side = input.evaluation.action;
   const now = input.now ?? new Date();
