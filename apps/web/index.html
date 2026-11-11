@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#FFFDF7" />
+    <title>TRIDENT — PAPER operations</title>
+    <script>
+      // Applies the stored or system theme before first paint; no network, no dependencies.
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('trident.theme');
+          var system = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          document.documentElement.dataset['theme'] = stored === 'dark' || stored === 'light' ? stored : system;
+        } catch (error) {
+          document.documentElement.dataset['theme'] = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
