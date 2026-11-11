@@ -108,6 +108,43 @@ Error codes: `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`,
 11. **Kill switch.** Persisted in `automation_state` and read by the risk gate on
     every intent; an unreadable state fails closed.
 
+## Chain checkpoint, reorg recovery, and atomic audit (AT-04 / AT-16)
+
+**Checkpoint.** `chain_checkpoints` stores one row per pool:
+`{chain_id, pool_id, block_number, block_hash, parent_hash, updated_at}`. Each
+ingest writes the checkpoint in the same transaction as the snapshot and its
+audit event. Before any ingest, `verifyCheckpoint` proves the stored checkpoint is
+still canonical:
+
+- head below the checkpoint -> `CHAIN_ROLLBACK`;
+- head at the checkpoint height -> hashes must match;
+- head one block above -> `head.parentHash` must equal the checkpoint hash;
+- head further above (a gap or a restart after downtime) -> the checkpoint
+  height must still resolve to the stored hash, which proves every block above
+  it descends from the stored data;
+- a provider that cannot resolve the checkpoint height -> fail closed
+  (`CANONICAL_BLOCK_UNAVAILABLE`).
+
+**Reorg recovery.** On divergence, `recoverFromReorg` runs in one transaction: it
+rewinds every chain-derived snapshot/evaluation at or above the divergence
+block. A row no paper execution references is deleted. A row a fill or intent
+already references is kept for provenance, marked `quarantined_at`/`reorg_id`,
+and every affected intent gets a `paper.execution.reorg_review_required` audit
+event. It records `chain_reorgs` plus `chain_reorg_impacts`, re-anchors the
+checkpoint at the highest surviving canonical block, engages the kill switch with
+reason `CHAIN_REORG`, and writes `chain.reorg.detected`. A quarantined block
+height is never re-ingested — its unique `(pool_id, block_number)` row keeps the
+orphan hash — so ingestion resumes at the next canonical block above it, and
+`POST /api/v1/intents` rejects a quarantined evaluation with `409 CONFLICT`.
+
+**Atomic audit.** Every state write commits with its audit event in one
+transaction: snapshot + checkpoint + audit, evaluation + audit, intent + audit,
+`EXPIRED` + audit, risk decision + audit, fill/ledger/position + audit, and the
+kill switch + audit. `withTransaction` joins an already-open transaction, so a
+service composed inside a larger unit of work does not split the writes. A
+test-only `FaultHooks.afterEntityWrite` seam throws between the entity write and
+the audit write to prove a crash leaves neither row.
+
 ## Paper accounting model
 
 `postBuy`/`postSell` post through a `CLEARING` account so each asset leg balances
@@ -118,7 +155,7 @@ carry `quantity` and `cost_basis` in base units; unrealized PnL is
 ## Tests
 
 ```bash
-pnpm --filter @trident/api test           # 44 offline tests, 4 skipped
+pnpm --filter @trident/api test           # 73 offline tests, 4 skipped
 RUN_RPC_TESTS=1 pnpm --filter @trident/api test   # adds 4 real-RPC tests
 ```
 
@@ -135,6 +172,18 @@ evaluation replayed after the kill switch is released, and a replay after a
 restart that asserts every table keeps its pre-replay row counts. The real-RPC
 suite proves chain id, testnet rejection, factory→pool derivation, and a
 block-pinned snapshot.
+
+AT-04 coverage (`test/reorg.test.ts`): first-ingest checkpoint with hash and
+parent hash, restart continuation by parent, gap acceptance, same-height hash
+replacement, parent mismatch, unreadable checkpoint block, quarantine of a
+referenced snapshot (kept for its fill, `reorg_review_required` audit, `409` on
+new intents), quarantined height never re-ingested, resume at the next canonical
+block, and full rollback of the rewind when the reorg transaction fails.
+
+AT-16 coverage (`test/atomic.test.ts`): fault injection between entity and audit
+for snapshot, evaluation, intent, expiry, risk decision, fill/ledger/position,
+and halt; each proves the entity and the audit are both absent. A full paper
+cycle proves one audit event per persisted entity and a replay adds none.
 
 ## Sanitized real-RPC evidence (11 Nov 2026, mainnet 4663)
 
@@ -178,6 +227,19 @@ uses new keys against one already-executed evaluation.
   either run returned `500`.
 - `/api/v1/portfolio` -> equity `9999850251` (≈ 9,999.85 USDG after the buy, fee,
   and price impact), position `VALUED`.
+
+### Chain checkpoint live evidence (11 Nov 2026, port 8093, fresh DB)
+
+- First worker tick persisted `chain_checkpoints` with chain id `4663`, pool
+  `0x52e6…71Ca`, block `111929143`, hash `0xb706…49f5`, and that block's parent
+  hash `0xed4f…bffb`, together with its snapshot and audit event.
+- The process was stopped and started again on the same database. The new tick
+  verified the stored parent before ingesting, then advanced to block `111929661`;
+  the second snapshot was written and audited, and no block height holds two
+  hashes (`COUNT(*) GROUP BY block_number HAVING COUNT(DISTINCT block_hash) > 1`
+  is empty).
+- `chain_reorgs` is empty and the checkpoint count stays `1`, which is the
+  expected result on a healthy chain.
 
 - **Contract type names are not re-declared here.** `src/domain/types.ts` keeps
   only engine-internal types (`PoolSnapshot`, `EvaluationRecord`, `RiskOutcome`,

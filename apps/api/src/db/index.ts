@@ -43,9 +43,17 @@ export function applyMigrations(db: Db): void {
   }
 }
 
-/** Runs work inside a single immediate transaction; any throw rolls back. */
+const openTransactions = new WeakSet<Db>();
+
+/**
+ * Runs work inside a single immediate transaction; any throw rolls back.
+ * Nested calls join the open transaction so a service can be composed inside a
+ * larger unit of work without splitting entity and audit writes apart.
+ */
 export function withTransaction<T>(db: Db, work: () => T): T {
+  if (openTransactions.has(db)) return work();
   db.exec('BEGIN IMMEDIATE');
+  openTransactions.add(db);
   try {
     const result = work();
     db.exec('COMMIT');
@@ -53,6 +61,8 @@ export function withTransaction<T>(db: Db, work: () => T): T {
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;
+  } finally {
+    openTransactions.delete(db);
   }
 }
 

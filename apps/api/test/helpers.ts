@@ -5,6 +5,7 @@ import { DEFAULT_STRATEGY_CONFIG } from '../src/domain/strategy.js';
 import { buildSnapshot } from '../src/domain/snapshot.js';
 import type { EvaluationRecord, PoolSnapshot, PoolIdentity } from '../src/domain/types.js';
 import type { QuotePort, QuoteRequest } from '../src/services/ports.js';
+import type { ChainBlock, ChainReadPort } from '../src/chain/client.js';
 
 export const TEST_POOL: PoolIdentity = {
   id: '0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca',
@@ -62,7 +63,7 @@ export function seedEvaluation(db: Db, snapshot: PoolSnapshot, action: Evaluatio
     proposedAmountIn: action === 'BUY' || action === 'SELL' ? amount : null,
     invalidation: 'test',
     reasons: ['test'],
-  });
+  }).evaluation;
 }
 
 /** Deterministic stand-in for QuoterV2 at the observed ≈2,060 USDG/WETH price. */
@@ -83,6 +84,49 @@ export function createFakeQuotePort(
     },
     async baseFeePerGasAt() {
       return options.baseFeePerGas === undefined ? 20_014_000n : options.baseFeePerGas;
+    },
+  };
+}
+
+/** A synthetic chain a test can fork, reorg, and restart against. */
+export type FakeChain = ChainReadPort & {
+  setCanonical(blocks: ChainBlock[]): void;
+  setHead(block: ChainBlock): void;
+  hideBlock(blockNumber: number): void;
+};
+
+export function fakeBlock(number: number, hashSeed: string, parentHash: `0x${string}` | null = null): ChainBlock {
+  const hash = `0x${hashSeed.padEnd(64, '0').slice(0, 64)}` as `0x${string}`;
+  const parent: `0x${string}` =
+    parentHash ?? (`0x${`${number - 1}${hashSeed}`.padEnd(64, '0').slice(0, 64)}` as `0x${string}`);
+  return { number, hash, parentHash: parent, timestamp: Math.floor(Date.now() / 1000) + number };
+}
+
+export function createFakeChain(initial: ChainBlock[]): FakeChain {
+  let canonical = new Map(initial.map((b) => [b.number, b]));
+  let head = initial[initial.length - 1]!;
+  return {
+    async getHead() {
+      return head;
+    },
+    async getBlockByNumber(blockNumber: number) {
+      return canonical.get(blockNumber) ?? null;
+    },
+    async readPoolState() {
+      return { sqrtPriceX96: REAL_SQRT_PRICE_X96, tick: -200012, liquidity: REAL_LIQUIDITY, token0: WETH.address, token1: USDG.address };
+    },
+    async readBalance(token: `0x${string}`) {
+      return token.toLowerCase() === WETH.address.toLowerCase() ? 5_569_872_785_751_890_475_170n : 1_958_102_737_784n;
+    },
+    setCanonical(blocks: ChainBlock[]) {
+      canonical = new Map(blocks.map((b) => [b.number, b]));
+    },
+    setHead(next: ChainBlock) {
+      head = next;
+      canonical.set(next.number, next);
+    },
+    hideBlock(blockNumber: number) {
+      canonical.delete(blockNumber);
     },
   };
 }

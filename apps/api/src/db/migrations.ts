@@ -232,4 +232,59 @@ FROM fills_legacy;
 DROP TABLE fills_legacy;
 `,
   },
+  {
+    version: '004_chain_checkpoint_and_reorg',
+    // AT-04: the worker records the last ingested block as a persistent
+    // checkpoint, so a restart can prove the chain still descends from it.
+    // Chain-derived rows keep a quarantine marker instead of being deleted when
+    // a paper execution already references them; the next canonical block above
+    // the quarantined height is ingested normally.
+    sql: `
+ALTER TABLE market_snapshots ADD COLUMN reorg_id TEXT;
+ALTER TABLE market_snapshots ADD COLUMN quarantined_at TEXT;
+
+ALTER TABLE strategy_evaluations ADD COLUMN reorg_id TEXT;
+ALTER TABLE strategy_evaluations ADD COLUMN quarantined_at TEXT;
+
+CREATE TABLE chain_checkpoints (
+  pool_id TEXT PRIMARY KEY REFERENCES pools(id),
+  chain_id INTEGER NOT NULL CHECK (chain_id = 4663),
+  block_number INTEGER NOT NULL CHECK (block_number >= 0),
+  block_hash TEXT NOT NULL,
+  parent_hash TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE chain_reorgs (
+  id TEXT PRIMARY KEY,
+  pool_id TEXT NOT NULL REFERENCES pools(id),
+  detected_at TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('SAME_HEIGHT_HASH_REPLACEMENT','PARENT_MISMATCH','CHAIN_ROLLBACK','CANONICAL_BLOCK_UNAVAILABLE')),
+  divergence_block INTEGER NOT NULL,
+  checkpoint_block INTEGER,
+  checkpoint_hash TEXT,
+  canonical_block INTEGER,
+  canonical_hash TEXT,
+  rewound_snapshots INTEGER NOT NULL,
+  rewound_evaluations INTEGER NOT NULL,
+  quarantined_snapshots INTEGER NOT NULL,
+  quarantined_evaluations INTEGER NOT NULL,
+  affected_intents INTEGER NOT NULL,
+  correlation_id TEXT NOT NULL
+);
+
+CREATE TABLE chain_reorg_impacts (
+  reorg_id TEXT NOT NULL REFERENCES chain_reorgs(id),
+  entity TEXT NOT NULL CHECK (entity IN ('market_snapshot','strategy_evaluation','order_intent')),
+  entity_id TEXT NOT NULL,
+  block_number INTEGER NOT NULL,
+  disposition TEXT NOT NULL CHECK (disposition IN ('DELETED','QUARANTINED')),
+  PRIMARY KEY (reorg_id, entity, entity_id)
+);
+
+CREATE INDEX idx_market_snapshots_canonical ON market_snapshots (pool_id, block_number DESC) WHERE quarantined_at IS NULL;
+CREATE INDEX idx_strategy_evaluations_canonical ON strategy_evaluations (created_at DESC) WHERE quarantined_at IS NULL;
+CREATE INDEX idx_chain_reorgs_pool ON chain_reorgs (pool_id, detected_at DESC);
+`,
+  },
 ];

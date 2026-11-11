@@ -44,6 +44,8 @@ describe.skipIf(!RUN)('real Robinhood Chain RPC', () => {
     const market = createMarketService({ db, chain, pool: verified.pool, config: DEFAULT_STRATEGY_CONFIG, correlationId: 'rpc-test' });
 
     const snapshot = await market.takeSnapshot();
+    expect(snapshot).not.toBeNull();
+    if (snapshot === null) throw new Error('unreachable');
     expect(snapshot.chainId).toBe(4663);
     expect(snapshot.blockHash).toMatch(/^0x[0-9a-f]{64}$/);
     expect(BigInt(snapshot.liquidity)).toBeGreaterThan(0n);

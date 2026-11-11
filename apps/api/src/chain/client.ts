@@ -31,6 +31,25 @@ export type QuoteResult = {
   readonly gasEstimate: bigint;
 };
 
+/** One block identity, enough to prove chain continuity across restarts. */
+export type ChainBlock = {
+  readonly number: number;
+  readonly hash: `0x${string}`;
+  readonly parentHash: `0x${string}`;
+  readonly timestamp: number;
+};
+
+/**
+ * Narrow read port used by the market service. Keeping it small lets the
+ * checkpoint/reorg tests drive a synthetic chain without an RPC.
+ */
+export type ChainReadPort = {
+  getHead(): Promise<ChainBlock>;
+  getBlockByNumber(blockNumber: number): Promise<ChainBlock | null>;
+  readPoolState(pool: `0x${string}`, blockNumber: number): Promise<PoolState>;
+  readBalance(token: `0x${string}`, account: `0x${string}`, blockNumber: number): Promise<bigint>;
+};
+
 /** Minimal HTTP JSON-RPC surface; the only RPC caller in the process. */
 export type RpcTransport = {
   readonly client: PublicClient;
@@ -51,7 +70,7 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => set
  * Serialises RPC calls to stay inside the conservative public-RPC budget and
  * retries transient transport failures with exponential backoff and jitter.
  */
-export class ChainClient {
+export class ChainClient implements ChainReadPort {
   private readonly client: PublicClient;
   private readonly minIntervalMs: number;
   private readonly maxRetries: number;
@@ -104,9 +123,34 @@ export class ChainClient {
     return chainId;
   }
 
-  async getHead(): Promise<{ number: number; hash: `0x${string}`; timestamp: number }> {
+  async getHead(): Promise<ChainBlock> {
     const block = await this.run(() => this.client.getBlock({ blockTag: 'latest' }));
-    return { number: Number(block.number), hash: block.hash, timestamp: Number(block.timestamp) };
+    return {
+      number: Number(block.number),
+      hash: block.hash,
+      parentHash: block.parentHash,
+      timestamp: Number(block.timestamp),
+    };
+  }
+
+  /**
+   * Reads one block by height. A block the provider does not know returns null
+   * so the checkpoint check can fail closed instead of treating a pruned or
+   * missing block as a fresh chain tip.
+   */
+  async getBlockByNumber(blockNumber: number): Promise<ChainBlock | null> {
+    try {
+      const block = await this.run(() => this.client.getBlock({ blockNumber: BigInt(blockNumber) }));
+      return {
+        number: Number(block.number),
+        hash: block.hash,
+        parentHash: block.parentHash,
+        timestamp: Number(block.timestamp),
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'BlockNotFoundError') return null;
+      throw error;
+    }
   }
 
   async getCodeSize(address: `0x${string}`): Promise<number> {

@@ -32,6 +32,7 @@ import { effectiveStatus } from '../domain/snapshot.js';
 import type { AssetIdentity, EvaluationRecord, PoolIdentity, RiskOutcome, StrategyConfig } from '../domain/types.js';
 import { WETH, USDG } from '../chain/venue.js';
 import type { QuotePort } from './ports.js';
+import { maybeInjectFault, type FaultHooks } from './faults.js';
 
 export const ASSUMPTIONS_VERSION = 'paper-v1';
 const INTENT_TTL_SECONDS = 60;
@@ -64,7 +65,14 @@ function storedView(db: Db, intent: IntentRecord): IntentView {
 
 export function createIntentFromEvaluation(
   db: Db,
-  input: { evaluation: EvaluationRecord; idempotencyKey: string; now?: Date; correlationId: string; mode: 'OBSERVE' | 'PAPER' },
+  input: {
+    evaluation: EvaluationRecord;
+    idempotencyKey: string;
+    now?: Date;
+    correlationId: string;
+    mode: 'OBSERVE' | 'PAPER';
+    faults?: FaultHooks | undefined;
+  },
 ): IntentRecord {
   // `evaluation_id` is the business key: one evaluation can produce at most one
   // intent, so a new idempotency key must replay the stored intent instead of
@@ -88,30 +96,35 @@ export function createIntentFromEvaluation(
     throw new AppError('INTENT_NOT_ACTIONABLE', 'Evaluation sizes a trade smaller than one base unit at the snapshot price');
   }
   const now = input.now ?? new Date();
-  const { intent, created } = createIntent(db, {
-    evaluationId: input.evaluation.id,
-    idempotencyKey: input.idempotencyKey,
-    mode: input.mode,
-    side,
-    tokenInId: side === 'BUY' ? 'USDG' : 'WETH',
-    tokenOutId: side === 'BUY' ? 'WETH' : 'USDG',
-    amountIn: input.evaluation.proposedAmountIn,
-    minAmountOut: '0',
-    snapshotId: input.evaluation.snapshotId,
-    expiresAt: new Date(now.getTime() + INTENT_TTL_SECONDS * 1000).toISOString(),
-  });
-  // Losing a concurrent insert is a replay, not a new effect: no intent audit.
-  if (created) {
-    appendAudit(db, {
-      actor: 'operator',
-      action: 'intent.created',
-      entity: 'order_intent',
-      entityId: intent.id,
-      correlationId: input.correlationId,
-      payload: { side, amountIn: intent.amountIn, evaluationId: intent.evaluationId },
+  // AT-16: the intent row and its audit event commit together. A crash between
+  // them must not leave an intent the journal cannot explain.
+  return withTransaction(db, () => {
+    const { intent, created } = createIntent(db, {
+      evaluationId: input.evaluation.id,
+      idempotencyKey: input.idempotencyKey,
+      mode: input.mode,
+      side,
+      tokenInId: side === 'BUY' ? 'USDG' : 'WETH',
+      tokenOutId: side === 'BUY' ? 'WETH' : 'USDG',
+      amountIn: input.evaluation.proposedAmountIn!,
+      minAmountOut: '0',
+      snapshotId: input.evaluation.snapshotId,
+      expiresAt: new Date(now.getTime() + INTENT_TTL_SECONDS * 1000).toISOString(),
     });
-  }
-  return intent;
+    // Losing a concurrent insert is a replay, not a new effect: no intent audit.
+    if (created) {
+      maybeInjectFault(input.faults, 'order.intent');
+      appendAudit(db, {
+        actor: 'operator',
+        action: 'intent.created',
+        entity: 'order_intent',
+        entityId: intent.id,
+        correlationId: input.correlationId,
+        payload: { side, amountIn: intent.amountIn, evaluationId: intent.evaluationId },
+      });
+    }
+    return intent;
+  });
 }
 
 /**
@@ -178,6 +191,8 @@ export type ExecutionDeps = {
   readonly mode: 'OBSERVE' | 'PAPER';
   readonly correlationId: string;
   readonly now?: () => Date;
+  /** Test-only crash boundary between an entity write and its audit write. */
+  readonly faults?: FaultHooks | undefined;
 };
 
 /**
@@ -198,14 +213,19 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
   }
 
   if (clock().getTime() > new Date(intent.expiresAt).getTime()) {
-    setIntentStatus(db, intent.id, 'EXPIRED');
-    appendAudit(db, {
-      actor: 'system',
-      action: 'intent.expired',
-      entity: 'order_intent',
-      entityId: intent.id,
-      correlationId: deps.correlationId,
-      payload: { expiresAt: intent.expiresAt },
+    // AT-16: the EXPIRED status and its audit event commit together; the error
+    // is thrown after the commit so the record survives the request failing.
+    withTransaction(db, () => {
+      setIntentStatus(db, intent.id, 'EXPIRED');
+      maybeInjectFault(deps.faults, 'intent.expired');
+      appendAudit(db, {
+        actor: 'system',
+        action: 'intent.expired',
+        entity: 'order_intent',
+        entityId: intent.id,
+        correlationId: deps.correlationId,
+        payload: { expiresAt: intent.expiresAt },
+      });
     });
     throw new AppError('INTENT_EXPIRED', 'Intent expired before it could be approved; request a new one');
   }
@@ -311,6 +331,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       decision: risk,
       portfolioVersion: portfolio.portfolioVersion,
     });
+    maybeInjectFault(deps.faults, 'risk.decision');
     appendAudit(db, {
       actor: 'risk-gate',
       action: 'risk.decision.recorded',
@@ -350,6 +371,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       });
       markOrderFilled(db, orderId);
       setIntentStatus(db, intent.id, 'FILLED');
+      maybeInjectFault(deps.faults, 'paper.fill');
       appendAudit(db, {
         actor: 'paper-execution',
         action: 'paper.fill.recorded',
@@ -392,6 +414,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
     });
     markOrderFilled(db, orderId);
     setIntentStatus(db, intent.id, 'FILLED');
+    maybeInjectFault(deps.faults, 'paper.fill');
     appendAudit(db, {
       actor: 'paper-execution',
       action: 'paper.fill.recorded',

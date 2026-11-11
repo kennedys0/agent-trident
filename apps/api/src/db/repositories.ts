@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { nowIso, type Db } from './index.js';
 import { quoteValueOf } from '../domain/price.js';
+import type { ChainCheckpoint, ReorgKind } from '../chain/checkpoint.js';
 import type {
   AssetIdentity,
   EvaluationRecord,
@@ -118,10 +119,31 @@ export function postLedgerEntries(db: Db, entries: readonly LedgerEntryInput[]):
   }
 }
 
-export function insertSnapshot(db: Db, snapshot: PoolSnapshot): PoolSnapshot {
+export type SnapshotIngest =
+  | { readonly status: 'CREATED'; readonly snapshot: PoolSnapshot }
+  | { readonly status: 'EXISTING'; readonly snapshot: PoolSnapshot }
+  | { readonly status: 'QUARANTINED_BLOCK'; readonly blockNumber: number };
+
+/**
+ * Stores one block-pinned snapshot. A block height that a reorg quarantined is
+ * never re-used: the row already holds that height and a second hash at the same
+ * height would rewrite the provenance a stored fill points at, so ingestion
+ * resumes at the next canonical block above it.
+ */
+export function insertSnapshot(db: Db, snapshot: PoolSnapshot): SnapshotIngest {
+  const existing = getSnapshotAtBlockAny(db, snapshot.poolId, snapshot.blockNumber);
+  if (existing !== null) {
+    if (existing.quarantined) return { status: 'QUARANTINED_BLOCK', blockNumber: snapshot.blockNumber };
+    if (existing.snapshot.blockHash.toLowerCase() !== snapshot.blockHash.toLowerCase()) {
+      throw new Error(
+        `Block ${snapshot.blockNumber} already stores hash ${existing.snapshot.blockHash}; refusing to overwrite it with ${snapshot.blockHash}`,
+      );
+    }
+    return { status: 'EXISTING', snapshot: existing.snapshot };
+  }
   db.prepare(
-    `INSERT INTO market_snapshots (id, pool_id, chain_id, block_number, block_hash, sqrt_price_x96, tick, liquidity, reserve0, reserve1, price_scaled, price_scale, source, status, source_time, observed_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO market_snapshots (id, pool_id, chain_id, block_number, block_hash, sqrt_price_x96, tick, liquidity, reserve0, reserve1, price_scaled, price_scale, source, status, source_time, observed_at, created_at, reorg_id, quarantined_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
      ON CONFLICT(pool_id, block_number) DO NOTHING`,
   ).run(
     snapshot.id,
@@ -144,14 +166,25 @@ export function insertSnapshot(db: Db, snapshot: PoolSnapshot): PoolSnapshot {
   );
   const stored = getSnapshotByBlock(db, snapshot.poolId, snapshot.blockNumber);
   if (!stored) throw new Error('snapshot insert failed');
-  return stored;
+  return { status: 'CREATED', snapshot: stored };
 }
 
 export function getSnapshotByBlock(db: Db, poolId: string, blockNumber: number): PoolSnapshot | null {
   const row = db
-    .prepare('SELECT * FROM market_snapshots WHERE pool_id = ? AND block_number = ?')
+    .prepare('SELECT * FROM market_snapshots WHERE pool_id = ? AND block_number = ? AND quarantined_at IS NULL')
     .get(poolId, blockNumber) as Row | undefined;
   return row ? mapSnapshot(row) : null;
+}
+
+export function getSnapshotAtBlockAny(
+  db: Db,
+  poolId: string,
+  blockNumber: number,
+): { snapshot: PoolSnapshot; quarantined: boolean } | null {
+  const row = db
+    .prepare('SELECT * FROM market_snapshots WHERE pool_id = ? AND block_number = ?')
+    .get(poolId, blockNumber) as Row | undefined;
+  return row ? { snapshot: mapSnapshot(row), quarantined: row['quarantined_at'] !== null } : null;
 }
 
 export function getSnapshotById(db: Db, id: string): PoolSnapshot | null {
@@ -161,46 +194,116 @@ export function getSnapshotById(db: Db, id: string): PoolSnapshot | null {
 
 export function getLatestSnapshot(db: Db, poolId: string): PoolSnapshot | null {
   const row = db
-    .prepare('SELECT * FROM market_snapshots WHERE pool_id = ? ORDER BY block_number DESC LIMIT 1')
+    .prepare(
+      'SELECT * FROM market_snapshots WHERE pool_id = ? AND quarantined_at IS NULL ORDER BY block_number DESC LIMIT 1',
+    )
     .get(poolId) as Row | undefined;
   return row ? mapSnapshot(row) : null;
+}
+
+/** Canonical snapshots at or above `fromBlock`, oldest first. */
+export function listCanonicalSnapshotsFrom(db: Db, poolId: string, fromBlock: number): (PoolSnapshot & { id: string })[] {
+  const rows = db
+    .prepare(
+      'SELECT * FROM market_snapshots WHERE pool_id = ? AND block_number >= ? AND quarantined_at IS NULL ORDER BY block_number ASC',
+    )
+    .all(poolId, fromBlock) as Row[];
+  return rows.map((row) => mapSnapshot(row));
+}
+
+export function quarantineSnapshot(db: Db, snapshotId: string, reorgId: string, at: string): void {
+  db.prepare('UPDATE market_snapshots SET reorg_id = ?, quarantined_at = ? WHERE id = ?').run(reorgId, at, snapshotId);
+}
+
+export function deleteSnapshot(db: Db, snapshotId: string): void {
+  db.prepare('DELETE FROM market_snapshots WHERE id = ?').run(snapshotId);
 }
 
 export function insertEvaluation(
   db: Db,
   evaluation: Omit<EvaluationRecord, 'id' | 'createdAt'>,
-): EvaluationRecord {
-  db.prepare(
-    `INSERT INTO strategy_evaluations (id, snapshot_id, strategy_id, config_version, input_hash, action, signal_strength, proposed_amount_in, invalidation, reasons_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(snapshot_id, strategy_id, config_version) DO NOTHING`,
-  ).run(
-    randomUUID(),
-    evaluation.snapshotId,
-    evaluation.strategyId,
-    evaluation.configVersion,
-    evaluation.inputHash,
-    evaluation.action,
-    evaluation.signalStrength,
-    evaluation.proposedAmountIn,
-    evaluation.invalidation,
-    JSON.stringify(evaluation.reasons),
-    nowIso(),
-  );
+): { evaluation: EvaluationRecord; created: boolean } {
+  const result = db
+    .prepare(
+      `INSERT INTO strategy_evaluations (id, snapshot_id, strategy_id, config_version, input_hash, action, signal_strength, proposed_amount_in, invalidation, reasons_json, created_at, reorg_id, quarantined_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+       ON CONFLICT(snapshot_id, strategy_id, config_version) DO NOTHING`,
+    )
+    .run(
+      randomUUID(),
+      evaluation.snapshotId,
+      evaluation.strategyId,
+      evaluation.configVersion,
+      evaluation.inputHash,
+      evaluation.action,
+      evaluation.signalStrength,
+      evaluation.proposedAmountIn,
+      evaluation.invalidation,
+      JSON.stringify(evaluation.reasons),
+      nowIso(),
+    );
   const row = db
     .prepare('SELECT * FROM strategy_evaluations WHERE snapshot_id = ? AND strategy_id = ? AND config_version = ?')
     .get(evaluation.snapshotId, evaluation.strategyId, evaluation.configVersion) as Row;
-  return mapEvaluation(row);
+  return { evaluation: mapEvaluation(row), created: Number(result.changes) === 1 };
 }
 
 export function listEvaluations(db: Db, limit = 20): EvaluationRecord[] {
-  const rows = db.prepare('SELECT * FROM strategy_evaluations ORDER BY created_at DESC LIMIT ?').all(limit) as Row[];
+  const rows = db
+    .prepare(
+      `SELECT e.* FROM strategy_evaluations e
+       JOIN market_snapshots s ON s.id = e.snapshot_id
+       WHERE e.quarantined_at IS NULL AND s.quarantined_at IS NULL
+       ORDER BY e.created_at DESC LIMIT ?`,
+    )
+    .all(limit) as Row[];
   return rows.map(mapEvaluation);
 }
 
 export function getEvaluation(db: Db, id: string): EvaluationRecord | null {
   const row = db.prepare('SELECT * FROM strategy_evaluations WHERE id = ?').get(id) as Row | undefined;
   return row ? mapEvaluation(row) : null;
+}
+
+/** True when a reorg quarantined the evaluation or its snapshot. */
+export function isEvaluationQuarantined(db: Db, evaluationId: string): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 AS quarantined FROM strategy_evaluations e
+       JOIN market_snapshots s ON s.id = e.snapshot_id
+       WHERE e.id = ? AND (e.quarantined_at IS NOT NULL OR s.quarantined_at IS NOT NULL)`,
+    )
+    .get(evaluationId) as Row | undefined;
+  return row !== undefined;
+}
+
+export function listEvaluationsForSnapshot(db: Db, snapshotId: string): (EvaluationRecord & { id: string })[] {
+  const rows = db.prepare('SELECT * FROM strategy_evaluations WHERE snapshot_id = ? ORDER BY created_at ASC').all(snapshotId) as Row[];
+  return rows.map(mapEvaluation);
+}
+
+export function quarantineEvaluation(db: Db, evaluationId: string, reorgId: string, at: string): void {
+  db.prepare('UPDATE strategy_evaluations SET reorg_id = ?, quarantined_at = ? WHERE id = ?').run(reorgId, at, evaluationId);
+}
+
+export function deleteEvaluation(db: Db, evaluationId: string): void {
+  db.prepare('DELETE FROM strategy_evaluations WHERE id = ?').run(evaluationId);
+}
+
+export function listIntentsForSnapshot(db: Db, snapshotId: string): IntentRecord[] {
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT i.* FROM order_intents i
+       LEFT JOIN strategy_evaluations e ON e.id = i.evaluation_id
+       WHERE i.snapshot_id = ? OR e.snapshot_id = ?`,
+    )
+    .all(snapshotId, snapshotId) as Row[];
+  return rows.map(mapIntent);
+}
+
+export function countFillsForSnapshot(db: Db, snapshotId: string): number {
+  const row = db.prepare('SELECT COUNT(*) AS count FROM fills WHERE snapshot_id = ?').get(snapshotId) as Row;
+  return Number(row['count']);
 }
 
 export type IntentRecord = {
@@ -518,4 +621,113 @@ export function isKillSwitchEngaged(db: Db): boolean {
     // Unreadable state fails closed.
     return true;
   }
+}
+
+export type { ChainCheckpoint };
+
+export function getCheckpoint(db: Db, poolId: string): ChainCheckpoint | null {
+  const row = db.prepare('SELECT * FROM chain_checkpoints WHERE pool_id = ?').get(poolId) as Row | undefined;
+  if (!row) return null;
+  return {
+    poolId: row['pool_id'] as string,
+    chainId: Number(row['chain_id']),
+    blockNumber: Number(row['block_number']),
+    blockHash: row['block_hash'] as string,
+    parentHash: (row['parent_hash'] as string | null) ?? null,
+    updatedAt: row['updated_at'] as string,
+  };
+}
+
+export function saveCheckpoint(
+  db: Db,
+  input: { poolId: string; chainId: number; blockNumber: number; blockHash: string; parentHash: string | null },
+): void {
+  db.prepare(
+    `INSERT INTO chain_checkpoints (pool_id, chain_id, block_number, block_hash, parent_hash, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(pool_id) DO UPDATE SET
+       chain_id = excluded.chain_id,
+       block_number = excluded.block_number,
+       block_hash = excluded.block_hash,
+       parent_hash = excluded.parent_hash,
+       updated_at = excluded.updated_at`,
+  ).run(input.poolId, input.chainId, input.blockNumber, input.blockHash, input.parentHash, nowIso());
+}
+
+export function clearCheckpoint(db: Db, poolId: string): void {
+  db.prepare('DELETE FROM chain_checkpoints WHERE pool_id = ?').run(poolId);
+}
+
+export type ReorgRecord = {
+  readonly id: string;
+  readonly poolId: string;
+  readonly detectedAt: string;
+  readonly kind: ReorgKind;
+  readonly divergenceBlock: number;
+  readonly checkpointBlock: number | null;
+  readonly checkpointHash: string | null;
+  readonly canonicalBlock: number | null;
+  readonly canonicalHash: string | null;
+  readonly rewoundSnapshots: number;
+  readonly rewoundEvaluations: number;
+  readonly quarantinedSnapshots: number;
+  readonly quarantinedEvaluations: number;
+  readonly affectedIntents: number;
+  readonly correlationId: string;
+};
+
+export function insertReorg(db: Db, reorg: ReorgRecord): void {
+  db.prepare(
+    `INSERT INTO chain_reorgs (id, pool_id, detected_at, kind, divergence_block, checkpoint_block, checkpoint_hash, canonical_block, canonical_hash, rewound_snapshots, rewound_evaluations, quarantined_snapshots, quarantined_evaluations, affected_intents, correlation_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    reorg.id,
+    reorg.poolId,
+    reorg.detectedAt,
+    reorg.kind,
+    reorg.divergenceBlock,
+    reorg.checkpointBlock,
+    reorg.checkpointHash,
+    reorg.canonicalBlock,
+    reorg.canonicalHash,
+    reorg.rewoundSnapshots,
+    reorg.rewoundEvaluations,
+    reorg.quarantinedSnapshots,
+    reorg.quarantinedEvaluations,
+    reorg.affectedIntents,
+    reorg.correlationId,
+  );
+}
+
+export function recordReorgImpact(
+  db: Db,
+  input: {
+    reorgId: string;
+    entity: 'market_snapshot' | 'strategy_evaluation' | 'order_intent';
+    entityId: string;
+    blockNumber: number;
+    disposition: 'DELETED' | 'QUARANTINED';
+  },
+): void {
+  db.prepare(
+    'INSERT INTO chain_reorg_impacts (reorg_id, entity, entity_id, block_number, disposition) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+  ).run(input.reorgId, input.entity, input.entityId, input.blockNumber, input.disposition);
+}
+
+export function listReorgs(db: Db, limit = 20): Row[] {
+  return db.prepare('SELECT * FROM chain_reorgs ORDER BY detected_at DESC LIMIT ?').all(limit) as Row[];
+}
+
+export function listReorgImpacts(db: Db, reorgId: string): Row[] {
+  return db.prepare('SELECT * FROM chain_reorg_impacts WHERE reorg_id = ? ORDER BY block_number ASC').all(reorgId) as Row[];
+}
+
+/** Highest canonical snapshot strictly below `blockNumber`, used to re-anchor the checkpoint. */
+export function getHighestCanonicalSnapshotBelow(db: Db, poolId: string, blockNumber: number): PoolSnapshot | null {
+  const row = db
+    .prepare(
+      'SELECT * FROM market_snapshots WHERE pool_id = ? AND block_number < ? AND quarantined_at IS NULL ORDER BY block_number DESC LIMIT 1',
+    )
+    .get(poolId, blockNumber) as Row | undefined;
+  return row ? mapSnapshot(row) : null;
 }

@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { z } from 'zod';
 import type { Config } from './config.js';
 import type { Db } from './db/index.js';
+import { withTransaction } from './db/index.js';
 import {
   appendAudit,
   getEvaluation,
@@ -14,6 +15,7 @@ import {
   getRiskDecisionByIntent,
   getSnapshotById,
   isKillSwitchEngaged,
+  isEvaluationQuarantined,
   KILL_SWITCH_KEY,
   listEvaluations,
   listJournal,
@@ -25,6 +27,7 @@ import type { PoolIdentity, StrategyConfig } from './domain/types.js';
 import type { MarketService } from './services/market.js';
 import { createIntentFromEvaluation, executeIntent } from './services/execution.js';
 import type { QuotePort } from './services/ports.js';
+import { maybeInjectFault, type FaultHooks } from './services/faults.js';
 import { USDG, VERIFIED_VENUE, WETH } from './chain/venue.js';
 import {
   toCandidate,
@@ -50,6 +53,8 @@ export type AppDeps = {
   readonly market: MarketService;
   readonly quote: QuotePort;
   readonly probe: HealthProbe;
+  /** Test-only crash boundary seam; production leaves it undefined. */
+  readonly faults?: FaultHooks | undefined;
 };
 
 type Envelope = { requestId: string };
@@ -183,12 +188,18 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const body = intentBodySchema.parse(request.body);
     const evaluation = getEvaluation(deps.db, body.evaluationId);
     if (!evaluation) throw new AppError('NOT_FOUND', 'EvaluationRecord not found');
+    // A reorg quarantined this evaluation's block; its price is no longer
+    // canonical, so it must never produce a paper execution.
+    if (isEvaluationQuarantined(deps.db, evaluation.id)) {
+      throw new AppError('CONFLICT', 'Evaluation was quarantined by a chain reorg and requires manual review');
+    }
 
     const intent = createIntentFromEvaluation(deps.db, {
       evaluation,
       idempotencyKey: body.idempotencyKey,
       correlationId: requestId,
       mode: deps.config.mode,
+      faults: deps.faults,
     });
     const view = await executeIntent(
       {
@@ -198,6 +209,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         config: deps.strategyConfig,
         mode: deps.config.mode,
         correlationId: requestId,
+        faults: deps.faults,
       },
       intent.id,
     );
@@ -271,13 +283,18 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.post('/api/v1/system/halt', async (request, reply) => {
     const requestId = requestIdOf(request);
     const body = haltBodySchema.parse(request.body);
-    setState(deps.db, KILL_SWITCH_KEY, String(body.engaged));
-    appendAudit(deps.db, {
-      actor: 'operator',
-      action: body.engaged ? 'system.halt.engaged' : 'system.halt.released',
-      entity: 'automation_state',
-      entityId: KILL_SWITCH_KEY,
-      correlationId: requestId,
+    // AT-16: the automation state and its audit event commit together, so a
+    // crash cannot change the kill switch without a journal entry.
+    withTransaction(deps.db, () => {
+      setState(deps.db, KILL_SWITCH_KEY, String(body.engaged));
+      maybeInjectFault(deps.faults, 'automation.state');
+      appendAudit(deps.db, {
+        actor: 'operator',
+        action: body.engaged ? 'system.halt.engaged' : 'system.halt.released',
+        entity: 'automation_state',
+        entityId: KILL_SWITCH_KEY,
+        correlationId: requestId,
+      });
     });
     return reply.send({ data: { killSwitchEngaged: body.engaged }, meta: meta(requestId) });
   });

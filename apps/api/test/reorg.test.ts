@@ -1,0 +1,326 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import { buildApp } from '../src/app.js';
+import type { Config } from '../src/config.js';
+import {
+  getCheckpoint,
+  getLatestSnapshot,
+  getSnapshotAtBlockAny,
+  listReorgImpacts,
+  listReorgs,
+  seedOpeningCash,
+} from '../src/db/repositories.js';
+import { DEFAULT_STRATEGY_CONFIG } from '../src/domain/strategy.js';
+import { createMarketService, ReorgDetectedError } from '../src/services/market.js';
+import { createIntentFromEvaluation, executeIntent } from '../src/services/execution.js';
+import { createFakeChain, createFakeQuotePort, fakeBlock, makeDb, seedEvaluation, TEST_POOL } from './helpers.js';
+
+const config: Config = {
+  mode: 'PAPER',
+  rpcUrl: 'https://rpc.mainnet.chain.robinhood.com',
+  expectedChainId: 4663,
+  databasePath: ':memory:',
+  port: 0,
+  host: '127.0.0.1',
+  logLevel: 'silent',
+  marketFreshnessSeconds: 30,
+  openingCashUsdgBase: '10000000000',
+};
+
+let app: FastifyInstance | null = null;
+
+afterEach(async () => {
+  await app?.close();
+  app = null;
+});
+
+function market(db: ReturnType<typeof makeDb>, chain: ReturnType<typeof createFakeChain>) {
+  return createMarketService({ db, chain, pool: TEST_POOL, config: DEFAULT_STRATEGY_CONFIG, correlationId: 'reorg-test' });
+}
+
+function countRows(db: ReturnType<typeof makeDb>, table: string): number {
+  const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number | bigint };
+  return Number(row.count);
+}
+
+function auditActions(db: ReturnType<typeof makeDb>): string[] {
+  return (db.prepare('SELECT action FROM audit_events ORDER BY rowid ASC').all() as { action: string }[]).map((r) => r.action);
+}
+
+function checkpointFor(db: ReturnType<typeof makeDb>) {
+  return getCheckpoint(db, TEST_POOL.id);
+}
+
+describe('AT-04 chain checkpoint', () => {
+  it('persists the checkpoint with block hash and parent hash on the first ingest', async () => {
+    const db = makeDb();
+    const chain = createFakeChain([fakeBlock(100, 'aa')]);
+    const service = market(db, chain);
+
+    const snapshot = await service.takeSnapshot();
+    expect(snapshot).not.toBeNull();
+
+    const checkpoint = checkpointFor(db);
+    expect(checkpoint).not.toBeNull();
+    expect(checkpoint!.chainId).toBe(4663);
+    expect(checkpoint!.poolId).toBe(TEST_POOL.id);
+    expect(checkpoint!.blockNumber).toBe(100);
+    expect(checkpoint!.blockHash).toBe(snapshot!.blockHash);
+    expect(checkpoint!.parentHash).toBe(fakeBlock(100, 'aa').parentHash);
+    expect(auditActions(db)).toContain('market.snapshot.persisted');
+  });
+
+  it('verifies the parent hash after a restart and continues from the next block', async () => {
+    const db = makeDb();
+    const previous = fakeBlock(100, 'aa');
+    const next = fakeBlock(101, 'bb', previous.hash);
+    const chain = createFakeChain([previous]);
+
+    const first = market(db, chain);
+    await first.takeSnapshot();
+    expect(checkpointFor(db)!.blockNumber).toBe(100);
+
+    // Simulate a restart: a fresh service over the same database.
+    chain.setHead(next);
+    const restarted = market(db, chain);
+    const snapshot = await restarted.takeSnapshot();
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot!.blockNumber).toBe(101);
+    expect(checkpointFor(db)!.blockNumber).toBe(101);
+    expect(checkpointFor(db)!.parentHash).toBe(previous.hash);
+  });
+
+  it('accepts a gap above the checkpoint once the checkpoint block still resolves to the stored hash', async () => {
+    const db = makeDb();
+    const base = fakeBlock(100, 'aa');
+    const chain = createFakeChain([base]);
+    await market(db, chain).takeSnapshot();
+
+    const far = fakeBlock(150, 'cc', fakeBlock(149, 'dd').hash);
+    chain.setCanonical([base, far]);
+    chain.setHead(far);
+
+    const snapshot = await market(db, chain).takeSnapshot();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot!.blockNumber).toBe(150);
+    expect(checkpointFor(db)!.blockNumber).toBe(150);
+  });
+
+  it('detects a same-height hash replacement, rewinds the orphan, and halts new entries', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const b101 = fakeBlock(101, 'bb', b100.hash);
+    const chain = createFakeChain([b100]);
+    const service = market(db, chain);
+    await service.takeSnapshot();
+
+    // The chain reorgs block 100 to a different hash at the same height.
+    const replacement = fakeBlock(100, 'ff');
+    chain.setCanonical([replacement]);
+    chain.setHead(replacement);
+
+    await expect(service.takeSnapshot()).rejects.toBeInstanceOf(ReorgDetectedError);
+
+    // The orphaned snapshot is gone, its hash can never be read again.
+    expect(getSnapshotAtBlockAny(db, TEST_POOL.id, 100)).toBeNull();
+    expect(checkpointFor(db)).toBeNull();
+    expect(auditActions(db)).toContain('chain.reorg.detected');
+    expect(auditActions(db)).toContain('system.halt.engaged');
+    expect(db.prepare("SELECT value FROM automation_state WHERE key = 'new_entries_halted'").get()).toEqual({ value: 'true' });
+
+    const reorgs = listReorgs(db);
+    expect(reorgs).toHaveLength(1);
+    expect(reorgs[0]!['kind']).toBe('SAME_HEIGHT_HASH_REPLACEMENT');
+    expect(reorgs[0]!['divergence_block']).toBe(100);
+    expect(reorgs[0]!['rewound_snapshots']).toBe(1);
+
+    // The next tick ingests the replacement hash, never the orphan.
+    const after = await market(db, chain).takeSnapshot();
+    expect(after).not.toBeNull();
+    expect(after!.blockHash).toBe(replacement.hash);
+  });
+
+  it('rejects a head whose parent does not extend the checkpoint', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const chain = createFakeChain([b100]);
+    await market(db, chain).takeSnapshot();
+
+    // Same height+1 but a different parent: a stale side branch.
+    chain.setHead(fakeBlock(101, 'ee', fakeBlock(99, 'zz').hash));
+
+    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ReorgDetectedError);
+    expect(listReorgs(db)[0]!['kind']).toBe('PARENT_MISMATCH');
+    expect(listReorgs(db)[0]!['divergence_block']).toBe(101);
+  });
+
+  it('fails closed when the checkpoint block cannot be resolved by the provider', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const chain = createFakeChain([b100]);
+    await market(db, chain).takeSnapshot();
+
+    const far = fakeBlock(120, 'cc', fakeBlock(119, 'dd').hash);
+    chain.setCanonical([far]);
+    chain.setHead(far);
+    chain.hideBlock(100);
+
+    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ReorgDetectedError);
+    expect(listReorgs(db)[0]!['kind']).toBe('CANONICAL_BLOCK_UNAVAILABLE');
+    expect(db.prepare("SELECT value FROM automation_state WHERE key = 'new_entries_halted'").get()).toEqual({ value: 'true' });
+  });
+});
+
+describe('AT-04 reorg quarantine of referenced executions', () => {
+  async function seedExecutedSnapshot(db: ReturnType<typeof makeDb>, chain: ReturnType<typeof createFakeChain>) {
+    seedOpeningCash(db, '10000000000');
+    const snapshot = await market(db, chain).takeSnapshot();
+    const evaluation = seedEvaluation(db, snapshot!, 'BUY', '500000000');
+    const intent = createIntentFromEvaluation(db, {
+      evaluation,
+      idempotencyKey: 'reorg-key-1',
+      correlationId: 'seed',
+      mode: 'PAPER',
+    });
+    return { snapshot: snapshot!, evaluation, intent };
+  }
+
+  it('quarantines a snapshot a paper execution references instead of deleting it', async () => {
+    const db = makeDb();
+    const chain = createFakeChain([fakeBlock(100, 'aa')]);
+    const { snapshot, evaluation, intent } = await seedExecutedSnapshot(db, chain);
+
+    // Execute the intent so a fill points at the snapshot.
+    await executeIntent(
+      { db, quote: createFakeQuotePort({ headBlock: 100 }), pool: TEST_POOL, config: DEFAULT_STRATEGY_CONFIG, mode: 'PAPER', correlationId: 'seed' },
+      intent.id,
+    );
+    expect(countRows(db, 'fills')).toBe(1);
+
+    const replacement = fakeBlock(100, 'ff');
+    chain.setCanonical([replacement]);
+    chain.setHead(replacement);
+
+    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ReorgDetectedError);
+
+    const stored = getSnapshotAtBlockAny(db, TEST_POOL.id, 100);
+    expect(stored).not.toBeNull();
+    expect(stored!.quarantined).toBe(true);
+    expect(stored!.snapshot.blockHash).toBe(snapshot.blockHash);
+    // The fill survives; the row is never deleted from under it.
+    expect(countRows(db, 'fills')).toBe(1);
+
+    expect(auditActions(db)).toContain('paper.execution.reorg_review_required');
+    const reorgId = listReorgs(db)[0]!['id'] as string;
+    const impacts = listReorgImpacts(db, reorgId);
+    expect(impacts.some((row) => row['entity'] === 'market_snapshot' && row['disposition'] === 'QUARANTINED')).toBe(true);
+    expect(impacts.some((row) => row['entity'] === 'strategy_evaluation' && row['disposition'] === 'QUARANTINED')).toBe(true);
+    expect(impacts.some((row) => row['entity'] === 'order_intent' && row['disposition'] === 'QUARANTINED')).toBe(true);
+
+    // The quarantined height is never re-ingested: the row keeps the orphan hash
+    // and ingestion resumes only at a higher canonical block.
+    const skipped = await market(db, chain).takeSnapshot();
+    expect(skipped).toBeNull();
+    expect(getSnapshotAtBlockAny(db, TEST_POOL.id, 100)!.snapshot.blockHash).toBe(snapshot.blockHash);
+
+    const next = fakeBlock(101, 'gg', replacement.hash);
+    chain.setHead(next);
+    const resumed = await market(db, chain).takeSnapshot();
+    expect(resumed).not.toBeNull();
+    expect(resumed!.blockNumber).toBe(101);
+    expect(resumed!.blockHash).toBe(next.hash);
+
+    // The quarantined evaluation can no longer produce a paper intent.
+    app = buildApp({
+      db,
+      config,
+      pool: TEST_POOL,
+      strategyConfig: DEFAULT_STRATEGY_CONFIG,
+      market: market(db, chain),
+      quote: createFakeQuotePort(),
+      probe: async () => ({ chainId: 4663, headBlock: 101, latencyMs: 1 }),
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: evaluation.id, idempotencyKey: 'reorg-key-2' },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('CONFLICT');
+  });
+
+  it('never reports a quarantined snapshot as the latest market read', async () => {
+    const db = makeDb();
+    const chain = createFakeChain([fakeBlock(100, 'aa')]);
+    const { snapshot, intent } = await seedExecutedSnapshot(db, chain);
+    // Execute so the snapshot must be retained, not deleted.
+    await executeIntent(
+      { db, quote: createFakeQuotePort({ headBlock: 100 }), pool: TEST_POOL, config: DEFAULT_STRATEGY_CONFIG, mode: 'PAPER', correlationId: 'seed' },
+      intent.id,
+    );
+
+    const replacement = fakeBlock(100, 'ff');
+    chain.setCanonical([replacement]);
+    chain.setHead(replacement);
+    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ReorgDetectedError);
+    expect(getSnapshotAtBlockAny(db, TEST_POOL.id, 100)!.snapshot.blockHash).toBe(snapshot.blockHash);
+
+    const canonical = db
+      .prepare('SELECT block_hash FROM market_snapshots WHERE pool_id = ? AND quarantined_at IS NULL')
+      .all(TEST_POOL.id) as { block_hash: string }[];
+    expect(canonical).toHaveLength(0);
+    expect(getLatestSnapshot(db, TEST_POOL.id)).toBeNull();
+  });
+});
+
+describe('AT-04 checkpoint survives a restart without duplicating rows', () => {
+  it('keeps one snapshot per block height across a restart', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const chain = createFakeChain([b100]);
+    await market(db, chain).takeSnapshot();
+    await market(db, chain).takeSnapshot();
+
+    expect(countRows(db, 'market_snapshots')).toBe(1);
+    expect(countRows(db, 'audit_events')).toBe(1);
+    const snapshot = await market(db, chain).takeSnapshot();
+    expect(snapshot!.blockHash).toBe(b100.hash);
+  });
+});
+
+describe('AT-04 reorg transaction boundary', () => {
+  it('rolls back the whole rewind when the reorg transaction fails', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const chain = createFakeChain([b100]);
+    const service = createMarketService({
+      db,
+      chain,
+      pool: TEST_POOL,
+      config: DEFAULT_STRATEGY_CONFIG,
+      correlationId: 'reorg-test',
+      faults: {
+        afterEntityWrite: (stage) => {
+          if (stage === 'chain.reorg') throw new Error('simulated crash before commit');
+        },
+      },
+    });
+    await service.takeSnapshot();
+
+    const replacement = fakeBlock(100, 'ff');
+    chain.setCanonical([replacement]);
+    chain.setHead(replacement);
+
+    await expect(service.takeSnapshot()).rejects.toThrow('simulated crash before commit');
+
+    // Nothing was rewound or nudged: no reorg row, no quarantine, no halt.
+    expect(countRows(db, 'chain_reorgs')).toBe(0);
+    expect(countRows(db, 'chain_reorg_impacts')).toBe(0);
+    const stored = getSnapshotAtBlockAny(db, TEST_POOL.id, 100);
+    expect(stored).not.toBeNull();
+    expect(stored!.quarantined).toBe(false);
+    expect(checkpointFor(db)!.blockNumber).toBe(100);
+    expect(db.prepare("SELECT value FROM automation_state WHERE key = 'new_entries_halted'").get()).not.toEqual({ value: 'true' });
+  });
+});
