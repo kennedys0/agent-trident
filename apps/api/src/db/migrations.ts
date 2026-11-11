@@ -185,4 +185,13 @@ CREATE INDEX idx_audit_events_entity ON audit_events (entity, entity_id, at);
 CREATE INDEX idx_ledger_entries_group ON ledger_entries (tx_group);
 `,
   },
+  {
+    version: '002_risk_approval_units',
+    // The contract separates the approved base quantity from the quote leg, so the
+    // former in/out columns are renamed to say what each amount actually means.
+    sql: `
+ALTER TABLE risk_decisions RENAME COLUMN approved_amount_in TO approved_base_qty;
+ALTER TABLE risk_decisions RENAME COLUMN approved_amount_out TO approved_quote_amount;
+`,
+  },
 ];

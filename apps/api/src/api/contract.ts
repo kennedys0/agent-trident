@@ -5,19 +5,24 @@ import {
   journalPageSchema,
   marketSnapshotSchema,
   portfolioSchema,
+  riskDecisionSchema,
+  tradeIntentSchema,
   venueSchema,
   type AuditEvent,
   type Evaluation,
   type MarketSnapshot,
   type Portfolio,
-  type ScaledInteger,
+  type RiskDecision,
+  type TradeIntent,
 } from '@trident/api-contract';
 import { quoteToBaseQty, quoteValueOf } from '../domain/price.js';
+import type { RiskDecisionRecord, IntentRecord } from '../db/repositories.js';
 import type {
   EvaluationRecord,
   PoolIdentity,
   PoolSnapshot,
   PortfolioState,
+  RiskRule,
   SnapshotStatus,
   Venue,
 } from '../domain/types.js';
@@ -36,7 +41,7 @@ function amount(value: bigint | string, decimals: number): { value: string; deci
   return { value: value.toString(), decimals };
 }
 
-function scaled(value: bigint | string, scale: number): { value: string; scale: string } {
+function scaled(value: bigint | string, scale: number) {
   return { value: value.toString(), scale: String(scale) };
 }
 
@@ -140,7 +145,7 @@ export function toEvaluation(record: EvaluationRecord, snapshot: PoolSnapshot): 
     snapshotId: record.snapshotId,
     snapshotStatus: snapshot.status,
     strategyId: record.strategyId,
-    configVersion: String(record.configVersion),
+    configVersion: record.configVersion,
     inputHash: `0x${record.inputHash.replace(/^0x/, '').slice(0, 64)}`,
     signalStrength: Math.min(10_000, record.signalStrength * 100),
     invalidation: record.invalidation,
@@ -173,9 +178,86 @@ export function toCandidate(record: EvaluationRecord, snapshot: PoolSnapshot, po
 }
 
 /**
- * The contract marks positions as priced (`valuationSnapshotId` is required and
- * unrealized PnL cannot be null), so an unpriced position is omitted from the
- * payload and flagged in `meta` instead of being valued at a fake zero.
+ * Intent terms come from the evaluation and its snapshot: the strategy sizes the
+ * trade and the snapshot price is the limit the gate priced. The executed units
+ * are not copied here — they live on the risk decision and the fill.
+ */
+export function toTradeIntent(intent: IntentRecord, pool: PoolIdentity, snapshot: PoolSnapshot): TradeIntent {
+  const { base, quote } = baseQuoteAddresses(pool);
+  const baseQty =
+    intent.side === 'BUY'
+      ? quoteToBaseQty(BigInt(intent.amountIn), BigInt(snapshot.priceScaled), WETH_DECIMALS, USDC_DECIMALS, snapshot.priceScale)
+      : BigInt(intent.amountIn);
+
+  return tradeIntentSchema.parse({
+    id: intent.id,
+    evaluationId: intent.evaluationId,
+    idempotencyKey: intent.idempotencyKey,
+    mode: 'PAPER',
+    side: intent.side,
+    token: base,
+    quoteToken: quote,
+    baseQty: baseQty.toString(),
+    limitPrice: scaled(snapshot.priceScaled, snapshot.priceScale),
+    snapshotId: intent.snapshotId,
+    expiresAt: intent.expiresAt,
+    status: intent.status,
+  });
+}
+
+function riskRuleEvidence(rule: RiskRule): {
+  rule: string;
+  status: RiskRule['status'];
+  observed: RiskRule['observed'];
+  threshold: RiskRule['threshold'];
+  reason?: string;
+} {
+  return {
+    rule: rule.rule,
+    status: rule.status,
+    observed: rule.observed,
+    threshold: rule.threshold,
+    ...(rule.reason === undefined ? {} : { reason: rule.reason }),
+  };
+}
+
+/**
+ * The wire decision carries the same per-rule evidence the gate produced, with
+ * the approval split into explicit base and quote units.
+ */
+export function toRiskDecision(record: RiskDecisionRecord): RiskDecision {
+  const shared = {
+    intentId: record.intentId,
+    policyVersion: record.policyVersion,
+    portfolioVersion: record.portfolioVersion,
+    evaluatedAt: record.evaluatedAt,
+  };
+
+  if (record.verdict === 'APPROVED') {
+    if (record.approvedBaseQty === null || record.approvedQuoteAmount === null) {
+      throw new Error('Approved risk decision is missing its approved units');
+    }
+    return riskDecisionSchema.parse({
+      ...shared,
+      verdict: 'APPROVED',
+      rules: record.rules.map(riskRuleEvidence),
+      reasons: [`All ${record.rules.length} ${record.policyVersion} rules passed`],
+      approvedBaseQty: amount(record.approvedBaseQty, WETH_DECIMALS),
+      maximumQuoteCost: amount(record.approvedQuoteAmount, USDC_DECIMALS),
+    });
+  }
+
+  return riskDecisionSchema.parse({
+    ...shared,
+    verdict: 'REJECTED',
+    rules: record.rules.map(riskRuleEvidence),
+    reasons: record.rules.filter((rule) => rule.status !== 'PASS').map((rule) => `${rule.rule}: ${rule.reason ?? 'failed'}`),
+  });
+}
+
+/**
+ * A position is priced only when a snapshot exists. The contract's `UNPRICED`
+ * variant keeps the quantity and cost basis visible instead of inventing a zero.
  */
 export function toPortfolio(
   state: PortfolioState,
@@ -185,36 +267,42 @@ export function toPortfolio(
     readonly priceScaled: string | null;
     readonly priceScale: number;
   },
-): { portfolio: Portfolio; unpricedPosition: boolean } {
+): Portfolio {
   const { base, quote } = baseQuoteAddresses(input.pool);
   const weth = state.positions.find((position) => position.assetId === 'WETH');
   const priced = input.snapshotId !== null && input.priceScaled !== null;
   const quantity = weth ? BigInt(weth.quantity) : 0n;
 
-  const positions: {
-    asset: string;
-    quantity: { value: string; decimals: number };
-    costBasisQuote: { value: string; decimals: number };
-    unrealizedPnlQuote: { value: string; decimals: number };
-    valuationSnapshotId: string;
-  }[] = [];
+  const positions: unknown[] = [];
   let unrealized = 0n;
   let marketValue = 0n;
 
-  if (priced && quantity > 0n) {
-    marketValue = quoteValueOf(quantity, BigInt(input.priceScaled as string), WETH_DECIMALS, USDC_DECIMALS, input.priceScale);
-    unrealized = marketValue - BigInt(state.costBasisUsdg);
-    positions.push({
+  if (quantity > 0n) {
+    const shared = {
       asset: base,
       quantity: amount(quantity, WETH_DECIMALS),
       costBasisQuote: amount(BigInt(state.costBasisUsdg), USDC_DECIMALS),
-      unrealizedPnlQuote: { value: unrealized.toString(), decimals: USDC_DECIMALS },
-      valuationSnapshotId: input.snapshotId as string,
-    });
+    };
+    if (priced) {
+      marketValue = quoteValueOf(quantity, BigInt(input.priceScaled as string), WETH_DECIMALS, USDC_DECIMALS, input.priceScale);
+      unrealized = marketValue - BigInt(state.costBasisUsdg);
+      positions.push({
+        ...shared,
+        valuationStatus: 'VALUED',
+        unrealizedPnlQuote: { value: unrealized.toString(), decimals: USDC_DECIMALS },
+        valuationSnapshotId: input.snapshotId as string,
+      });
+    } else {
+      positions.push({
+        ...shared,
+        valuationStatus: 'UNPRICED',
+        reason: 'No market snapshot is available to value this position',
+      });
+    }
   }
 
   const equity = BigInt(state.cashUsdg) + marketValue;
-  const portfolio = portfolioSchema.parse({
+  return portfolioSchema.parse({
     mode: 'PAPER',
     asOf: state.asOf,
     balances: [
@@ -226,8 +314,6 @@ export function toPortfolio(
     realizedPnlQuote: { value: state.realizedPnlUsdg, decimals: USDC_DECIMALS },
     unrealizedPnlQuote: { value: unrealized.toString(), decimals: USDC_DECIMALS },
   });
-
-  return { portfolio, unpricedPosition: quantity > 0n && !priced };
 }
 
 export function toJournal(

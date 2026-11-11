@@ -10,6 +10,8 @@ function approvedInput(overrides: Partial<RiskInput> = {}): RiskInput {
     mode: 'PAPER',
     amountIn: '500000000',
     notionalQuote: '500000000',
+    feeQuoteBase: '50000',
+    evaluatedAt: '2026-11-11T03:00:00.000Z',
     snapshot,
     snapshotStatus: 'COMPLETE',
     snapshotAgeSeconds: 2,
@@ -33,13 +35,20 @@ describe('fail-closed risk gate', () => {
     const decision = evaluateRisk(approvedInput());
     expect(decision.verdict).toBe('APPROVED');
     expect(decision.rules.every((rule) => rule.status === 'PASS')).toBe(true);
+    expect(decision.approvedBaseQty).toBe('242701000000000000');
+    expect(decision.approvedQuoteAmount).toBe('500050000');
+    expect(decision.evaluatedAt).toBe('2026-11-11T03:00:00.000Z');
   });
 
   it('rejects a stale snapshot and reports the failing rule', () => {
     const decision = evaluateRisk(approvedInput({ snapshotStatus: 'STALE', snapshotAgeSeconds: 60 }));
     expect(decision.verdict).toBe('REJECTED');
-    expect(decision.rules.find((rule) => rule.rule === 'R04_snapshot_fresh')?.status).toBe('FAIL');
-    expect(decision.approvedAmountIn).toBeNull();
+    const stale = decision.rules.find((rule) => rule.rule === 'R04_snapshot_fresh');
+    expect(stale?.status).toBe('FAIL');
+    expect(stale?.observed).toBe(60);
+    expect(stale?.threshold).toBe(30);
+    expect(stale?.reason).toBeTruthy();
+    expect(decision.approvedBaseQty).toBeNull();
   });
 
   it('rejects when the snapshot is missing entirely', () => {
@@ -69,5 +78,20 @@ describe('fail-closed risk gate', () => {
 
   it('rejects a pool outside the allowlist', () => {
     expect(evaluateRisk(approvedInput({ poolMatchesAllowlist: false })).verdict).toBe('REJECTED');
+  });
+
+  it('gives every non-passing rule a reason the contract accepts', () => {
+    const decision = evaluateRisk(
+      approvedInput({ snapshotStatus: 'STALE', snapshotAgeSeconds: 60, killSwitchEngaged: true, poolMatchesAllowlist: false }),
+    );
+    const failing = decision.rules.filter((rule) => rule.status !== 'PASS');
+    expect(failing.length).toBeGreaterThan(0);
+    for (const rule of failing) expect(rule.reason?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('counts the quote fee in the cash rule', () => {
+    const decision = evaluateRisk(approvedInput({ cashUsdgBase: '500000000', feeQuoteBase: '50000' }));
+    expect(decision.verdict).toBe('REJECTED');
+    expect(decision.rules.find((rule) => rule.rule === 'R11_cash_available')?.status).toBe('FAIL');
   });
 });

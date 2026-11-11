@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp, type AppDeps } from '../src/app.js';
 import type { Config } from '../src/config.js';
-import { insertSnapshot } from '../src/db/repositories.js';
+import { insertSnapshot, upsertPosition } from '../src/db/repositories.js';
 import { DEFAULT_STRATEGY_CONFIG } from '../src/domain/strategy.js';
 import { createFakeQuotePort, makeDb, makeSnapshot, seedEvaluation, TEST_POOL } from './helpers.js';
 import type { MarketService } from '../src/services/market.js';
@@ -12,6 +12,8 @@ import {
   journalPageSchema,
   marketSnapshotSchema,
   portfolioSchema,
+  riskDecisionSchema,
+  tradeIntentSchema,
   venueSchema,
 } from '@trident/api-contract';
 
@@ -82,11 +84,13 @@ describe('HTTP API', () => {
     const response = await server.inject({ method: 'GET', url: '/api/v1/venues' });
     const body = response.json();
     expect(response.statusCode).toBe(200);
-    expect(body.data.venues[0].pool).toBe(TEST_POOL.id);
-    expect(body.data.venues[0].chainId).toBe(4663);
-    expect(body.data.venues[0].provenance.length).toBeGreaterThan(0);
+    // The contract types `data` as an array, not a wrapped object.
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data[0].pool).toBe(TEST_POOL.id);
+    expect(body.data[0].chainId).toBe(4663);
+    expect(body.data[0].provenance.length).toBeGreaterThan(0);
     expect(body.meta.assets).toHaveLength(2);
-    expect(() => venueSchema.parse(body.data.venues[0])).not.toThrow();
+    for (const venue of body.data as unknown[]) expect(() => venueSchema.parse(venue)).not.toThrow();
   });
 
   it('returns 404 for a market snapshot before any observation exists', async () => {
@@ -139,12 +143,25 @@ describe('HTTP API', () => {
     expect(first.statusCode).toBe(201);
     const firstBody = first.json();
     expect(firstBody.data.riskDecision.verdict).toBe('APPROVED');
-    expect(firstBody.data.fillId).toBeTruthy();
+    expect(firstBody.meta.fillId).toBeTruthy();
+    // Both payload halves are the ratified contract shapes.
+    expect(() => tradeIntentSchema.parse(firstBody.data.intent)).not.toThrow();
+    expect(() => riskDecisionSchema.parse(firstBody.data.riskDecision)).not.toThrow();
+    const approved = firstBody.data.riskDecision;
+    expect(approved.approvedBaseQty.decimals).toBe(18);
+    expect(approved.maximumQuoteCost.decimals).toBe(6);
+    expect(approved.rules.length).toBeGreaterThan(0);
+    expect(approved.rules.every((rule: { status: string }) => rule.status === 'PASS')).toBe(true);
 
     const second = await server.inject({ method: 'POST', url: '/api/v1/intents', payload });
     expect(second.statusCode).toBe(200);
-    expect(second.json().data.replayed).toBe(true);
-    expect(second.json().data.fillId).toBe(firstBody.data.fillId);
+    expect(second.json().meta.replayed).toBe(true);
+    expect(second.json().meta.fillId).toBe(firstBody.meta.fillId);
+
+    const detail = await server.inject({ method: 'GET', url: `/api/v1/intents/${firstBody.data.intent.id}` });
+    expect(detail.statusCode).toBe(200);
+    expect(() => tradeIntentSchema.parse(detail.json().data.intent)).not.toThrow();
+    expect(() => riskDecisionSchema.parse(detail.json().data.riskDecision)).not.toThrow();
   });
 
   it('reports a simulated portfolio and an append-only journal', async () => {
@@ -157,12 +174,16 @@ describe('HTTP API', () => {
     expect(portfolio.statusCode).toBe(200);
     expect(portfolio.json().meta.simulated).toBe(true);
     expect(portfolio.json().data.positions).toHaveLength(1);
+    expect(portfolio.json().data.positions[0].valuationStatus).toBe('VALUED');
+    expect(portfolio.json().data.positions[0].valuationSnapshotId).toBeTruthy();
     expect(portfolio.json().data.mode).toBe('PAPER');
     expect(() => portfolioSchema.parse(portfolio.json().data)).not.toThrow();
 
     const candidates = await server.inject({ method: 'GET', url: '/api/v1/candidates?limit=5' });
     expect(candidates.statusCode).toBe(200);
-    for (const candidate of candidates.json().data.candidates as unknown[]) {
+    const candidateList = candidates.json().data as unknown[];
+    expect(Array.isArray(candidateList)).toBe(true);
+    for (const candidate of candidateList) {
       expect(() => candidateSchema.parse(candidate)).not.toThrow();
     }
 
@@ -173,6 +194,21 @@ describe('HTTP API', () => {
     const types = (journalBody.events as { type: string }[]).map((event) => event.type);
     expect(types).toContain('paper.fill.recorded');
     expect(types).toContain('risk.decision.recorded');
+  });
+
+  it('marks a position UNPRICED when no snapshot can value it', async () => {
+    const db = makeDb();
+    upsertPosition(db, { assetId: 'WETH', quantity: '242701000000000000', costBasis: '500050000' });
+    const server = makeApp({ db });
+    const response = await server.inject({ method: 'GET', url: '/api/v1/portfolio' });
+    const body = response.json();
+    expect(response.statusCode).toBe(200);
+    const position = body.data.positions[0];
+    expect(position.valuationStatus).toBe('UNPRICED');
+    expect(position.reason).toBeTruthy();
+    expect(position.unrealizedPnlQuote).toBeUndefined();
+    expect(body.data.equityQuote.value).toBe('10000000000');
+    expect(() => portfolioSchema.parse(body.data)).not.toThrow();
   });
 
   it('engages and reports the persisted kill switch', async () => {

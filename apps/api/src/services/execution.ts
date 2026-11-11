@@ -19,10 +19,11 @@ import {
   setIntentStatus,
   upsertPosition,
   type IntentRecord,
+  type RiskDecisionRecord,
 } from '../db/repositories.js';
 import { AppError } from '../errors.js';
 import { postBuy, postSell } from '../domain/ledger.js';
-import { executionPriceScaled, quoteValueOf } from '../domain/price.js';
+import { executionPriceScaled, quoteToBaseQty, quoteValueOf } from '../domain/price.js';
 import { evaluateRisk } from '../domain/risk.js';
 import { effectiveStatus } from '../domain/snapshot.js';
 import type { AssetIdentity, EvaluationRecord, PoolIdentity, RiskOutcome, StrategyConfig } from '../domain/types.js';
@@ -34,7 +35,7 @@ const INTENT_TTL_SECONDS = 60;
 
 export type IntentView = {
   readonly intent: IntentRecord;
-  readonly riskDecision: RiskOutcome | null;
+  readonly riskDecision: RiskDecisionRecord | null;
   readonly orderId: string | null;
   readonly fillId: string | null;
   readonly replayed: boolean;
@@ -55,6 +56,15 @@ export function createIntentFromEvaluation(
     throw new AppError('INTENT_NOT_ACTIONABLE', `EvaluationRecord action ${input.evaluation.action} cannot produce a paper intent`);
   }
   const side = input.evaluation.action;
+  const snapshot = getSnapshotById(db, input.evaluation.snapshotId);
+  if (snapshot === null) throw new AppError('CONFLICT', 'Evaluation points at a snapshot that does not exist');
+  const baseQty =
+    side === 'BUY'
+      ? quoteToBaseQty(BigInt(input.evaluation.proposedAmountIn), BigInt(snapshot.priceScaled), 18, 6, snapshot.priceScale)
+      : BigInt(input.evaluation.proposedAmountIn);
+  if (baseQty <= 0n) {
+    throw new AppError('INTENT_NOT_ACTIONABLE', 'Evaluation sizes a trade smaller than one base unit at the snapshot price');
+  }
   const now = input.now ?? new Date();
   const intent = createIntent(db, {
     evaluationId: input.evaluation.id,
@@ -177,12 +187,21 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
   const snapshotAgeSeconds = snapshot
     ? Math.max(0, Math.floor((now.getTime() - new Date(snapshot.observedAt).getTime()) / 1000))
     : null;
+  /** Fees are quote-denominated on both sides, so the risk gate can size them. */
+  const feeQuote =
+    quote === null
+      ? 0n
+      : intent.side === 'BUY'
+        ? (BigInt(intent.amountIn) * BigInt(pool.fee)) / 1_000_000n
+        : (quote.amountOut * BigInt(pool.fee)) / 1_000_000n;
 
   const risk = evaluateRisk({
     side: intent.side,
     mode: intent.mode,
     amountIn: intent.amountIn,
     notionalQuote: intent.side === 'BUY' ? intent.amountIn : (quote?.amountOut ?? 0n).toString(),
+    feeQuoteBase: feeQuote.toString(),
+    evaluatedAt: now.toISOString(),
     snapshot,
     snapshotStatus,
     snapshotAgeSeconds,
@@ -225,24 +244,23 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
     const amountOut = quote.amountOut;
 
     if (intent.side === 'BUY') {
-      const fee = (amountIn * BigInt(pool.fee)) / 1_000_000n;
       const fillId = insertFill(db, {
         orderId,
         snapshotId: snapshot.id,
         amountIn: amountIn.toString(),
         amountOut: amountOut.toString(),
         executionPriceScaled: executionPrice!.toString(),
-        feeAmount: fee.toString(),
+        feeAmount: feeQuote.toString(),
         gasUnits: quote.gasEstimate.toString(),
         gasCostWei: gasCostWei.toString(),
         assumptionsVersion: ASSUMPTIONS_VERSION,
       });
-      postBuy(db, { fillId, amountInUsdg: amountIn.toString(), amountOutWeth: amountOut.toString(), feeUsdg: fee.toString() });
+      postBuy(db, { fillId, amountInUsdg: amountIn.toString(), amountOutWeth: amountOut.toString(), feeUsdg: feeQuote.toString() });
       const prior = getPosition(db, 'WETH');
       upsertPosition(db, {
         assetId: 'WETH',
         quantity: ((prior ? BigInt(prior.quantity) : 0n) + amountOut).toString(),
-        costBasis: ((prior ? BigInt(prior.costBasis) : 0n) + amountIn + fee).toString(),
+        costBasis: ((prior ? BigInt(prior.costBasis) : 0n) + amountIn + feeQuote).toString(),
       });
       markOrderFilled(db, orderId);
       setIntentStatus(db, intent.id, 'FILLED');
@@ -252,7 +270,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
         entity: 'fill',
         entityId: fillId,
         correlationId: deps.correlationId,
-        payload: { side: 'BUY', amountIn: amountIn.toString(), amountOut: amountOut.toString(), fee: fee.toString(), snapshotId: snapshot.id },
+        payload: { side: 'BUY', amountIn: amountIn.toString(), amountOut: amountOut.toString(), fee: feeQuote.toString(), snapshotId: snapshot.id },
       });
       return { orderId, fillId, riskDecisionId };
     }
@@ -261,8 +279,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
     const quantityBefore = costBasis ? BigInt(costBasis.costBasis) : 0n;
     const unitsBefore = costBasis ? BigInt(costBasis.quantity) : 0n;
     const costReleased = unitsBefore > 0n ? (quantityBefore * amountIn) / unitsBefore : 0n;
-    const fee = (amountOut * BigInt(pool.fee)) / 1_000_000n;
-    const proceeds = amountOut - fee;
+    const proceeds = amountOut - feeQuote;
     const realized = proceeds - costReleased;
     const fillId = insertFill(db, {
       orderId,
@@ -270,7 +287,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       amountIn: amountIn.toString(),
       amountOut: amountOut.toString(),
       executionPriceScaled: executionPrice!.toString(),
-      feeAmount: fee.toString(),
+      feeAmount: feeQuote.toString(),
       gasUnits: quote.gasEstimate.toString(),
       gasCostWei: gasCostWei.toString(),
       assumptionsVersion: ASSUMPTIONS_VERSION,
@@ -279,7 +296,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       fillId,
       amountInWeth: amountIn.toString(),
       amountOutUsdg: amountOut.toString(),
-      feeUsdg: fee.toString(),
+      feeUsdg: feeQuote.toString(),
       realizedPnlUsdg: realized.toString(),
     });
     const remainingUnits = unitsBefore - amountIn;
@@ -296,7 +313,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       entity: 'fill',
       entityId: fillId,
       correlationId: deps.correlationId,
-      payload: { side: 'SELL', amountIn: amountIn.toString(), amountOut: amountOut.toString(), fee: fee.toString(), snapshotId: snapshot.id },
+      payload: { side: 'SELL', amountIn: amountIn.toString(), amountOut: amountOut.toString(), fee: feeQuote.toString(), snapshotId: snapshot.id },
     });
     return { orderId, fillId, riskDecisionId };
   });

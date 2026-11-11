@@ -49,21 +49,20 @@ Envelope: `{ "data": ..., "meta": { "requestId", "observedAt" } }` on success an
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/health` | mode, chain id, head block, RPC latency, kill switch. `503` when the chain id is wrong or the probe fails |
-| GET | `/api/v1/venues` | allowlist: tokens, factory, quoter, router, factory-derived pool |
-
-Every `data` payload below the health/venue/snapshot/candidates/portfolio/journal
-rows is the type owned by `@trident/api-contract` and is produced through the
-mappers in `src/api/contract.ts`, which call the contract's zod schema. A
-contract change therefore fails the API build or its tests instead of drifting
-quietly. Operational detail the contract does not model (kill switch, RPC
-latency, `sqrtPriceX96`, pool liquidity, snapshot id) travels in `meta`.
+| GET | `/api/v1/venues` | allowlist: tokens, factory, quoter, router, factory-derived pool (`data` is an array) |
 | GET | `/api/v1/markets/weth-usdg/snapshot` | latest stored snapshot, freshness recomputed at read time; `404` before the first observation |
-| GET | `/api/v1/candidates?limit=` | latest strategy evaluations |
-| POST | `/api/v1/intents` | `{ evaluationId, idempotencyKey }`; `201` approved and filled, `200` replayed or rejected |
+| GET | `/api/v1/candidates?limit=` | latest strategy evaluations (`data` is an array) |
+| POST | `/api/v1/intents` | request `{ evaluationId, idempotencyKey }` only; server derives side, size, and limit. `201` approved, `200` replayed or rejected |
 | GET | `/api/v1/intents/:id` | stored intent plus its risk decision |
-| GET | `/api/v1/portfolio` | simulated cash, position, realized/unrealized PnL |
+| GET | `/api/v1/portfolio` | simulated cash, positions (`VALUED`/`UNPRICED`), realized/unrealized PnL |
 | GET | `/api/v1/journal?limit=&before=` | append-only audit journal, newest first |
 | POST | `/api/v1/system/halt` | `{ engaged: boolean }`; persisted, survives restart |
+
+Every `data` payload is the type owned by `@trident/api-contract` and is produced
+through the mappers in `src/api/contract.ts`, which call the contract's zod
+schema. A contract change therefore fails the API build or its tests instead of
+drifting quietly. Facts the contract does not model (kill switch, RPC latency,
+`sqrtPriceX96`, pool liquidity, snapshot id, order/fill ids) travel in `meta`.
 
 Error codes: `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`,
 `INTENT_NOT_ACTIONABLE`, `INTENT_EXPIRED`, `CHAIN_UNAVAILABLE`,
@@ -111,7 +110,7 @@ carry `quantity` and `cost_basis` in base units; unrealized PnL is
 ## Tests
 
 ```bash
-pnpm --filter @trident/api test           # 39 offline tests, 4 skipped
+pnpm --filter @trident/api test           # 42 offline tests, 4 skipped
 RUN_RPC_TESTS=1 pnpm --filter @trident/api test   # adds 4 real-RPC tests
 ```
 
@@ -144,36 +143,42 @@ derivation, and a block-pinned snapshot.
   `Evaluation`, `RiskDecision`, `Portfolio`, `AuditEvent`) come from
   `@trident/api-contract`; the earlier local copies of those names were deleted.
 
-### Contract gaps found while integrating #7
+### Contract conformance with PR #7 (`acf1295`)
 
-These cannot be closed from the backend side; they need a contract decision.
+The backend is based on the amended contract, and all five integration findings
+from the first round are closed on the contract side and used here:
 
-1. **Version fields are typed as amounts.** `riskDecision.policyVersion`,
-   `portfolioVersion`, and `paperFill.assumptionsVersion` use
-   `positiveBaseUnitStringSchema`, which only accepts digits. Real values like
-   `paper-risk-v1`, `ledger:8`, and `paper-v1` are therefore not expressible.
-   Used as-is, the wire either loses the identifier or has to lie with a number.
-2. **`RiskDecision` has no per-rule evidence.** The gate produces `R01`–`R15`
-   with `observed`/`threshold`/`status`, but the contract keeps only free-text
-   `reasons`. That regresses the review surface the UI spec asks for
-   ("observed vs threshold", `UNAVAILABLE` ≠ `PASS`). The rules stay in
-   `risk_decisions.rules_json` and in the audit journal.
-3. **`POST /api/v1/intents` input ownership conflicts.** `createTradeIntentSchema`
-   lets a client choose `side`, `baseQty`, and `limitPrice`. This slice derives
-   the intent from an approved evaluation and refuses client-chosen sizing, by
-   design. The intent response is consequently still the internal shape and is
-   the one route not validated against the contract.
-4. **BUY size is expressed in two units.** The strategy allocates quote currency
-   (USDG) and the risk gate approves that amount, while `evaluation.proposedBaseQty`
-   is base currency (WETH). The boundary converts at the snapshot price; the same
-   trade therefore appears as `proposedBaseQty` on the wire and `amountIn` in the
-   ledger.
-5. **Unpriced positions are not representable.** `portfolio.positions[].valuationSnapshotId`
-   is required and `unrealizedPnlQuote` cannot be `null`, so a position held
-   without a fresh snapshot would have to be valued at a fake zero. The API omits
-   that position and sets `meta.unpricedPosition: true` instead.
-6. **Snapshot provenance is thin on the wire.** `MarketSnapshot` carries no
-   `sqrtPriceX96` or `tick`; both stay in storage and in `meta`.
+1. **Semantic versions.** `configVersion`, `policyVersion`, `portfolioVersion`,
+   and `assumptionsVersion` are validated by `versionSchema` (nonempty, no
+   spaces). The strategy publishes `1.0.0`, the gate `paper-risk-v1`, the ledger
+   `ledger:<entry-count>`, and the fill model `paper-v1`; no numeric coercion is
+   left in the mappers.
+2. **Per-rule risk evidence.** `RiskDecision.rules` carries `R01`–`R15` with
+   `observed`, `threshold`, and `status`, plus a mandatory `reason` on every
+   `FAIL`/`UNAVAILABLE` rule. Approval is only expressible when every rule is
+   `PASS`.
+3. **Create intent takes references, not sizing.** `POST /api/v1/intents`
+   accepts only `{ evaluationId, idempotencyKey }`; side, size, and limit come
+   from the evaluation and its snapshot.
+4. **Explicit approval units.** `approvedBaseQty` is WETH base units and
+   `maximumQuoteCost` is USDG base units. A BUY approves the quote spend
+   *including* the 0.01% fee; a SELL approves the base quantity sold and the net
+   quote proceeds the gate priced. `R11` compares cash against amount + fee, so
+   an approval can never overdraw the simulated balance.
+5. **`VALUED` / `UNPRICED` positions.** A position with a stored snapshot is
+   `VALUED` with `valuationSnapshotId` and unrealized PnL; without one it is
+   `UNPRICED` with a `reason`. `meta.unpricedPosition` is gone.
+
+Remaining wire notes, both recorded for the contract owner rather than worked
+around:
+
+- **`POST /api/v1/intents` has no response schema in the OpenAPI document.** The
+  route returns `{ intent: TradeIntent, riskDecision: RiskDecision }` (both
+  contract entities), with `orderId`, `fillId`, and `replayed` in `meta`.
+- **`PaperFill` is not emitted.** `gasQuoteEstimate` is quote-denominated, while
+  the fill records gas in ETH wei; converting needs an ETH/USDG price this slice
+  does not have, so gas is reported as units and wei instead of inventing a
+  quote value.
 
 ## Deviations from `ARCHITECTURE.md` (for review)
 
@@ -192,14 +197,14 @@ These cannot be closed from the backend side; they need a contract decision.
   `feat/issue-6-domain-contracts` (`@trident/api-contract`), so it must not merge
   before PR #7. `apps/api` builds the contract package before typecheck/test to
   keep a clean checkout working.
-- **Contract conformance is partial by contract, not by omission.** Health,
-  venues, snapshot, candidates, portfolio, and journal are schema-validated. The
-  intent route is not; see "Contract gaps" above.
+- **Contract conformance.** Health, venues, snapshot, candidates, intents,
+  portfolio, and journal payloads are all produced through schema-validated
+  mappers; the API tests parse each response with the contract schema.
 
 ## Known blockers
 
-- Contract gaps 1, 2, 3, and 5 above need a decision from the contract owner;
-  they are not fixable in the backend.
+- `POST /api/v1/intents` response shape and `PaperFill` gas units still need a
+  contract decision (see the wire notes above).
 - No auth/CSRF: do not expose beyond loopback.
 - No container/runtime manifest for this API yet.
 - The snapshot worker polls every 10 s (`SNAPSHOT_INTERVAL_MS`); the public RPC

@@ -61,7 +61,8 @@ export type SnapshotStatus = 'COMPLETE' | 'INCOMPLETE' | 'STALE';
 
 export type StrategyConfig = {
   readonly strategyId: 'weth-usdg-momentum-v1';
-  readonly version: number;
+  /** Semantic identifier, as required by the wire contract's version fields. */
+  readonly version: string;
   readonly maxAllocationBps: number;
   readonly maxStalenessSeconds: number;
   readonly minPoolLiquidity: string;
@@ -75,7 +76,7 @@ export type EvaluationRecord = {
   readonly id: string;
   readonly snapshotId: string;
   readonly strategyId: string;
-  readonly configVersion: number;
+  readonly configVersion: string;
   readonly inputHash: string;
   readonly action: StrategyAction;
   readonly signalStrength: number;
@@ -87,25 +88,33 @@ export type EvaluationRecord = {
 
 export type RiskRuleStatus = 'PASS' | 'FAIL' | 'UNAVAILABLE';
 
+/** Evidence values the contract accepts for per-rule `observed`/`threshold`. */
+export type RiskEvidenceValue = string | number | boolean | null;
+
 export type RiskRule = {
   readonly rule: string;
   readonly status: RiskRuleStatus;
-  readonly observed: string;
-  readonly threshold: string;
+  readonly observed: RiskEvidenceValue;
+  readonly threshold: RiskEvidenceValue;
+  /** Required by the contract for FAIL and UNAVAILABLE rules. */
+  readonly reason?: string;
 };
 
 export type RiskVerdict = 'APPROVED' | 'REJECTED';
 
 /**
- * Engine-side verdict. `rules` is the audit evidence the risk gate produces;
- * the wire contract carries the same facts folded into `reasons`.
+ * Engine-side verdict. The risk gate approves explicit units so the caller never
+ * has to reinterpret them: `approvedBaseQty` is base-token base units and
+ * `approvedQuoteAmount` is the quote leg the gate priced (spend cap for a BUY,
+ * proceeds for a SELL).
  */
 export type RiskOutcome = {
   readonly verdict: RiskVerdict;
   readonly policyVersion: string;
   readonly rules: readonly RiskRule[];
-  readonly approvedAmountIn: string | null;
-  readonly approvedAmountOut: string | null;
+  readonly approvedBaseQty: string | null;
+  readonly approvedQuoteAmount: string | null;
+  readonly evaluatedAt: string;
 };
 
 export type IntentSide = 'BUY' | 'SELL';

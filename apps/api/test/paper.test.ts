@@ -54,6 +54,10 @@ describe('paper execution and persistence', () => {
 
     const view = await executeIntent(deps(db), intent.id);
     expect(view.riskDecision?.verdict).toBe('APPROVED');
+    // Approval is expressed in explicit units: WETH base qty and the USDG cost
+    // including the 0.01% fee the fill will charge.
+    expect(view.riskDecision?.approvedBaseQty).toBe(FAKE_BUY_OUT.toString());
+    expect(view.riskDecision?.approvedQuoteAmount).toBe('500050000');
     expect(view.replayed).toBe(false);
     expect(count(db, 'orders')).toBe(1);
     expect(count(db, 'fills')).toBe(1);
@@ -121,7 +125,10 @@ describe('paper execution and persistence', () => {
 
     const view = await executeIntent(deps(db), intent.id);
     expect(view.riskDecision?.verdict).toBe('REJECTED');
-    expect(view.riskDecision?.rules.find((rule) => rule.rule === 'R02_kill_switch')?.status).toBe('FAIL');
+    const killSwitch = view.riskDecision?.rules.find((rule) => rule.rule === 'R02_kill_switch');
+    expect(killSwitch?.status).toBe('FAIL');
+    expect(killSwitch?.reason).toBeTruthy();
+    expect(view.riskDecision?.rules.every((rule) => rule.status === 'PASS' || (rule.reason?.length ?? 0) > 0)).toBe(true);
     expect(count(db, 'fills')).toBe(0);
   });
 
@@ -178,6 +185,9 @@ describe('paper execution and persistence', () => {
     const sell = await executeIntent(deps(db), sellIntent.id);
 
     expect(sell.riskDecision?.verdict).toBe('APPROVED');
+    // A SELL approves the base units sold and the net quote proceeds it is bounded to.
+    expect(sell.riskDecision?.approvedBaseQty).toBe(position?.quantity);
+    expect(BigInt(sell.riskDecision?.approvedQuoteAmount as string)).toBeGreaterThan(0n);
     assertBalanced(db, sell.fillId as string);
     expect(getPosition(db, 'WETH')?.quantity).toBe('0');
     expect(count(db, 'fills')).toBe(2);

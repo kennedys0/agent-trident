@@ -6,6 +6,7 @@ import type { Db } from './db/index.js';
 import {
   appendAudit,
   getEvaluation,
+  getIntentById,
   getLatestSnapshot,
   getPortfolio,
   getRiskDecisionByIntent,
@@ -23,7 +24,7 @@ import type { MarketService } from './services/market.js';
 import { createIntentFromEvaluation, executeIntent } from './services/execution.js';
 import type { QuotePort } from './services/ports.js';
 import { USDG, VERIFIED_FEE, VERIFIED_VENUE, WETH } from './chain/venue.js';
-import { toCandidate, toHealth, toJournal, toPortfolio, toSnapshot, toVenue } from './api/contract.js';
+import { toCandidate, toHealth, toJournal, toPortfolio, toRiskDecision, toSnapshot, toTradeIntent, toVenue } from './api/contract.js';
 
 export type HealthProbe = () => Promise<{ chainId: number; headBlock: number; latencyMs: number }>;
 
@@ -120,7 +121,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.get('/api/v1/venues', async (request, reply) => {
     const requestId = requestIdOf(request);
     return reply.send({
-      data: { venues: [toVenue(VERIFIED_VENUE, deps.pool)] },
+      data: [toVenue(VERIFIED_VENUE, deps.pool)],
       meta: meta(requestId, {
         venueId: VERIFIED_VENUE.id,
         quoterV2: VERIFIED_VENUE.quoterV2,
@@ -158,7 +159,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       return snapshot === null ? [] : [toCandidate(evaluation, snapshot, deps.pool)];
     });
     return reply.send({
-      data: { candidates },
+      data: candidates,
       meta: meta(requestId, { strategyId: deps.strategyConfig.strategyId, configVersion: deps.strategyConfig.version }),
     });
   });
@@ -186,25 +187,35 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       },
       intent.id,
     );
-    const status = view.riskDecision?.verdict === 'APPROVED' ? 201 : 200;
+    const stored = getSnapshotById(deps.db, view.intent.snapshotId);
+    if (stored === null || view.riskDecision === null) {
+      throw new AppError('CONFLICT', 'Intent executed without its snapshot or risk decision');
+    }
+    const status = view.riskDecision.verdict === 'APPROVED' ? 201 : 200;
     return reply.status(view.replayed ? 200 : status).send({
       data: {
-        intent: view.intent,
-        riskDecision: view.riskDecision,
-        orderId: view.orderId,
-        fillId: view.fillId,
-        replayed: view.replayed,
+        intent: toTradeIntent(view.intent, deps.pool, stored),
+        riskDecision: toRiskDecision(view.riskDecision),
       },
-      meta: meta(requestId, { fee: VERIFIED_FEE }),
+      meta: meta(requestId, { fee: VERIFIED_FEE, orderId: view.orderId, fillId: view.fillId, replayed: view.replayed }),
     });
   });
 
   app.get('/api/v1/intents/:id', async (request, reply) => {
     const requestId = requestIdOf(request);
     const id = (request.params as { id: string }).id;
-    const intent = deps.db.prepare('SELECT * FROM order_intents WHERE id = ?').get(id);
+    const intent = getIntentById(deps.db, id);
     if (!intent) throw new AppError('NOT_FOUND', 'Intent not found');
-    return reply.send({ data: { intent, riskDecision: getRiskDecisionByIntent(deps.db, id) }, meta: meta(requestId) });
+    const stored = getSnapshotById(deps.db, intent.snapshotId);
+    if (stored === null) throw new AppError('CONFLICT', 'Intent points at a snapshot that does not exist');
+    const decision = getRiskDecisionByIntent(deps.db, id);
+    return reply.send({
+      data: {
+        intent: toTradeIntent(intent, deps.pool, stored),
+        riskDecision: decision === null ? null : toRiskDecision(decision),
+      },
+      meta: meta(requestId),
+    });
   });
 
   app.get('/api/v1/portfolio', async (request, reply) => {
@@ -212,7 +223,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const stored = getLatestSnapshot(deps.db, deps.pool.id);
     const status = stored ? effectiveStatus(stored, new Date(), deps.strategyConfig.maxStalenessSeconds) : 'UNAVAILABLE';
     const state = getPortfolio(deps.db, stored ? stored.priceScaled : null, stored ? stored.priceScale : 18);
-    const { portfolio, unpricedPosition } = toPortfolio(state, {
+    const portfolio = toPortfolio(state, {
       pool: deps.pool,
       snapshotId: stored ? stored.id : null,
       priceScaled: stored ? stored.priceScaled : null,
@@ -224,7 +235,6 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         simulated: true,
         priceStatus: status,
         priceAsOf: stored?.sourceTime ?? null,
-        unpricedPosition,
         portfolioVersion: state.portfolioVersion,
       }),
     });

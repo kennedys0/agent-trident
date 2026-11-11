@@ -136,7 +136,7 @@ export function evaluateStrategy(input: StrategyInput): StrategyOutput {
 
 export const DEFAULT_STRATEGY_CONFIG: StrategyConfig = {
   strategyId: 'weth-usdg-momentum-v1',
-  version: 1,
+  version: '1.0.0',
   maxAllocationBps: 500,
   maxStalenessSeconds: 30,
   minPoolLiquidity: '100000000000000000',

@@ -40,7 +40,7 @@ function mapEvaluation(row: Row): EvaluationRecord {
     id: row['id'] as string,
     snapshotId: row['snapshot_id'] as string,
     strategyId: row['strategy_id'] as EvaluationRecord['strategyId'],
-    configVersion: Number(row['config_version']),
+    configVersion: String(row['config_version']),
     inputHash: row['input_hash'] as string,
     action: row['action'] as EvaluationRecord['action'],
     signalStrength: Number(row['signal_strength']),
@@ -280,7 +280,7 @@ export function insertRiskDecision(
 ): string {
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO risk_decisions (id, intent_id, policy_version, portfolio_version, verdict, rules_json, approved_amount_in, approved_amount_out, created_at)
+    `INSERT INTO risk_decisions (id, intent_id, policy_version, portfolio_version, verdict, rules_json, approved_base_qty, approved_quote_amount, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(intent_id) DO NOTHING`,
   ).run(
     id,
@@ -289,24 +289,33 @@ export function insertRiskDecision(
     input.portfolioVersion,
     input.decision.verdict,
     JSON.stringify(input.decision.rules),
-    input.decision.approvedAmountIn,
-    input.decision.approvedAmountOut,
-    nowIso(),
+    input.decision.approvedBaseQty,
+    input.decision.approvedQuoteAmount,
+    input.decision.evaluatedAt,
   );
   const row = db.prepare('SELECT id FROM risk_decisions WHERE intent_id = ?').get(input.intentId) as Row;
   return row['id'] as string;
 }
 
-export function getRiskDecisionByIntent(db: Db, intentId: string): (RiskOutcome & { id: string }) | null {
+export type RiskDecisionRecord = RiskOutcome & {
+  readonly id: string;
+  readonly intentId: string;
+  readonly portfolioVersion: string;
+};
+
+export function getRiskDecisionByIntent(db: Db, intentId: string): RiskDecisionRecord | null {
   const row = db.prepare('SELECT * FROM risk_decisions WHERE intent_id = ?').get(intentId) as Row | undefined;
   if (!row) return null;
   return {
     id: row['id'] as string,
+    intentId: row['intent_id'] as string,
     verdict: row['verdict'] as RiskOutcome['verdict'],
     policyVersion: row['policy_version'] as string,
+    portfolioVersion: row['portfolio_version'] as string,
     rules: JSON.parse(row['rules_json'] as string) as RiskOutcome['rules'],
-    approvedAmountIn: (row['approved_amount_in'] as string | null) ?? null,
-    approvedAmountOut: (row['approved_amount_out'] as string | null) ?? null,
+    approvedBaseQty: (row['approved_base_qty'] as string | null) ?? null,
+    approvedQuoteAmount: (row['approved_quote_amount'] as string | null) ?? null,
+    evaluatedAt: row['created_at'] as string,
   };
 }
 
