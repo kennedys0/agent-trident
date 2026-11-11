@@ -945,6 +945,96 @@
           }
         ]
       },
+      "GasEstimate": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "AVAILABLE"
+                ]
+              },
+              "gasUnits": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "gasPriceWei": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "gasCostWei": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "gasQuoteCost": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                },
+                "required": [
+                  "value",
+                  "decimals"
+                ],
+                "additionalProperties": false
+              },
+              "provenance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "status",
+              "gasUnits",
+              "gasPriceWei",
+              "gasCostWei",
+              "provenance"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "UNAVAILABLE"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "provenance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "status",
+              "reason",
+              "provenance"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
       "Health": {
         "type": "object",
         "properties": {
@@ -993,6 +1083,871 @@
           "lagSeconds"
         ],
         "additionalProperties": false
+      },
+      "IntentExecution": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "intent": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "evaluationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 256
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "PAPER"
+                    ]
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "BUY",
+                      "SELL"
+                    ]
+                  },
+                  "token": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "quoteToken": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "baseQty": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "limitPrice": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "scale": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "scale"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "snapshotId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING",
+                      "APPROVED",
+                      "REJECTED",
+                      "EXPIRED",
+                      "ORDERED",
+                      "FILLED",
+                      "FAILED"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "evaluationId",
+                  "idempotencyKey",
+                  "mode",
+                  "side",
+                  "token",
+                  "quoteToken",
+                  "baseQty",
+                  "limitPrice",
+                  "snapshotId",
+                  "expiresAt",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              "riskDecision": {
+                "type": "object",
+                "properties": {
+                  "intentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "policyVersion": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
+                  },
+                  "portfolioVersion": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
+                  },
+                  "reasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "evaluatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "verdict": {
+                    "type": "string",
+                    "enum": [
+                      "APPROVED"
+                    ]
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "rule": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "observed": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "threshold": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PASS"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "rule",
+                        "observed",
+                        "threshold",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  },
+                  "approvedBaseQty": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "decimals"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maximumQuoteCost": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "decimals"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "intentId",
+                  "policyVersion",
+                  "portfolioVersion",
+                  "reasons",
+                  "evaluatedAt",
+                  "verdict",
+                  "rules",
+                  "approvedBaseQty",
+                  "maximumQuoteCost"
+                ],
+                "additionalProperties": false
+              },
+              "order": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "intentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "riskDecisionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "CREATED",
+                      "FILLED",
+                      "CANCELLED"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "id",
+                  "intentId",
+                  "riskDecisionId",
+                  "status",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              },
+              "fill": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "snapshotId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "baseQty": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "quoteQty": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "feeQuote": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "decimals"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "gasEstimate": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "AVAILABLE"
+                            ]
+                          },
+                          "gasUnits": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "gasPriceWei": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "gasCostWei": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "gasQuoteCost": {
+                            "type": "object",
+                            "properties": {
+                              "value": {
+                                "type": "string",
+                                "maxLength": 256,
+                                "pattern": "^(0|[1-9][0-9]*)$"
+                              },
+                              "decimals": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 255
+                              }
+                            },
+                            "required": [
+                              "value",
+                              "decimals"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "provenance": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "gasUnits",
+                          "gasPriceWei",
+                          "gasCostWei",
+                          "provenance"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "UNAVAILABLE"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "provenance": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "reason",
+                          "provenance"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "executionPrice": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "scale": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "scale"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "assumptionsVersion": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
+                  },
+                  "filledAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "orderId",
+                  "snapshotId",
+                  "baseQty",
+                  "quoteQty",
+                  "feeQuote",
+                  "gasEstimate",
+                  "executionPrice",
+                  "assumptionsVersion",
+                  "filledAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "intent",
+              "riskDecision",
+              "order",
+              "fill"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "intent": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "evaluationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 256
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "PAPER"
+                    ]
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "BUY",
+                      "SELL"
+                    ]
+                  },
+                  "token": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "quoteToken": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "baseQty": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "limitPrice": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "scale": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "scale"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "snapshotId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING",
+                      "APPROVED",
+                      "REJECTED",
+                      "EXPIRED",
+                      "ORDERED",
+                      "FILLED",
+                      "FAILED"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "evaluationId",
+                  "idempotencyKey",
+                  "mode",
+                  "side",
+                  "token",
+                  "quoteToken",
+                  "baseQty",
+                  "limitPrice",
+                  "snapshotId",
+                  "expiresAt",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              "riskDecision": {
+                "type": "object",
+                "properties": {
+                  "intentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "policyVersion": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
+                  },
+                  "portfolioVersion": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
+                  },
+                  "reasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "evaluatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "verdict": {
+                    "type": "string",
+                    "enum": [
+                      "REJECTED"
+                    ]
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "rule": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "observed": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "PASS"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "rule",
+                            "observed",
+                            "threshold",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "rule": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "observed": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "FAIL"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "rule",
+                            "observed",
+                            "threshold",
+                            "status",
+                            "reason"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "rule": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "observed": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "threshold": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "UNAVAILABLE"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "rule",
+                            "observed",
+                            "threshold",
+                            "status",
+                            "reason"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "intentId",
+                  "policyVersion",
+                  "portfolioVersion",
+                  "reasons",
+                  "evaluatedAt",
+                  "verdict",
+                  "rules"
+                ],
+                "additionalProperties": false
+              },
+              "order": {
+                "type": "null"
+              },
+              "fill": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "intent",
+              "riskDecision",
+              "order",
+              "fill"
+            ],
+            "additionalProperties": false
+          }
+        ]
       },
       "JournalPage": {
         "type": "object",
@@ -1534,25 +2489,95 @@
             ],
             "additionalProperties": false
           },
-          "gasQuoteEstimate": {
-            "type": "object",
-            "properties": {
-              "value": {
-                "type": "string",
-                "maxLength": 256,
-                "pattern": "^(0|[1-9][0-9]*)$"
+          "gasEstimate": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "AVAILABLE"
+                    ]
+                  },
+                  "gasUnits": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "gasPriceWei": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "gasCostWei": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "gasQuoteCost": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "decimals"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "provenance": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "status",
+                  "gasUnits",
+                  "gasPriceWei",
+                  "gasCostWei",
+                  "provenance"
+                ],
+                "additionalProperties": false
               },
-              "decimals": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 255
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "UNAVAILABLE"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "provenance": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "status",
+                  "reason",
+                  "provenance"
+                ],
+                "additionalProperties": false
               }
-            },
-            "required": [
-              "value",
-              "decimals"
-            ],
-            "additionalProperties": false
+            ]
           },
           "executionPrice": {
             "type": "object",
@@ -1590,10 +2615,50 @@
           "baseQty",
           "quoteQty",
           "feeQuote",
-          "gasQuoteEstimate",
+          "gasEstimate",
           "executionPrice",
           "assumptionsVersion",
           "filledAt"
+        ],
+        "additionalProperties": false
+      },
+      "PaperOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "intentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "riskDecisionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "FILLED",
+              "CANCELLED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "intentId",
+          "riskDecisionId",
+          "status",
+          "createdAt"
         ],
         "additionalProperties": false
       },
@@ -4559,114 +5624,877 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Created paper intent",
+          "200": {
+            "description": "Idempotent replay or rejected execution",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 256
-                        },
-                        "evaluationId": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 256
-                        },
-                        "idempotencyKey": {
-                          "type": "string",
-                          "minLength": 8,
-                          "maxLength": 256
-                        },
-                        "mode": {
-                          "type": "string",
-                          "enum": [
-                            "PAPER"
-                          ]
-                        },
-                        "side": {
-                          "type": "string",
-                          "enum": [
-                            "BUY",
-                            "SELL"
-                          ]
-                        },
-                        "token": {
-                          "type": "string",
-                          "pattern": "^0x[0-9a-fA-F]{40}$"
-                        },
-                        "quoteToken": {
-                          "type": "string",
-                          "pattern": "^0x[0-9a-fA-F]{40}$"
-                        },
-                        "baseQty": {
-                          "type": "string",
-                          "maxLength": 256,
-                          "pattern": "^[1-9][0-9]*$"
-                        },
-                        "limitPrice": {
+                      "anyOf": [
+                        {
                           "type": "object",
                           "properties": {
-                            "value": {
-                              "type": "string",
-                              "maxLength": 256,
-                              "pattern": "^(0|[1-9][0-9]*)$"
+                            "intent": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "evaluationId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "idempotencyKey": {
+                                  "type": "string",
+                                  "minLength": 8,
+                                  "maxLength": 256
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PAPER"
+                                  ]
+                                },
+                                "side": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BUY",
+                                    "SELL"
+                                  ]
+                                },
+                                "token": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "quoteToken": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "baseQty": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                },
+                                "limitPrice": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "scale": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "scale"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "snapshotId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PENDING",
+                                    "APPROVED",
+                                    "REJECTED",
+                                    "EXPIRED",
+                                    "ORDERED",
+                                    "FILLED",
+                                    "FAILED"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "evaluationId",
+                                "idempotencyKey",
+                                "mode",
+                                "side",
+                                "token",
+                                "quoteToken",
+                                "baseQty",
+                                "limitPrice",
+                                "snapshotId",
+                                "expiresAt",
+                                "status"
+                              ],
+                              "additionalProperties": false
                             },
-                            "scale": {
-                              "type": "string",
-                              "maxLength": 256,
-                              "pattern": "^[1-9][0-9]*$"
+                            "riskDecision": {
+                              "type": "object",
+                              "properties": {
+                                "intentId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "policyVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "portfolioVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "reasons": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "evaluatedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "verdict": {
+                                  "type": "string",
+                                  "enum": [
+                                    "APPROVED"
+                                  ]
+                                },
+                                "rules": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "rule": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "observed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "threshold": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "PASS"
+                                        ]
+                                      },
+                                      "reason": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "rule",
+                                      "observed",
+                                      "threshold",
+                                      "status"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1
+                                },
+                                "approvedBaseQty": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "decimals"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "maximumQuoteCost": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "decimals"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "intentId",
+                                "policyVersion",
+                                "portfolioVersion",
+                                "reasons",
+                                "evaluatedAt",
+                                "verdict",
+                                "rules",
+                                "approvedBaseQty",
+                                "maximumQuoteCost"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "order": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "intentId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "riskDecisionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "CREATED",
+                                    "FILLED",
+                                    "CANCELLED"
+                                  ]
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "intentId",
+                                "riskDecisionId",
+                                "status",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "fill": {
+                              "type": "object",
+                              "properties": {
+                                "orderId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "snapshotId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "baseQty": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                },
+                                "quoteQty": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                },
+                                "feeQuote": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "decimals"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "gasEstimate": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "AVAILABLE"
+                                          ]
+                                        },
+                                        "gasUnits": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^[1-9][0-9]*$"
+                                        },
+                                        "gasPriceWei": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "gasCostWei": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "gasQuoteCost": {
+                                          "type": "object",
+                                          "properties": {
+                                            "value": {
+                                              "type": "string",
+                                              "maxLength": 256,
+                                              "pattern": "^(0|[1-9][0-9]*)$"
+                                            },
+                                            "decimals": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 255
+                                            }
+                                          },
+                                          "required": [
+                                            "value",
+                                            "decimals"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "provenance": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        }
+                                      },
+                                      "required": [
+                                        "status",
+                                        "gasUnits",
+                                        "gasPriceWei",
+                                        "gasCostWei",
+                                        "provenance"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "UNAVAILABLE"
+                                          ]
+                                        },
+                                        "reason": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        },
+                                        "provenance": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        }
+                                      },
+                                      "required": [
+                                        "status",
+                                        "reason",
+                                        "provenance"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "executionPrice": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "scale": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "scale"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "assumptionsVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "filledAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "orderId",
+                                "snapshotId",
+                                "baseQty",
+                                "quoteQty",
+                                "feeQuote",
+                                "gasEstimate",
+                                "executionPrice",
+                                "assumptionsVersion",
+                                "filledAt"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
-                            "value",
-                            "scale"
+                            "intent",
+                            "riskDecision",
+                            "order",
+                            "fill"
                           ],
                           "additionalProperties": false
                         },
-                        "snapshotId": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 256
-                        },
-                        "expiresAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "PENDING",
-                            "APPROVED",
-                            "REJECTED",
-                            "EXPIRED",
-                            "ORDERED",
-                            "FILLED",
-                            "FAILED"
-                          ]
+                        {
+                          "type": "object",
+                          "properties": {
+                            "intent": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "evaluationId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "idempotencyKey": {
+                                  "type": "string",
+                                  "minLength": 8,
+                                  "maxLength": 256
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PAPER"
+                                  ]
+                                },
+                                "side": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BUY",
+                                    "SELL"
+                                  ]
+                                },
+                                "token": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "quoteToken": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "baseQty": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                },
+                                "limitPrice": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "scale": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "scale"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "snapshotId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PENDING",
+                                    "APPROVED",
+                                    "REJECTED",
+                                    "EXPIRED",
+                                    "ORDERED",
+                                    "FILLED",
+                                    "FAILED"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "evaluationId",
+                                "idempotencyKey",
+                                "mode",
+                                "side",
+                                "token",
+                                "quoteToken",
+                                "baseQty",
+                                "limitPrice",
+                                "snapshotId",
+                                "expiresAt",
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "riskDecision": {
+                              "type": "object",
+                              "properties": {
+                                "intentId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "policyVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "portfolioVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "reasons": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "minItems": 1
+                                },
+                                "evaluatedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "verdict": {
+                                  "type": "string",
+                                  "enum": [
+                                    "REJECTED"
+                                  ]
+                                },
+                                "rules": {
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "rule": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "observed": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "PASS"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "rule",
+                                          "observed",
+                                          "threshold",
+                                          "status"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "rule": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "observed": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "FAIL"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "rule",
+                                          "observed",
+                                          "threshold",
+                                          "status",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "rule": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "observed": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "UNAVAILABLE"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "rule",
+                                          "observed",
+                                          "threshold",
+                                          "status",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "intentId",
+                                "policyVersion",
+                                "portfolioVersion",
+                                "reasons",
+                                "evaluatedAt",
+                                "verdict",
+                                "rules"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "order": {
+                              "type": "null"
+                            },
+                            "fill": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "intent",
+                            "riskDecision",
+                            "order",
+                            "fill"
+                          ],
+                          "additionalProperties": false
                         }
-                      },
-                      "required": [
-                        "id",
-                        "evaluationId",
-                        "idempotencyKey",
-                        "mode",
-                        "side",
-                        "token",
-                        "quoteToken",
-                        "baseQty",
-                        "limitPrice",
-                        "snapshotId",
-                        "expiresAt",
-                        "status"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "meta": {
                       "type": "object",
@@ -4675,10 +6503,924 @@
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 256
+                        },
+                        "observedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "replayed": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
-                        "requestId"
+                        "requestId",
+                        "observedAt",
+                        "replayed"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Executed paper intent (fresh, approved)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "intent": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "evaluationId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "idempotencyKey": {
+                                  "type": "string",
+                                  "minLength": 8,
+                                  "maxLength": 256
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PAPER"
+                                  ]
+                                },
+                                "side": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BUY",
+                                    "SELL"
+                                  ]
+                                },
+                                "token": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "quoteToken": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "baseQty": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                },
+                                "limitPrice": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "scale": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "scale"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "snapshotId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PENDING",
+                                    "APPROVED",
+                                    "REJECTED",
+                                    "EXPIRED",
+                                    "ORDERED",
+                                    "FILLED",
+                                    "FAILED"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "evaluationId",
+                                "idempotencyKey",
+                                "mode",
+                                "side",
+                                "token",
+                                "quoteToken",
+                                "baseQty",
+                                "limitPrice",
+                                "snapshotId",
+                                "expiresAt",
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "riskDecision": {
+                              "type": "object",
+                              "properties": {
+                                "intentId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "policyVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "portfolioVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "reasons": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "evaluatedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "verdict": {
+                                  "type": "string",
+                                  "enum": [
+                                    "APPROVED"
+                                  ]
+                                },
+                                "rules": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "rule": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "observed": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "threshold": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "PASS"
+                                        ]
+                                      },
+                                      "reason": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "rule",
+                                      "observed",
+                                      "threshold",
+                                      "status"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1
+                                },
+                                "approvedBaseQty": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "decimals"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "maximumQuoteCost": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "decimals"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "intentId",
+                                "policyVersion",
+                                "portfolioVersion",
+                                "reasons",
+                                "evaluatedAt",
+                                "verdict",
+                                "rules",
+                                "approvedBaseQty",
+                                "maximumQuoteCost"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "order": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "intentId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "riskDecisionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "CREATED",
+                                    "FILLED",
+                                    "CANCELLED"
+                                  ]
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "intentId",
+                                "riskDecisionId",
+                                "status",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "fill": {
+                              "type": "object",
+                              "properties": {
+                                "orderId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "snapshotId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "baseQty": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                },
+                                "quoteQty": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                },
+                                "feeQuote": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "decimals"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "gasEstimate": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "AVAILABLE"
+                                          ]
+                                        },
+                                        "gasUnits": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^[1-9][0-9]*$"
+                                        },
+                                        "gasPriceWei": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "gasCostWei": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "gasQuoteCost": {
+                                          "type": "object",
+                                          "properties": {
+                                            "value": {
+                                              "type": "string",
+                                              "maxLength": 256,
+                                              "pattern": "^(0|[1-9][0-9]*)$"
+                                            },
+                                            "decimals": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 255
+                                            }
+                                          },
+                                          "required": [
+                                            "value",
+                                            "decimals"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "provenance": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        }
+                                      },
+                                      "required": [
+                                        "status",
+                                        "gasUnits",
+                                        "gasPriceWei",
+                                        "gasCostWei",
+                                        "provenance"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "UNAVAILABLE"
+                                          ]
+                                        },
+                                        "reason": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        },
+                                        "provenance": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        }
+                                      },
+                                      "required": [
+                                        "status",
+                                        "reason",
+                                        "provenance"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "executionPrice": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "scale": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "scale"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "assumptionsVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "filledAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "orderId",
+                                "snapshotId",
+                                "baseQty",
+                                "quoteQty",
+                                "feeQuote",
+                                "gasEstimate",
+                                "executionPrice",
+                                "assumptionsVersion",
+                                "filledAt"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "intent",
+                            "riskDecision",
+                            "order",
+                            "fill"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "intent": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "evaluationId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "idempotencyKey": {
+                                  "type": "string",
+                                  "minLength": 8,
+                                  "maxLength": 256
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PAPER"
+                                  ]
+                                },
+                                "side": {
+                                  "type": "string",
+                                  "enum": [
+                                    "BUY",
+                                    "SELL"
+                                  ]
+                                },
+                                "token": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "quoteToken": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "baseQty": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                },
+                                "limitPrice": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "scale": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "scale"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "snapshotId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PENDING",
+                                    "APPROVED",
+                                    "REJECTED",
+                                    "EXPIRED",
+                                    "ORDERED",
+                                    "FILLED",
+                                    "FAILED"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "evaluationId",
+                                "idempotencyKey",
+                                "mode",
+                                "side",
+                                "token",
+                                "quoteToken",
+                                "baseQty",
+                                "limitPrice",
+                                "snapshotId",
+                                "expiresAt",
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "riskDecision": {
+                              "type": "object",
+                              "properties": {
+                                "intentId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "policyVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "portfolioVersion": {
+                                  "type": "string",
+                                  "maxLength": 128,
+                                  "pattern": "^\\S+$"
+                                },
+                                "reasons": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "minItems": 1
+                                },
+                                "evaluatedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "verdict": {
+                                  "type": "string",
+                                  "enum": [
+                                    "REJECTED"
+                                  ]
+                                },
+                                "rules": {
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "rule": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "observed": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "PASS"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "rule",
+                                          "observed",
+                                          "threshold",
+                                          "status"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "rule": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "observed": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "FAIL"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "rule",
+                                          "observed",
+                                          "threshold",
+                                          "status",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "rule": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "observed": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "threshold": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "UNAVAILABLE"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "rule",
+                                          "observed",
+                                          "threshold",
+                                          "status",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "intentId",
+                                "policyVersion",
+                                "portfolioVersion",
+                                "reasons",
+                                "evaluatedAt",
+                                "verdict",
+                                "rules"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "order": {
+                              "type": "null"
+                            },
+                            "fill": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "intent",
+                            "riskDecision",
+                            "order",
+                            "fill"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "observedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "observedAt",
+                        "replayed"
                       ],
                       "additionalProperties": false
                     }

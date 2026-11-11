@@ -145,19 +145,60 @@ const riskBaseSchema = z.object({
   evaluatedAt: isoDateTimeSchema,
 });
 
+export const approvedRiskDecisionSchema = riskBaseSchema.extend({
+  verdict: z.literal('APPROVED'),
+  rules: z.array(passingRiskRuleSchema).min(1),
+  approvedBaseQty: positiveBaseUnitAmountSchema,
+  maximumQuoteCost: positiveBaseUnitAmountSchema,
+}).strict();
+
+export const rejectedRiskDecisionSchema = riskBaseSchema.extend({
+  verdict: z.literal('REJECTED'),
+  rules: z.array(riskRuleSchema).min(1),
+  reasons: z.array(z.string().min(1)).min(1),
+}).strict();
+
 export const riskDecisionSchema = z.discriminatedUnion('verdict', [
-  riskBaseSchema.extend({
-    verdict: z.literal('APPROVED'),
-    rules: z.array(passingRiskRuleSchema).min(1),
-    approvedBaseQty: positiveBaseUnitAmountSchema,
-    maximumQuoteCost: positiveBaseUnitAmountSchema,
-  }).strict(),
-  riskBaseSchema.extend({
-    verdict: z.literal('REJECTED'),
-    rules: z.array(riskRuleSchema).min(1),
-    reasons: z.array(z.string().min(1)).min(1),
-  }).strict(),
+  approvedRiskDecisionSchema,
+  rejectedRiskDecisionSchema,
 ]);
+
+const gasAvailableSchema = z.object({
+  status: z.literal('AVAILABLE'),
+  gasUnits: positiveBaseUnitStringSchema,
+  gasPriceWei: baseUnitStringSchema,
+  gasCostWei: baseUnitStringSchema,
+  gasQuoteCost: baseUnitAmountSchema.optional(),
+  provenance: z.string().min(1).max(512),
+}).strict();
+
+const gasUnavailableSchema = z.object({
+  status: z.literal('UNAVAILABLE'),
+  reason: z.string().min(1).max(512),
+  provenance: z.string().min(1).max(512),
+}).strict();
+
+export const gasEstimateSchema = z.discriminatedUnion('status', [
+  gasAvailableSchema,
+  gasUnavailableSchema,
+]).superRefine((value, ctx) => {
+  if (value.status !== 'AVAILABLE') return;
+  if (BigInt(value.gasCostWei) !== BigInt(value.gasUnits) * BigInt(value.gasPriceWei)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['gasCostWei'],
+      message: 'gasCostWei must equal gasUnits * gasPriceWei',
+    });
+  }
+});
+
+export const paperOrderSchema = z.object({
+  id: idSchema,
+  intentId: idSchema,
+  riskDecisionId: idSchema,
+  status: z.enum(['CREATED', 'FILLED', 'CANCELLED']),
+  createdAt: isoDateTimeSchema,
+}).strict();
 
 export const paperFillSchema = z.object({
   orderId: idSchema,
@@ -165,11 +206,47 @@ export const paperFillSchema = z.object({
   baseQty: positiveBaseUnitStringSchema,
   quoteQty: positiveBaseUnitStringSchema,
   feeQuote: baseUnitAmountSchema,
-  gasQuoteEstimate: baseUnitAmountSchema,
+  gasEstimate: gasEstimateSchema,
   executionPrice: scaledIntegerSchema,
   assumptionsVersion: versionSchema,
   filledAt: isoDateTimeSchema,
 }).strict();
+
+const executedIntentExecutionSchema = z.object({
+  intent: tradeIntentSchema,
+  riskDecision: approvedRiskDecisionSchema,
+  order: paperOrderSchema,
+  fill: paperFillSchema,
+}).strict().superRefine((value, ctx) => {
+  if (value.order.intentId !== value.intent.id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['order', 'intentId'], message: 'order.intentId must match intent.id' });
+  }
+  if (value.fill.orderId !== value.order.id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fill', 'orderId'], message: 'fill.orderId must match order.id' });
+  }
+  if (value.fill.snapshotId !== value.intent.snapshotId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fill', 'snapshotId'], message: 'fill.snapshotId must match intent.snapshotId' });
+  }
+  if (value.intent.status !== 'FILLED') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['intent', 'status'], message: 'an executed intent must have status FILLED' });
+  }
+});
+
+const rejectedIntentExecutionSchema = z.object({
+  intent: tradeIntentSchema,
+  riskDecision: rejectedRiskDecisionSchema,
+  order: z.null(),
+  fill: z.null(),
+}).strict().superRefine((value, ctx) => {
+  if (value.intent.status !== 'REJECTED') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['intent', 'status'], message: 'a rejected execution must have intent status REJECTED' });
+  }
+});
+
+export const intentExecutionSchema = z.union([
+  executedIntentExecutionSchema,
+  rejectedIntentExecutionSchema,
+]);
 
 const assetBalanceSchema = z.object({
   asset: evmAddressSchema,
@@ -256,6 +333,11 @@ export type Evaluation = z.infer<typeof evaluationSchema>;
 export type TradeIntent = z.infer<typeof tradeIntentSchema>;
 export type CreateTradeIntent = z.infer<typeof createTradeIntentSchema>;
 export type RiskDecision = z.infer<typeof riskDecisionSchema>;
+export type ApprovedRiskDecision = z.infer<typeof approvedRiskDecisionSchema>;
+export type RejectedRiskDecision = z.infer<typeof rejectedRiskDecisionSchema>;
+export type GasEstimate = z.infer<typeof gasEstimateSchema>;
+export type PaperOrder = z.infer<typeof paperOrderSchema>;
 export type PaperFill = z.infer<typeof paperFillSchema>;
+export type IntentExecution = z.infer<typeof intentExecutionSchema>;
 export type Portfolio = z.infer<typeof portfolioSchema>;
 export type AuditEvent = z.infer<typeof auditEventSchema>;

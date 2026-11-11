@@ -9,16 +9,19 @@ import {
   createTradeIntentSchema,
   errorBodySchema,
   evaluationSchema,
+  gasEstimateSchema,
   healthSchema,
+  intentExecutionSchema,
   journalPageSchema,
   marketSnapshotSchema,
   paperFillSchema,
+  paperOrderSchema,
   portfolioSchema,
   riskDecisionSchema,
   tradeIntentSchema,
   venueSchema,
 } from './domain.js';
-import { idSchema } from './primitives.js';
+import { idSchema, isoDateTimeSchema } from './primitives.js';
 
 const registry = new OpenAPIRegistry();
 const schemas = {
@@ -27,10 +30,13 @@ const schemas = {
   CreateTradeIntent: createTradeIntentSchema,
   Error: errorBodySchema,
   Evaluation: evaluationSchema,
+  GasEstimate: gasEstimateSchema,
   Health: healthSchema,
+  IntentExecution: intentExecutionSchema,
   JournalPage: journalPageSchema,
   MarketSnapshot: marketSnapshotSchema,
   PaperFill: paperFillSchema,
+  PaperOrder: paperOrderSchema,
   Portfolio: portfolioSchema,
   RiskDecision: riskDecisionSchema,
   TradeIntent: tradeIntentSchema,
@@ -42,6 +48,19 @@ for (const [name, schema] of Object.entries(schemas)) {
 }
 
 const requestMeta = z.object({ requestId: idSchema }).strict();
+export const intentExecutionMetaSchema = z.object({
+  requestId: idSchema,
+  observedAt: isoDateTimeSchema,
+  replayed: z.boolean(),
+}).strict();
+const intentExecutionResponse = (description: string) => ({
+  description,
+  content: {
+    'application/json': {
+      schema: z.object({ data: intentExecutionSchema, meta: intentExecutionMetaSchema }).strict(),
+    },
+  },
+});
 const response = (name: string, data: z.ZodType) => ({
   description: name,
   content: {
@@ -80,7 +99,11 @@ registry.registerPath({
   method: 'post',
   path: '/api/v1/intents',
   request: { body: { required: true, content: { 'application/json': { schema: createTradeIntentSchema } } } },
-  responses: { 201: response('Created paper intent', tradeIntentSchema), ...errorResponses },
+  responses: {
+    201: intentExecutionResponse('Executed paper intent (fresh, approved)'),
+    200: intentExecutionResponse('Idempotent replay or rejected execution'),
+    ...errorResponses,
+  },
 });
 
 export const openApiDocument: OpenAPIObject = new OpenApiGeneratorV31(registry.definitions).generateDocument({

@@ -718,7 +718,171 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Created paper intent */
+                /** @description Idempotent replay or rejected execution */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                intent: {
+                                    id: string;
+                                    evaluationId: string;
+                                    idempotencyKey: string;
+                                    /** @enum {string} */
+                                    mode: "PAPER";
+                                    /** @enum {string} */
+                                    side: "BUY" | "SELL";
+                                    token: string;
+                                    quoteToken: string;
+                                    baseQty: string;
+                                    limitPrice: {
+                                        value: string;
+                                        scale: string;
+                                    };
+                                    snapshotId: string;
+                                    /** Format: date-time */
+                                    expiresAt: string;
+                                    /** @enum {string} */
+                                    status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "ORDERED" | "FILLED" | "FAILED";
+                                };
+                                riskDecision: {
+                                    intentId: string;
+                                    policyVersion: string;
+                                    portfolioVersion: string;
+                                    reasons: string[];
+                                    /** Format: date-time */
+                                    evaluatedAt: string;
+                                    /** @enum {string} */
+                                    verdict: "APPROVED";
+                                    rules: {
+                                        rule: string;
+                                        observed: string | number | boolean | null;
+                                        threshold: string | number | boolean | null;
+                                        /** @enum {string} */
+                                        status: "PASS";
+                                        reason?: string;
+                                    }[];
+                                    approvedBaseQty: {
+                                        value: string;
+                                        decimals: number;
+                                    };
+                                    maximumQuoteCost: {
+                                        value: string;
+                                        decimals: number;
+                                    };
+                                };
+                                order: {
+                                    id: string;
+                                    intentId: string;
+                                    riskDecisionId: string;
+                                    /** @enum {string} */
+                                    status: "CREATED" | "FILLED" | "CANCELLED";
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                fill: {
+                                    orderId: string;
+                                    snapshotId: string;
+                                    baseQty: string;
+                                    quoteQty: string;
+                                    feeQuote: {
+                                        value: string;
+                                        decimals: number;
+                                    };
+                                    gasEstimate: {
+                                        /** @enum {string} */
+                                        status: "AVAILABLE";
+                                        gasUnits: string;
+                                        gasPriceWei: string;
+                                        gasCostWei: string;
+                                        gasQuoteCost?: {
+                                            value: string;
+                                            decimals: number;
+                                        };
+                                        provenance: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        status: "UNAVAILABLE";
+                                        reason: string;
+                                        provenance: string;
+                                    };
+                                    executionPrice: {
+                                        value: string;
+                                        scale: string;
+                                    };
+                                    assumptionsVersion: string;
+                                    /** Format: date-time */
+                                    filledAt: string;
+                                };
+                            } | {
+                                intent: {
+                                    id: string;
+                                    evaluationId: string;
+                                    idempotencyKey: string;
+                                    /** @enum {string} */
+                                    mode: "PAPER";
+                                    /** @enum {string} */
+                                    side: "BUY" | "SELL";
+                                    token: string;
+                                    quoteToken: string;
+                                    baseQty: string;
+                                    limitPrice: {
+                                        value: string;
+                                        scale: string;
+                                    };
+                                    snapshotId: string;
+                                    /** Format: date-time */
+                                    expiresAt: string;
+                                    /** @enum {string} */
+                                    status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "ORDERED" | "FILLED" | "FAILED";
+                                };
+                                riskDecision: {
+                                    intentId: string;
+                                    policyVersion: string;
+                                    portfolioVersion: string;
+                                    reasons: string[];
+                                    /** Format: date-time */
+                                    evaluatedAt: string;
+                                    /** @enum {string} */
+                                    verdict: "REJECTED";
+                                    rules: ({
+                                        rule: string;
+                                        observed: string | number | boolean | null;
+                                        threshold: string | number | boolean | null;
+                                        /** @enum {string} */
+                                        status: "PASS";
+                                        reason?: string;
+                                    } | {
+                                        rule: string;
+                                        observed: string | number | boolean | null;
+                                        threshold: string | number | boolean | null;
+                                        /** @enum {string} */
+                                        status: "FAIL";
+                                        reason: string;
+                                    } | {
+                                        rule: string;
+                                        observed: string | number | boolean | null;
+                                        threshold: string | number | boolean | null;
+                                        /** @enum {string} */
+                                        status: "UNAVAILABLE";
+                                        reason: string;
+                                    })[];
+                                };
+                                order: null;
+                                fill: null;
+                            };
+                            meta: {
+                                requestId: string;
+                                /** Format: date-time */
+                                observedAt: string;
+                                replayed: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description Executed paper intent (fresh, approved) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -726,28 +890,158 @@ export interface paths {
                     content: {
                         "application/json": {
                             data: {
-                                id: string;
-                                evaluationId: string;
-                                idempotencyKey: string;
-                                /** @enum {string} */
-                                mode: "PAPER";
-                                /** @enum {string} */
-                                side: "BUY" | "SELL";
-                                token: string;
-                                quoteToken: string;
-                                baseQty: string;
-                                limitPrice: {
-                                    value: string;
-                                    scale: string;
+                                intent: {
+                                    id: string;
+                                    evaluationId: string;
+                                    idempotencyKey: string;
+                                    /** @enum {string} */
+                                    mode: "PAPER";
+                                    /** @enum {string} */
+                                    side: "BUY" | "SELL";
+                                    token: string;
+                                    quoteToken: string;
+                                    baseQty: string;
+                                    limitPrice: {
+                                        value: string;
+                                        scale: string;
+                                    };
+                                    snapshotId: string;
+                                    /** Format: date-time */
+                                    expiresAt: string;
+                                    /** @enum {string} */
+                                    status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "ORDERED" | "FILLED" | "FAILED";
                                 };
-                                snapshotId: string;
-                                /** Format: date-time */
-                                expiresAt: string;
-                                /** @enum {string} */
-                                status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "ORDERED" | "FILLED" | "FAILED";
+                                riskDecision: {
+                                    intentId: string;
+                                    policyVersion: string;
+                                    portfolioVersion: string;
+                                    reasons: string[];
+                                    /** Format: date-time */
+                                    evaluatedAt: string;
+                                    /** @enum {string} */
+                                    verdict: "APPROVED";
+                                    rules: {
+                                        rule: string;
+                                        observed: string | number | boolean | null;
+                                        threshold: string | number | boolean | null;
+                                        /** @enum {string} */
+                                        status: "PASS";
+                                        reason?: string;
+                                    }[];
+                                    approvedBaseQty: {
+                                        value: string;
+                                        decimals: number;
+                                    };
+                                    maximumQuoteCost: {
+                                        value: string;
+                                        decimals: number;
+                                    };
+                                };
+                                order: {
+                                    id: string;
+                                    intentId: string;
+                                    riskDecisionId: string;
+                                    /** @enum {string} */
+                                    status: "CREATED" | "FILLED" | "CANCELLED";
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                fill: {
+                                    orderId: string;
+                                    snapshotId: string;
+                                    baseQty: string;
+                                    quoteQty: string;
+                                    feeQuote: {
+                                        value: string;
+                                        decimals: number;
+                                    };
+                                    gasEstimate: {
+                                        /** @enum {string} */
+                                        status: "AVAILABLE";
+                                        gasUnits: string;
+                                        gasPriceWei: string;
+                                        gasCostWei: string;
+                                        gasQuoteCost?: {
+                                            value: string;
+                                            decimals: number;
+                                        };
+                                        provenance: string;
+                                    } | {
+                                        /** @enum {string} */
+                                        status: "UNAVAILABLE";
+                                        reason: string;
+                                        provenance: string;
+                                    };
+                                    executionPrice: {
+                                        value: string;
+                                        scale: string;
+                                    };
+                                    assumptionsVersion: string;
+                                    /** Format: date-time */
+                                    filledAt: string;
+                                };
+                            } | {
+                                intent: {
+                                    id: string;
+                                    evaluationId: string;
+                                    idempotencyKey: string;
+                                    /** @enum {string} */
+                                    mode: "PAPER";
+                                    /** @enum {string} */
+                                    side: "BUY" | "SELL";
+                                    token: string;
+                                    quoteToken: string;
+                                    baseQty: string;
+                                    limitPrice: {
+                                        value: string;
+                                        scale: string;
+                                    };
+                                    snapshotId: string;
+                                    /** Format: date-time */
+                                    expiresAt: string;
+                                    /** @enum {string} */
+                                    status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "ORDERED" | "FILLED" | "FAILED";
+                                };
+                                riskDecision: {
+                                    intentId: string;
+                                    policyVersion: string;
+                                    portfolioVersion: string;
+                                    reasons: string[];
+                                    /** Format: date-time */
+                                    evaluatedAt: string;
+                                    /** @enum {string} */
+                                    verdict: "REJECTED";
+                                    rules: ({
+                                        rule: string;
+                                        observed: string | number | boolean | null;
+                                        threshold: string | number | boolean | null;
+                                        /** @enum {string} */
+                                        status: "PASS";
+                                        reason?: string;
+                                    } | {
+                                        rule: string;
+                                        observed: string | number | boolean | null;
+                                        threshold: string | number | boolean | null;
+                                        /** @enum {string} */
+                                        status: "FAIL";
+                                        reason: string;
+                                    } | {
+                                        rule: string;
+                                        observed: string | number | boolean | null;
+                                        threshold: string | number | boolean | null;
+                                        /** @enum {string} */
+                                        status: "UNAVAILABLE";
+                                        reason: string;
+                                    })[];
+                                };
+                                order: null;
+                                fill: null;
                             };
                             meta: {
                                 requestId: string;
+                                /** Format: date-time */
+                                observedAt: string;
+                                replayed: boolean;
                             };
                         };
                     };
@@ -979,6 +1273,23 @@ export interface components {
             action: "AVOID";
             proposedBaseQty?: string;
         };
+        GasEstimate: {
+            /** @enum {string} */
+            status: "AVAILABLE";
+            gasUnits: string;
+            gasPriceWei: string;
+            gasCostWei: string;
+            gasQuoteCost?: {
+                value: string;
+                decimals: number;
+            };
+            provenance: string;
+        } | {
+            /** @enum {string} */
+            status: "UNAVAILABLE";
+            reason: string;
+            provenance: string;
+        };
         Health: {
             /** @enum {string} */
             mode: "OBSERVE" | "PAPER";
@@ -988,6 +1299,154 @@ export interface components {
             rpcStatus: "HEALTHY" | "DEGRADED" | "OFFLINE";
             headBlock: string | null;
             lagSeconds: number | null;
+        };
+        IntentExecution: {
+            intent: {
+                id: string;
+                evaluationId: string;
+                idempotencyKey: string;
+                /** @enum {string} */
+                mode: "PAPER";
+                /** @enum {string} */
+                side: "BUY" | "SELL";
+                token: string;
+                quoteToken: string;
+                baseQty: string;
+                limitPrice: {
+                    value: string;
+                    scale: string;
+                };
+                snapshotId: string;
+                /** Format: date-time */
+                expiresAt: string;
+                /** @enum {string} */
+                status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "ORDERED" | "FILLED" | "FAILED";
+            };
+            riskDecision: {
+                intentId: string;
+                policyVersion: string;
+                portfolioVersion: string;
+                reasons: string[];
+                /** Format: date-time */
+                evaluatedAt: string;
+                /** @enum {string} */
+                verdict: "APPROVED";
+                rules: {
+                    rule: string;
+                    observed: string | number | boolean | null;
+                    threshold: string | number | boolean | null;
+                    /** @enum {string} */
+                    status: "PASS";
+                    reason?: string;
+                }[];
+                approvedBaseQty: {
+                    value: string;
+                    decimals: number;
+                };
+                maximumQuoteCost: {
+                    value: string;
+                    decimals: number;
+                };
+            };
+            order: {
+                id: string;
+                intentId: string;
+                riskDecisionId: string;
+                /** @enum {string} */
+                status: "CREATED" | "FILLED" | "CANCELLED";
+                /** Format: date-time */
+                createdAt: string;
+            };
+            fill: {
+                orderId: string;
+                snapshotId: string;
+                baseQty: string;
+                quoteQty: string;
+                feeQuote: {
+                    value: string;
+                    decimals: number;
+                };
+                gasEstimate: {
+                    /** @enum {string} */
+                    status: "AVAILABLE";
+                    gasUnits: string;
+                    gasPriceWei: string;
+                    gasCostWei: string;
+                    gasQuoteCost?: {
+                        value: string;
+                        decimals: number;
+                    };
+                    provenance: string;
+                } | {
+                    /** @enum {string} */
+                    status: "UNAVAILABLE";
+                    reason: string;
+                    provenance: string;
+                };
+                executionPrice: {
+                    value: string;
+                    scale: string;
+                };
+                assumptionsVersion: string;
+                /** Format: date-time */
+                filledAt: string;
+            };
+        } | {
+            intent: {
+                id: string;
+                evaluationId: string;
+                idempotencyKey: string;
+                /** @enum {string} */
+                mode: "PAPER";
+                /** @enum {string} */
+                side: "BUY" | "SELL";
+                token: string;
+                quoteToken: string;
+                baseQty: string;
+                limitPrice: {
+                    value: string;
+                    scale: string;
+                };
+                snapshotId: string;
+                /** Format: date-time */
+                expiresAt: string;
+                /** @enum {string} */
+                status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "ORDERED" | "FILLED" | "FAILED";
+            };
+            riskDecision: {
+                intentId: string;
+                policyVersion: string;
+                portfolioVersion: string;
+                reasons: string[];
+                /** Format: date-time */
+                evaluatedAt: string;
+                /** @enum {string} */
+                verdict: "REJECTED";
+                rules: ({
+                    rule: string;
+                    observed: string | number | boolean | null;
+                    threshold: string | number | boolean | null;
+                    /** @enum {string} */
+                    status: "PASS";
+                    reason?: string;
+                } | {
+                    rule: string;
+                    observed: string | number | boolean | null;
+                    threshold: string | number | boolean | null;
+                    /** @enum {string} */
+                    status: "FAIL";
+                    reason: string;
+                } | {
+                    rule: string;
+                    observed: string | number | boolean | null;
+                    threshold: string | number | boolean | null;
+                    /** @enum {string} */
+                    status: "UNAVAILABLE";
+                    reason: string;
+                })[];
+            };
+            order: null;
+            fill: null;
         };
         JournalPage: {
             events: {
@@ -1106,9 +1565,22 @@ export interface components {
                 value: string;
                 decimals: number;
             };
-            gasQuoteEstimate: {
-                value: string;
-                decimals: number;
+            gasEstimate: {
+                /** @enum {string} */
+                status: "AVAILABLE";
+                gasUnits: string;
+                gasPriceWei: string;
+                gasCostWei: string;
+                gasQuoteCost?: {
+                    value: string;
+                    decimals: number;
+                };
+                provenance: string;
+            } | {
+                /** @enum {string} */
+                status: "UNAVAILABLE";
+                reason: string;
+                provenance: string;
             };
             executionPrice: {
                 value: string;
@@ -1117,6 +1589,15 @@ export interface components {
             assumptionsVersion: string;
             /** Format: date-time */
             filledAt: string;
+        };
+        PaperOrder: {
+            id: string;
+            intentId: string;
+            riskDecisionId: string;
+            /** @enum {string} */
+            status: "CREATED" | "FILLED" | "CANCELLED";
+            /** Format: date-time */
+            createdAt: string;
         };
         Portfolio: {
             /** @enum {string} */

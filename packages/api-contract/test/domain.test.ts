@@ -74,7 +74,14 @@ test('accepts semantic version identifiers and rejects empty versions', () => {
   assert.equal(evaluationSchema.safeParse({ ...buyEvaluation, configVersion: '' }).success, false);
   const fill = {
     orderId: 'order-1', snapshotId: 'snapshot-1', baseQty: '1', quoteQty: '2060',
-    feeQuote: { value: '1', decimals: 6 }, gasQuoteEstimate: { value: '1', decimals: 6 },
+    feeQuote: { value: '1', decimals: 6 },
+    gasEstimate: {
+      status: 'AVAILABLE',
+      gasUnits: '139283',
+      gasPriceWei: '20014000',
+      gasCostWei: (139283n * 20014000n).toString(),
+      provenance: 'quoter-v2 gasEstimate + block baseFee at block 111408300',
+    },
     executionPrice: { value: '1', scale: '1' }, assumptionsVersion: 'paper-v1',
     filledAt: '2026-11-11T03:00:03Z',
   };
