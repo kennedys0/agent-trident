@@ -4,8 +4,36 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#FFFDF7" />
+    <meta name="theme-color" content="#FFFDF7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#18181B" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <title>TRIDENT — PAPER operations</title>
+    <meta
+      name="description"
+      content="TRIDENT PAPER operations: chain status, trading candidates, risk-gate evidence, simulated portfolio and audit journal. Paper only — no wallet, no signing."
+    />
+    <!-- og:image is site-relative because the deployment origin is not decided yet; a
+         crawler needs an absolute URL, so it has to be prefixed when the app is hosted. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TRIDENT" />
+    <meta property="og:title" content="TRIDENT — PAPER operations" />
+    <meta
+      property="og:description"
+      content="PAPER-only trading operations: verified chain status, risk-gate evidence, simulated portfolio and an append-only audit journal."
+    />
+    <meta property="og:image" content="/brand/seo-light.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="2000" />
+    <meta property="og:image:height" content="2000" />
+    <meta property="og:image:alt" content="TRIDENT trident mark in black on a light background" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TRIDENT — PAPER operations" />
+    <meta
+      name="twitter:description"
+      content="PAPER-only trading operations: verified chain status, risk-gate evidence, simulated portfolio and an append-only audit journal."
+    />
+    <meta name="twitter:image" content="/brand/seo-light.png" />
+    <meta name="twitter:image:alt" content="TRIDENT trident mark in black on a light background" />
     <script>
       // Applies the stored or system theme before first paint; no network, no dependencies.
       (function () {

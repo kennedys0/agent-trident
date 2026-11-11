@@ -5,6 +5,7 @@ import { useStatus } from '../app/StatusProvider.js';
 import { readFlag, readNumber } from '../lib/api/system.js';
 import { formatAge, formatUtc } from '../lib/format.js';
 import { Badge } from './Badge.js';
+import { BrandMark } from './BrandMark.js';
 import { StopControl } from './StopControl.js';
 import { ThemeToggle } from './ThemeToggle.js';
 
@@ -47,7 +48,7 @@ export function Shell(): ReactNode {
 
       <aside className="sidebar" aria-label="Primary">
         <div className="brand">
-          <span className="brand__mark">TRIDENT</span>
+          <BrandMark />
           <span className="brand__sub">PAPER</span>
         </div>
         <nav className="sidebar__nav" aria-label="Sections">
@@ -91,6 +92,9 @@ export function Shell(): ReactNode {
 
       <div className="shell__body">
         <header className="topbar">
+          <span className="topbar__brand">
+            <BrandMark />
+          </span>
           <div className="topbar__cluster">
             <Badge tone="wait" icon={<span aria-hidden="true">●</span>}>
               PAPER — SIMULATED

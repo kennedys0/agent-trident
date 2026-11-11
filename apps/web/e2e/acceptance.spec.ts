@@ -178,10 +178,73 @@ test.describe('responsive and accessibility evidence', () => {
       await page.evaluate(() => window.localStorage.setItem('trident.theme', 'dark'));
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+      await waitForChain(page);
       await shot(page, `overview-${viewport.name}-dark`, viewport.width >= 768);
       await page.evaluate(() => window.localStorage.setItem('trident.theme', 'light'));
     });
   }
+
+  test('official brand mark follows the theme, with favicon and social metadata', async ({ page, request }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+    await waitForChain(page);
+
+    // The mark is announced once, from the wrapper, and only the theme's variant renders.
+    const mark = page.locator('.brand').getByRole('img', { name: 'TRIDENT' });
+    await expect(mark).toBeVisible();
+    await expect(mark).toHaveCount(1);
+    await expect(page.locator('.brand-mark__img:visible')).toHaveCount(1);
+    await expect(page.locator('.brand-mark__img:visible')).toHaveAttribute('src', '/brand/logo-black-transparent.png');
+
+    // The artwork is used at its supplied size: square, never resampled by CSS.
+    const natural = await page
+      .locator('.brand-mark__img:visible')
+      .evaluate((element) => {
+        const image = element as HTMLImageElement;
+        return { width: image.naturalWidth, height: image.naturalHeight };
+      });
+    expect(natural).toEqual({ width: 2000, height: 2000 });
+    const box = await page.locator('.brand-mark').first().boundingBox();
+    expect(box === null ? 0 : Math.abs(box.width - box.height)).toBeLessThanOrEqual(0.5);
+
+    // Dark canvas swaps in the white variant and retints the browser toolbar.
+    await page.getByTestId('theme-toggle').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('.brand-mark__img:visible')).toHaveAttribute('src', '/brand/logo-white-transparent.png');
+    await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute('content', '#18181b');
+    await expect(page.locator('.brand-mark__img:visible')).toHaveCount(1);
+
+    // Favicon and social card are wired to shipped files that actually resolve.
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.ico');
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('sizes', '32x32');
+    expect((await request.get('/favicon.ico')).status()).toBe(200);
+
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /Paper only/);
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', '/brand/seo-light.png');
+    await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute('content', '2000');
+    await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute('content', '2000');
+    await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute('content', /TRIDENT/);
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
+    expect((await request.get('/brand/seo-light.png')).status()).toBe(200);
+    expect((await request.get('/brand/logo-black-transparent.png')).status()).toBe(200);
+    expect((await request.get('/brand/logo-white-transparent.png')).status()).toBe(200);
+
+    await page.evaluate(() => window.localStorage.setItem('trident.theme', 'light'));
+  });
+
+  test('the brand mark leads the top bar on mobile without overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto('/');
+    await waitForChain(page);
+
+    await expect(page.locator('.sidebar')).toBeHidden();
+    await expect(page.locator('.topbar__brand').getByRole('img', { name: 'TRIDENT' })).toBeVisible();
+    await expect(page.locator('.topbar__brand .brand-mark__img:visible')).toHaveCount(1);
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, 'the top bar must not overflow at 320px').toBeLessThanOrEqual(0);
+    await shot(page, 'brand-mobile-320-light', false);
+  });
 
   test('route evidence at 1280px: candidates, risk, portfolio, journal', async ({ page, request }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
