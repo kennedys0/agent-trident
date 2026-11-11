@@ -96,7 +96,7 @@ export function IntentAction({
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'CONTRACT_MISMATCH') {
         setError(
-          'The backend response does not match the amended intent-execution contract: it must return intent, riskDecision, order, and fill. The API branch has to adopt contract 0fb7be6 before this action can complete.',
+          'The backend response does not match the intent-execution contract: it must return intent, riskDecision, order, and fill.',
         );
       } else {
         setError(cause instanceof Error ? cause.message : 'The intent request failed');
@@ -179,8 +179,8 @@ export function IntentAction({
 
           {result.replayed ? (
             <p className="banner banner--info" role="status">
-              This idempotency key already produced an execution. The backend replayed the stored result; no new order, fill,
-              or ledger entry was written.
+              This evaluation already produced an execution. The backend replayed the stored result; no new order, fill, or
+              ledger entry was written.
             </p>
           ) : null}
 

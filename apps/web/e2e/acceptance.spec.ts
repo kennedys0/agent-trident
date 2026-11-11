@@ -91,7 +91,7 @@ test.describe('real backend', () => {
     await expect(page.getByText(firstType).first()).toBeVisible();
   });
 
-  test('the intent action follows the live evaluation: honest when disabled, a real fill when tradable', async ({ page, request }) => {
+  test('the intent action follows the live evaluation, and a duplicate submit replays the stored execution', async ({ page, request }) => {
     const candidates = await (await request.get('/api/v1/candidates?limit=20')).json();
     type CandidatePayload = { evaluation: { id: string; action: string; snapshotStatus: string } };
     const entries = candidates.data as CandidatePayload[];
@@ -115,14 +115,26 @@ test.describe('real backend', () => {
     }
 
     await expect(action).toBeEnabled();
+
+    // Any 5xx during the journey would be the duplicate-evaluation defect resurfacing.
+    const serverErrors: string[] = [];
+    page.on('response', (response) => {
+      if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`);
+    });
+
+    const firstPost = page.waitForResponse(
+      (response) => response.url().includes('/api/v1/intents') && response.request().method() === 'POST',
+    );
     await action.click();
-    await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByTestId('confirm-dialog-confirm').click();
+    const firstResponse = await firstPost;
+    expect([200, 201]).toContain(firstResponse.status());
 
     await expect(page.getByTestId('intent-result')).toBeVisible({ timeout: 30_000 });
     // The amended contract must parse without a mismatch and with explicit order/fill.
     await expect(page.getByTestId('intent-error')).toHaveCount(0);
     await expect(page.getByTestId('intent-status')).toHaveText(/FILLED|REJECTED/);
+    await expect(page.getByTestId('intent-replayed')).toHaveCount(0);
     const status = (await page.getByTestId('intent-status').textContent())?.trim();
     if (status === 'FILLED') {
       await expect(page.getByTestId('intent-order')).not.toHaveText('None — rejected');
@@ -135,7 +147,31 @@ test.describe('real backend', () => {
       await expect(page.getByTestId('intent-order')).toHaveText('None — rejected');
       await expect(page.getByTestId('gas-estimate')).toHaveCount(0);
     }
+    const storedOrder = (await page.getByTestId('intent-order').textContent())?.trim();
+    const storedFill = (await page.getByTestId('intent-fill').textContent())?.trim();
     await shot(page, `intent-result-${String(status).toLowerCase()}`);
+
+    // Duplicate evaluation: the UI mints a fresh idempotency key per submit, so the
+    // backend must replay by evaluationId (200 + meta.replayed) instead of inserting
+    // a second intent or returning the old 500 UNIQUE constraint error.
+    const secondPost = page.waitForResponse(
+      (response) => response.url().includes('/api/v1/intents') && response.request().method() === 'POST',
+    );
+    await action.click();
+    await page.getByTestId('confirm-dialog-confirm').click();
+    const secondResponse = await secondPost;
+    expect(secondResponse.status()).toBe(200);
+    const secondBody = (await secondResponse.json()) as { meta?: { replayed?: unknown } };
+    expect(secondBody.meta?.replayed).toBe(true);
+
+    await expect(page.getByTestId('intent-replayed')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('intent-replayed')).toHaveText(/REPLAYED — no new fill/);
+    await expect(page.getByTestId('intent-error')).toHaveCount(0);
+    // Same stored execution: no new order id and no new fill timestamp.
+    await expect(page.getByTestId('intent-order')).toHaveText(storedOrder ?? '');
+    await expect(page.getByTestId('intent-fill')).toHaveText(storedFill ?? '');
+    expect(serverErrors, 'no request may return 5xx').toEqual([]);
+    await shot(page, `intent-replay-${String(status).toLowerCase()}`);
   });
 
   test('risk page never shows a decision it does not have', async ({ page }) => {

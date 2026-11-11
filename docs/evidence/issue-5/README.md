@@ -1,9 +1,9 @@
 # Issue #5 — PAPER operational UI: evidence
 
 Run date: 2026-11-11 (UTC). Branch `feat/issue-5-operational-ui`, rebased onto
-`feat/issue-2-paper-backend` at `53ed588`, which is itself stacked on the
+`feat/issue-2-paper-backend` at `24e39e8`, which is itself stacked on the
 contract amendment `0fb7be6` from PR #7. The contract package is a real
-dependency here, not a copy: `53ed588` contains `packages/api-contract` at
+dependency here, not a copy: `24e39e8` contains `packages/api-contract` at
 `0fb7be6`, so the UI and the API are validated against the same schemas.
 
 Everything below was produced on this machine against a real backend process
@@ -25,11 +25,11 @@ tests are labelled "intercepted transport, clearly test-only".
 | Command | Result |
 |---|---|
 | `pnpm -r typecheck` | PASS (3 packages) |
-| `pnpm -r test` | PASS — contract 17, API 44 passed / 4 skipped (real-RPC tests need `RUN_RPC_TESTS=1`), web 38 |
-| `pnpm -r build` | PASS — web 390.77 kB JS / 114.99 kB gzip, 13.24 kB CSS / 3.14 kB gzip |
+| `pnpm -r test` | PASS — contract 17, API 50 passed / 4 skipped (real-RPC tests need `RUN_RPC_TESTS=1`), web 38 |
+| `pnpm -r build` | PASS — web 390.68 kB JS / 114.93 kB gzip, 13.24 kB CSS / 3.14 kB gzip |
 | `npx playwright test` (apps/web) | 22 passed |
 
-## Live intent evidence — three honest phases
+## Live intent evidence — four honest phases
 
 The market decides which states are reachable, so each phase used its own
 paper database and the UI was driven by a real browser click. The raw SQLite
@@ -80,21 +80,49 @@ strategy reports `HOLD` on every evaluation in the window. All 20 entries from
 - The button is not hidden and no result is invented; there is no success state
   without a backend decision.
 
-### Replay
+### 4. Duplicate evaluation replay — `intent-replay-filled.png`
 
-A replayed execution is proven at unit level (`apps/web/test/views.test.tsx`):
-a `200` body with `meta.replayed: true` renders `REPLAYED — no new fill` plus
-the stored order and fill. It cannot be produced by a browser click because the
-UI mints a new idempotency key per submission — that is the intended behaviour,
-so the replay path is exercised where it belongs, in the client contract tests.
+This is the path that used to fail with a 500. At backend `24e39e8`, a POST that
+carries a **new idempotency key** but an `evaluationId` that already has an
+execution returns `200` with `meta.replayed: true` and the stored execution; no
+second intent, order, fill, ledger entry, or audit row is written. The UI mints
+a fresh key for every submit by design, so a second click is exactly this case.
+
+Fresh paper portfolio (`trident-replay3.sqlite`), one duplicated browser click:
+
+- First submit: `201`, `APPROVED`, intent `d7dffdcb…` `FILLED`, order
+  `c86121c9-1d9c-4944-afda-4ab47c1e54f9`, fill
+  `2026-11-11 18:31:32Z`, 0.239380 WETH / 500.05 USDG, fee 0.050000 USDG,
+  15/15 rules `PASS`.
+- Second submit on the same evaluation with a new key: `200`,
+  `meta.replayed: true`, same intent/order/fill. The page renders the
+  `REPLAYED — NO NEW FILL` badge and the banner "This evaluation already
+  produced an execution. The backend replayed the stored result; no new order,
+  fill, or ledger entry was written." The order id and fill time are unchanged,
+  no error banner appears, and no request returns 5xx.
+- Gas for the stored fill: `AVAILABLE`, 91566 units at 20028000 wei/gas =
+  1833883848000 wei, provenance block 111911693, priority fee excluded.
+- An additional raw duplicate POST (`replay-duplicate-response.json`) returned
+  `200 replayed: true` while row counts stayed `intents 1, orders 1, fills 1,
+  ledger 8, audit 15`.
+- The dedicated browser run is recorded in `replay-test.json`
+  (`--grep "duplicate submit"`, 1 passed, 0 unexpected).
+
+The replay assertion lives in the same live browser test as phase 1: it submits
+twice, requires the second response to be `200` with `meta.replayed === true`,
+and requires the same order/fill plus the `intent-replayed` badge. The
+`REPLAYED` copy also appears in `apps/web/test/views.test.tsx`, but the browser
+run above is the live proof.
 
 ## Live API data observed during this run
 
 - `/health`: `mode PAPER`, `chainId 4663`, `rpcStatus HEALTHY`, head blocks
-  between `111888302` and `111893128`, latency 92–562 ms.
+  between `111888302` and `111893128` for phases 1–3; the replay phase ran at
+  head `111910423`–`111911754`.
 - `/api/v1/markets/weth-usdg/snapshot`: status `COMPLETE`, price around
-  `2090–2092 USDG/WETH`, `sourceTime` from the pinned block, block hash and
-  `block:` shown on the candidate page from the same payload.
+  `2090–2092 USDG/WETH` in phases 1–3 and `2088.50 USDG/WETH` in the replay
+  phase, `sourceTime` from the pinned block, block hash and `block:` shown on
+  the candidate page from the same payload.
 - `/api/v1/portfolio`: mode `PAPER`, real equity, one open WETH position in the
   long-running database, none in the fresh ones.
 - `/api/v1/journal`: real `strategy.evaluation.recorded`,
@@ -109,10 +137,13 @@ so the replay path is exercised where it belongs, in the client contract tests.
 3. Portfolio is labelled `SIMULATED`, shows a real equity value, and states
    `PAPER — no real money`.
 4. Journal lists a real audit event type returned by the API.
-5. **Intent action follows the live evaluation** — disabled with the exact
-   reason when the evaluation is not tradable, otherwise a real click that ends
-   `FILLED` or `REJECTED` with explicit order/fill and no contract mismatch.
-   This is the test that produced the three screenshots above.
+5. **Intent action follows the live evaluation, and a duplicate submit
+   replays** — disabled with the exact reason when the evaluation is not
+   tradable; otherwise a real click that ends `FILLED` or `REJECTED` with
+   explicit order/fill, no contract mismatch, then a second click on the same
+   evaluation that must receive `200 replayed: true` and render
+   `REPLAYED — no new fill` with the stored order/fill unchanged. This is the
+   test that produced the screenshots above and `replay-test.json`.
 6. Risk page shows either real per-rule evidence or an explicit empty state.
 7. Offline/error state keeps prior values labelled and offers retry.
 8. An empty evaluation list renders as Empty, not Error.
@@ -220,12 +251,9 @@ with provenance — never as zero.
 6. The long-running paper database holds a position, so `BUY` is only reachable
    on a fresh paper portfolio; the executed-intent evidence above states which
    database produced it.
-7. **Backend returns 500 when an evaluation already has an intent.** During this
-   run the candidate list still offered an older `BUY` evaluation whose intent
-   existed, so a second click reached `POST /api/v1/intents` and Fastify logged
-   `UNIQUE constraint failed: order_intents.evaluation_id` as an unhandled
-   request error. The UI then shows the backend's message ("Internal error") and
-   claims no success, but a typed `409` (or the stored execution, which the
-   idempotency contract already allows) would be correct. The browser test now
-   clicks the newest evaluation only, which is the one a user can still act on;
-   the gap belongs to `apps/api`.
+7. **Duplicate evaluation is now a replay, verified in the browser.** Earlier at
+   `53ed588` a second click on a consumed evaluation produced
+   `500 UNIQUE constraint failed: order_intents.evaluation_id`. At `24e39e8` the
+   same request returns `200 replayed: true` with the stored execution; the
+   duplicate scenario above proves the UI shows that without a 500 or a
+   `CONTRACT_MISMATCH`. A typed `409` is no longer needed for this case.
