@@ -11,7 +11,8 @@ export type FaultStage =
   | 'automation.state'
   | 'risk.decision'
   | 'paper.fill'
-  | 'chain.reorg';
+  | 'chain.reorg'
+  | 'chain.hold';
 
 export type FaultHooks = {
   readonly afterEntityWrite?: (stage: FaultStage) => void;

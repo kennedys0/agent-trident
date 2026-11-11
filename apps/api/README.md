@@ -88,16 +88,21 @@ Error codes: `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`,
    `10^(baseDecimals - quoteDecimals + scale)` (`1e30` for `WETH18/USDG6`).
    No `Number` touches a settlement value.
 6. **Fail-closed risk.** `paper-risk-v1` rules `R01`–`R15`; any `FAIL` or
-   `UNAVAILABLE` rejects. `UNAVAILABLE` is never treated as `PASS`.
+   `UNAVAILABLE` rejects. `UNAVAILABLE` is never treated as `PASS`. The whole
+   `evaluateRisk` call runs inside the write transaction, immediately before the
+   order and fill: the kill switch, cash, position, equity, clock, and snapshot
+   age are re-read there, so a halt or a fill that happened while the quote was
+   in flight cannot be missed. A stale quote can therefore only reject, never
+   overspend; the stored risk decision records the `portfolioVersion` it used.
 7. **At most one effect per intent.** `order_intents.evaluation_id` is unique,
    `orders.intent_id` and `fills.order_id` are unique, and every ledger row has a
    unique `business_key`, so a replay is a read, not a write.
    `evaluation_id` is the business key: a request that names an evaluation which
    already produced an intent replays that stored execution (`200`,
    `replayed: true`) even when it carries a new `idempotencyKey`. The insert uses
-   `ON CONFLICT DO NOTHING` and reads back by either key, so a concurrent
-   submission loses the unique constraint and falls back to the stored row
-   instead of failing. `executeIntent` re-reads the status inside the write
+   `ON CONFLICT DO NOTHING` and reads back by `evaluation_id` first, then by
+   `idempotency_key`; a key bound to a different evaluation is `409 CONFLICT`,
+   never an arbitrary row. `executeIntent` re-reads the status inside the write
    transaction, so only the winner writes risk/order/fill/ledger/audit rows.
 8. **Legacy block window.** The public RPC is not an archive node (~5,000 blocks
    of state), so `R14` rejects a snapshot more than `MAX_BLOCK_AGE` behind head.
@@ -105,8 +110,10 @@ Error codes: `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`,
    `audit_events`.
 10. **Single writer.** A pid lock in `automation_state` stops a second process
     from sharing the database.
-11. **Kill switch.** Persisted in `automation_state` and read by the risk gate on
-    every intent; an unreadable state fails closed.
+11. **Kill switch.** Persisted in `automation_state` as `new_entries_halted`, with
+    the cause in `new_entries_halted_reason` (`CHAIN_REORG`,
+    `CHAIN_EVIDENCE_UNAVAILABLE`, or `OPERATOR`). The risk gate reads it on every
+    intent; an unreadable state fails closed.
 
 ## Chain checkpoint, reorg recovery, and atomic audit (AT-04 / AT-16)
 
@@ -116,26 +123,41 @@ ingest writes the checkpoint in the same transaction as the snapshot and its
 audit event. Before any ingest, `verifyCheckpoint` proves the stored checkpoint is
 still canonical:
 
-- head below the checkpoint -> `CHAIN_ROLLBACK`;
+- head below the checkpoint -> a rollback only after the provider re-reads that
+  height and confirms the reported head hash; every stored row above the
+  confirmed head is then orphaned (`divergenceBlock = head + 1`). An
+  unconfirmed/lagging head is `UNAVAILABLE`, not divergence;
 - head at the checkpoint height -> hashes must match;
 - head one block above -> `head.parentHash` must equal the checkpoint hash;
 - head further above (a gap or a restart after downtime) -> the checkpoint
   height must still resolve to the stored hash, which proves every block above
   it descends from the stored data;
-- a provider that cannot resolve the checkpoint height -> fail closed
+- a provider that cannot resolve the checkpoint height -> `UNAVAILABLE`
   (`CANONICAL_BLOCK_UNAVAILABLE`).
 
-**Reorg recovery.** On divergence, `recoverFromReorg` runs in one transaction: it
-rewinds every chain-derived snapshot/evaluation at or above the divergence
-block. A row no paper execution references is deleted. A row a fill or intent
-already references is kept for provenance, marked `quarantined_at`/`reorg_id`,
-and every affected intent gets a `paper.execution.reorg_review_required` audit
-event. It records `chain_reorgs` plus `chain_reorg_impacts`, re-anchors the
-checkpoint at the highest surviving canonical block, engages the kill switch with
-reason `CHAIN_REORG`, and writes `chain.reorg.detected`. A quarantined block
-height is never re-ingested — its unique `(pool_id, block_number)` row keeps the
-orphan hash — so ingestion resumes at the next canonical block above it, and
-`POST /api/v1/intents` rejects a quarantined evaluation with `409 CONFLICT`.
+Each non-canonical result carries `evidence`. `PROVEN` names the canonical block
+that contradicted the checkpoint and may rewind. `UNAVAILABLE` means the provider
+could not answer, so no divergence is proven: `holdNewEntries` freezes every
+snapshot, evaluation, and the checkpoint as-is, engages the kill switch with
+reason `CHAIN_EVIDENCE_UNAVAILABLE`, and writes one `system.halt.engaged` audit
+row on transition. Nothing is deleted, quarantined, cleared, or re-anchored;
+later ticks retry until a verified canonical read arrives.
+
+**Reorg recovery.** On proven divergence, `recoverFromReorg` runs in one
+transaction: it rewinds every chain-derived snapshot/evaluation at or above the
+divergence block — so a rollback to head `105` rewinds stored rows `110` and
+`120` before anything is re-anchored. A row no paper execution references is
+deleted. A row a fill or intent already references is kept for provenance,
+marked `quarantined_at`/`reorg_id`, and every affected intent gets a
+`paper.execution.reorg_review_required` audit event. It records `chain_reorgs`
+plus `chain_reorg_impacts`, re-anchors the checkpoint at the highest surviving
+canonical block, engages the kill switch with reason `CHAIN_REORG`, and writes
+`chain.reorg.detected`. A quarantined block height is never re-ingested — its
+unique `(pool_id, block_number)` row keeps the orphan hash — so ingestion resumes
+at the next canonical block above it, and `POST /api/v1/intents` rejects a
+quarantined evaluation with `409 CONFLICT`. Both halt paths write their audit row
+only when the switch or the reason actually changes, so repeated ticks stay
+idempotent.
 
 **Atomic audit.** Every state write commits with its audit event in one
 transaction: snapshot + checkpoint + audit, evaluation + audit, intent + audit,
@@ -155,7 +177,7 @@ carry `quantity` and `cost_basis` in base units; unrealized PnL is
 ## Tests
 
 ```bash
-pnpm --filter @trident/api test           # 73 offline tests, 4 skipped
+pnpm --filter @trident/api test           # 84 offline tests, 4 skipped
 RUN_RPC_TESTS=1 pnpm --filter @trident/api test   # adds 4 real-RPC tests
 ```
 
@@ -175,10 +197,23 @@ block-pinned snapshot.
 
 AT-04 coverage (`test/reorg.test.ts`): first-ingest checkpoint with hash and
 parent hash, restart continuation by parent, gap acceptance, same-height hash
-replacement, parent mismatch, unreadable checkpoint block, quarantine of a
+replacement, parent mismatch, hold-with-retention when the provider cannot
+resolve the checkpoint block or a lower head, proven rollback to head `105` that
+removes stored rows `110`/`120` and re-anchors at `100`, the same rollback with
+referenced rows quarantined instead of deleted, a restart/failover after the
+rollback that resumes without duplicate heights or an orphan latest, a resume
+from a held checkpoint once the block is readable again, quarantine of a
 referenced snapshot (kept for its fill, `reorg_review_required` audit, `409` on
-new intents), quarantined height never re-ingested, resume at the next canonical
-block, and full rollback of the rewind when the reorg transaction fails.
+new intents), quarantined height never re-ingested, and full rollback of the
+rewind when the reorg transaction fails.
+
+Stale-risk and read-back coverage (`test/risk-race.test.ts`): a kill switch
+pressed during the quote is seen inside the write transaction and rejects with no
+order, fill, ledger, or position; two intents sized against the same cash leave
+the second rejected by `R11` on the fresh balance (`3999400000`) with cash still
+non-negative and one fill; the stored decision carries the portfolio version it
+decided on; a key bound to another evaluation returns `409`; and a replay with a
+new key returns the stored intent without a second row.
 
 AT-16 coverage (`test/atomic.test.ts`): fault injection between entity and audit
 for snapshot, evaluation, intent, expiry, risk decision, fill/ledger/position,

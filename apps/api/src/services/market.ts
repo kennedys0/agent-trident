@@ -16,7 +16,7 @@ import type { EvaluationRecord, PoolSnapshot, PoolIdentity, StrategyConfig } fro
 import type { ChainReadPort } from '../chain/client.js';
 import { ROBINHOOD_CHAIN_ID } from '../config.js';
 import { verifyCheckpoint, type ReorgKind } from '../chain/checkpoint.js';
-import { recoverFromReorg, type ReorgRecovery } from './reorg.js';
+import { holdNewEntries, recoverFromReorg, type ReorgHold, type ReorgRecovery } from './reorg.js';
 import { maybeInjectFault, type FaultHooks } from './faults.js';
 
 export type MarketService = {
@@ -35,6 +35,22 @@ export class ReorgDetectedError extends Error {
       `Chain reorg (${kind}) at block ${recovery.divergenceBlock}; rewound ${recovery.rewoundSnapshots} snapshots, quarantined ${recovery.quarantinedSnapshots}, halted new entries`,
     );
     this.name = 'ReorgDetectedError';
+  }
+}
+
+/**
+ * Raised when a checkpoint cannot be proven canonical or orphaned. Nothing was
+ * changed on disk except the halt switch and its audit: the caller must retry
+ * until a provider returns canonical evidence.
+ */
+export class ChainEvidenceUnavailableError extends Error {
+  constructor(
+    readonly kind: ReorgKind,
+    readonly hold: ReorgHold,
+    readonly detail: string,
+  ) {
+    super(`Chain evidence unavailable (${kind}): ${detail}; data and checkpoint frozen, new entries halted`);
+    this.name = 'ChainEvidenceUnavailableError';
   }
 }
 
@@ -61,6 +77,19 @@ export function createMarketService(input: {
         readBlock: (blockNumber) => chain.getBlockByNumber(blockNumber),
       });
       if (!verification.canonical) {
+        if (verification.evidence === 'UNAVAILABLE') {
+          // AT-04: missing evidence is not divergence. Freeze the checkpoint and
+          // every stored row, halt entries with a distinct reason, and wait for a
+          // verified canonical read instead of deleting live data.
+          const hold = holdNewEntries({
+            db,
+            poolId: pool.id,
+            verification,
+            correlationId: input.correlationId,
+            faults: input.faults,
+          });
+          throw new ChainEvidenceUnavailableError(verification.kind, hold, verification.detail);
+        }
         const recovery = recoverFromReorg({
           db,
           poolId: pool.id,

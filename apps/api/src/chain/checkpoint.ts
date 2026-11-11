@@ -17,10 +17,19 @@ export type ReorgKind =
   | 'CHAIN_ROLLBACK'
   | 'CANONICAL_BLOCK_UNAVAILABLE';
 
+/**
+ * PROVEN means the provider named the canonical block that contradicted the
+ * stored checkpoint, so stored rows above the divergence really are orphaned.
+ * UNAVAILABLE means the provider could not answer, so no divergence is proven
+ * and stored rows must be frozen rather than rewound.
+ */
+export type ReorgEvidence = 'PROVEN' | 'UNAVAILABLE';
+
 export type CheckpointVerification =
   | { readonly canonical: true }
   | {
       readonly canonical: false;
+      readonly evidence: ReorgEvidence;
       readonly kind: ReorgKind;
       /** First block whose stored data may no longer be canonical. */
       readonly divergenceBlock: number;
@@ -42,7 +51,10 @@ const same = (a: string | null | undefined, b: string | null | undefined): boole
  * - the head is further ahead (a gap, or a restart after downtime): the
  *   checkpoint height must still resolve to the stored hash, which proves every
  *   canonical block above it descends from the stored data.
- * A provider that cannot answer for the checkpoint height fails closed.
+ * A provider that cannot answer for the checkpoint height cannot prove
+ * divergence, so the result is UNAVAILABLE and the caller freezes state instead
+ * of rewinding it. The same applies to a head below the checkpoint: only a
+ * re-read that confirms the reported head hash proves a rollback.
  */
 export async function verifyCheckpoint(input: {
   readonly checkpoint: ChainCheckpoint | null;
@@ -58,14 +70,37 @@ export async function verifyCheckpoint(input: {
   } as const;
 
   if (head.number < checkpoint.blockNumber) {
+    // A lower head is a rollback only if the provider still reports the same
+    // block at that height. A moving or lagging node must not be enough to
+    // delete stored rows, so an unconfirmed head is UNAVAILABLE.
+    const confirmed = await readBlock(head.number);
+    if (confirmed === null || !same(confirmed.hash, head.hash)) {
+      return {
+        canonical: false,
+        evidence: 'UNAVAILABLE',
+        kind: 'CHAIN_ROLLBACK',
+        // Nothing is proven orphaned; the bound is only a lower estimate used
+        // for the audit payload, never to delete rows.
+        divergenceBlock: checkpoint.blockNumber + 1,
+        ...base,
+        canonicalBlock: confirmed === null ? null : confirmed.number,
+        canonicalHash: confirmed === null ? null : confirmed.hash,
+        detail:
+          confirmed === null
+            ? `Head ${head.number} is behind the checkpoint ${checkpoint.blockNumber} and the provider cannot resolve the reported head, so the rollback is not proven`
+            : `Head ${head.number} is behind the checkpoint ${checkpoint.blockNumber} but the provider now reports a different hash at that height, so the rollback is not proven`,
+      };
+    }
     return {
       canonical: false,
+      evidence: 'PROVEN',
       kind: 'CHAIN_ROLLBACK',
-      divergenceBlock: checkpoint.blockNumber,
+      // Every stored row above the confirmed canonical head is orphaned.
+      divergenceBlock: head.number + 1,
       ...base,
-      canonicalBlock: null,
-      canonicalHash: null,
-      detail: `Head ${head.number} is behind the checkpoint ${checkpoint.blockNumber}; the chain rolled back`,
+      canonicalBlock: confirmed.number,
+      canonicalHash: confirmed.hash,
+      detail: `Head ${head.number} is below the checkpoint ${checkpoint.blockNumber}; confirmed canonical head ${confirmed.hash}`,
     };
   }
 
@@ -77,6 +112,7 @@ export async function verifyCheckpoint(input: {
     if (canonical === null) {
       return {
         canonical: false,
+        evidence: 'UNAVAILABLE',
         kind: 'CANONICAL_BLOCK_UNAVAILABLE',
         divergenceBlock: checkpoint.blockNumber,
         ...base,
@@ -90,6 +126,7 @@ export async function verifyCheckpoint(input: {
       // side branch at the same height.
       return {
         canonical: false,
+        evidence: 'PROVEN',
         kind: 'PARENT_MISMATCH',
         divergenceBlock: checkpoint.blockNumber + 1,
         ...base,
@@ -100,6 +137,7 @@ export async function verifyCheckpoint(input: {
     }
     return {
       canonical: false,
+      evidence: 'PROVEN',
       kind: 'SAME_HEIGHT_HASH_REPLACEMENT',
       divergenceBlock: checkpoint.blockNumber,
       ...base,
@@ -119,6 +157,7 @@ export async function verifyCheckpoint(input: {
   if (canonical === null) {
     return {
       canonical: false,
+      evidence: 'UNAVAILABLE',
       kind: 'CANONICAL_BLOCK_UNAVAILABLE',
       divergenceBlock: checkpoint.blockNumber,
       ...base,
@@ -130,6 +169,7 @@ export async function verifyCheckpoint(input: {
   if (!same(canonical.hash, checkpoint.blockHash)) {
     return {
       canonical: false,
+      evidence: 'PROVEN',
       kind: 'SAME_HEIGHT_HASH_REPLACEMENT',
       divergenceBlock: checkpoint.blockNumber,
       ...base,
@@ -141,6 +181,7 @@ export async function verifyCheckpoint(input: {
   if (head.number === checkpoint.blockNumber + 1) {
     return {
       canonical: false,
+      evidence: 'PROVEN',
       kind: 'PARENT_MISMATCH',
       divergenceBlock: checkpoint.blockNumber + 1,
       ...base,

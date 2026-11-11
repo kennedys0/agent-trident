@@ -76,10 +76,19 @@ export function createIntentFromEvaluation(
 ): IntentRecord {
   // `evaluation_id` is the business key: one evaluation can produce at most one
   // intent, so a new idempotency key must replay the stored intent instead of
-  // inserting a second one. The idempotency key is checked first so a repeated
-  // key still maps to whatever intent it originally created.
-  const existing =
-    getIntentByIdempotencyKey(db, input.idempotencyKey) ?? getIntentByEvaluationId(db, input.evaluation.id);
+  // inserting a second one. A key already bound to a different evaluation is
+  // ambiguous: return CONFLICT rather than echo a row whose evaluationId does
+  // not match the request.
+  const byEvaluation = getIntentByEvaluationId(db, input.evaluation.id);
+  const byKey = getIntentByIdempotencyKey(db, input.idempotencyKey);
+  if (byKey !== null && byKey.evaluationId !== input.evaluation.id) {
+    throw new AppError('CONFLICT', 'Idempotency key already created an intent for a different evaluation', {
+      idempotencyKey: input.idempotencyKey,
+      existingEvaluationId: byKey.evaluationId,
+      requestedEvaluationId: input.evaluation.id,
+    });
+  }
+  const existing = byEvaluation ?? byKey;
   if (existing) return existing;
 
   if ((input.evaluation.action !== 'BUY' && input.evaluation.action !== 'SELL') || input.evaluation.proposedAmountIn === null) {
@@ -263,55 +272,15 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
           })
       : null;
 
-  const portfolio = getPortfolio(db, snapshot?.priceScaled ?? null, snapshot?.priceScale ?? 18);
-  const position = getPosition(db, 'WETH');
-  const equity = snapshot
-    ? (
-        BigInt(portfolio.cashUsdg) +
-        (position ? quoteValueOf(BigInt(position.quantity), BigInt(snapshot.priceScaled), 18, 6, snapshot.priceScale) : 0n)
-      ).toString()
-    : portfolio.cashUsdg;
-
   const headBlockNumber = await deps.quote.headBlockNumber().catch(() => null);
-  const now = clock();
-  const snapshotStatus = snapshot ? effectiveStatus(snapshot, now, config.maxStalenessSeconds) : 'UNAVAILABLE';
-  const snapshotAgeSeconds = snapshot
-    ? Math.max(0, Math.floor((now.getTime() - new Date(snapshot.observedAt).getTime()) / 1000))
-    : null;
-  /** Fees are quote-denominated on both sides, so the risk gate can size them. */
-  const feeQuote =
-    quote === null
-      ? 0n
-      : intent.side === 'BUY'
-        ? (BigInt(intent.amountIn) * BigInt(pool.fee)) / 1_000_000n
-        : (quote.amountOut * BigInt(pool.fee)) / 1_000_000n;
-
-  const risk = evaluateRisk({
-    side: intent.side,
-    mode: intent.mode,
-    amountIn: intent.amountIn,
-    notionalQuote: intent.side === 'BUY' ? intent.amountIn : (quote?.amountOut ?? 0n).toString(),
-    feeQuoteBase: feeQuote.toString(),
-    evaluatedAt: now.toISOString(),
-    snapshot,
-    snapshotStatus,
-    snapshotAgeSeconds,
-    quoteBlockNumber: quote?.blockNumber ?? null,
-    quoteAmountOut: quote ? quote.amountOut.toString() : null,
-    executionPriceScaled: executionPrice ? executionPrice.toString() : null,
-    headBlockNumber,
-    cashUsdgBase: portfolio.cashUsdg,
-    positionWethBase: position?.quantity ?? '0',
-    equityUsdgBase: equity,
-    openPositionCount: portfolio.positions.length,
-    killSwitchEngaged: isKillSwitchEngaged(db),
-    config,
-    poolMatchesAllowlist: snapshot !== null && snapshot.poolId.toLowerCase() === pool.id.toLowerCase(),
-  });
-
-  // Sourced only for an approved execution; a rejected intent does not pay gas.
+  // Gas is a read pinned to the snapshot block; it is only persisted with a
+  // fill, but sourcing it here keeps the write transaction free of network
+  // awaits (SQLite transactions are synchronous).
   const fillGas =
-    risk.verdict === 'APPROVED' ? await estimateFillGas(deps, quote, snapshot ? snapshot.blockNumber : null) : null;
+    quote !== null && snapshot !== null ? await estimateFillGas(deps, quote, snapshot.blockNumber) : null;
+  // Captured as change evidence only. The decision below is computed from
+  // values read inside the write transaction, never from this snapshot.
+  const portfolioVersionBefore = getPortfolio(db, snapshot?.priceScaled ?? null, snapshot?.priceScale ?? 18).portfolioVersion;
 
   const result = withTransaction(db, () => {
     // A concurrent request may have completed this intent while we were
@@ -326,6 +295,55 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       throw new AppError('INTENT_EXPIRED', 'Intent is no longer executable; request a new one');
     }
 
+    // F1/A2: every risk input is read after the write transaction has begun and
+    // immediately before the decision, order, and fill. A kill switch pressed or
+    // a ledger change committed while we were quoting is therefore visible, so
+    // the gate cannot approve against a stale cash balance or a released halt.
+    const now = clock();
+    const portfolio = getPortfolio(db, snapshot?.priceScaled ?? null, snapshot?.priceScale ?? 18);
+    const position = getPosition(db, 'WETH');
+    const equity = snapshot
+      ? (
+          BigInt(portfolio.cashUsdg) +
+          (position ? quoteValueOf(BigInt(position.quantity), BigInt(snapshot.priceScaled), 18, 6, snapshot.priceScale) : 0n)
+        ).toString()
+      : portfolio.cashUsdg;
+    const snapshotStatus = snapshot ? effectiveStatus(snapshot, now, config.maxStalenessSeconds) : 'UNAVAILABLE';
+    const snapshotAgeSeconds = snapshot
+      ? Math.max(0, Math.floor((now.getTime() - new Date(snapshot.observedAt).getTime()) / 1000))
+      : null;
+    /** Fees are quote-denominated on both sides, so the risk gate can size them. */
+    const feeQuote =
+      quote === null
+        ? 0n
+        : intent.side === 'BUY'
+          ? (BigInt(intent.amountIn) * BigInt(pool.fee)) / 1_000_000n
+          : (quote.amountOut * BigInt(pool.fee)) / 1_000_000n;
+    const portfolioVersionChanged = portfolio.portfolioVersion !== portfolioVersionBefore;
+
+    const risk = evaluateRisk({
+      side: intent.side,
+      mode: intent.mode,
+      amountIn: intent.amountIn,
+      notionalQuote: intent.side === 'BUY' ? intent.amountIn : (quote?.amountOut ?? 0n).toString(),
+      feeQuoteBase: feeQuote.toString(),
+      evaluatedAt: now.toISOString(),
+      snapshot,
+      snapshotStatus,
+      snapshotAgeSeconds,
+      quoteBlockNumber: quote?.blockNumber ?? null,
+      quoteAmountOut: quote ? quote.amountOut.toString() : null,
+      executionPriceScaled: executionPrice ? executionPrice.toString() : null,
+      headBlockNumber,
+      cashUsdgBase: portfolio.cashUsdg,
+      positionWethBase: position?.quantity ?? '0',
+      equityUsdgBase: equity,
+      openPositionCount: portfolio.positions.length,
+      killSwitchEngaged: isKillSwitchEngaged(db),
+      config,
+      poolMatchesAllowlist: snapshot !== null && snapshot.poolId.toLowerCase() === pool.id.toLowerCase(),
+    });
+
     const riskDecisionId = insertRiskDecision(db, {
       intentId: intent.id,
       decision: risk,
@@ -338,7 +356,14 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       entity: 'risk_decision',
       entityId: riskDecisionId,
       correlationId: deps.correlationId,
-      payload: { verdict: risk.verdict, intentId: intent.id, failedRules: risk.rules.filter((r) => r.status !== 'PASS').map((r) => r.rule) },
+      payload: {
+        verdict: risk.verdict,
+        intentId: intent.id,
+        portfolioVersion: portfolio.portfolioVersion,
+        portfolioVersionBefore,
+        portfolioVersionChanged,
+        failedRules: risk.rules.filter((r) => r.status !== 'PASS').map((r) => r.rule),
+      },
     });
 
     if (risk.verdict !== 'APPROVED' || !snapshot || !quote) {

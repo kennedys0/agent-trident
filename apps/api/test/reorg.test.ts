@@ -4,6 +4,7 @@ import { buildApp } from '../src/app.js';
 import type { Config } from '../src/config.js';
 import {
   getCheckpoint,
+  getEvaluation,
   getLatestSnapshot,
   getSnapshotAtBlockAny,
   listReorgImpacts,
@@ -11,7 +12,7 @@ import {
   seedOpeningCash,
 } from '../src/db/repositories.js';
 import { DEFAULT_STRATEGY_CONFIG } from '../src/domain/strategy.js';
-import { createMarketService, ReorgDetectedError } from '../src/services/market.js';
+import { createMarketService, ChainEvidenceUnavailableError, ReorgDetectedError } from '../src/services/market.js';
 import { createIntentFromEvaluation, executeIntent } from '../src/services/execution.js';
 import { createFakeChain, createFakeQuotePort, fakeBlock, makeDb, seedEvaluation, TEST_POOL } from './helpers.js';
 
@@ -155,20 +156,44 @@ describe('AT-04 chain checkpoint', () => {
     expect(listReorgs(db)[0]!['divergence_block']).toBe(101);
   });
 
-  it('fails closed when the checkpoint block cannot be resolved by the provider', async () => {
+  it('holds without deleting data when the checkpoint block cannot be resolved by the provider', async () => {
     const db = makeDb();
     const b100 = fakeBlock(100, 'aa');
     const chain = createFakeChain([b100]);
-    await market(db, chain).takeSnapshot();
+    const service = market(db, chain);
+    const snapshot = await service.takeSnapshot();
+    const evaluation = seedEvaluation(db, snapshot!, 'BUY', '500000000');
+    const before = checkpointFor(db);
 
     const far = fakeBlock(120, 'cc', fakeBlock(119, 'dd').hash);
     chain.setCanonical([far]);
     chain.setHead(far);
     chain.hideBlock(100);
 
-    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ReorgDetectedError);
-    expect(listReorgs(db)[0]!['kind']).toBe('CANONICAL_BLOCK_UNAVAILABLE');
+    const error = await market(db, chain)
+      .takeSnapshot()
+      .catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(ChainEvidenceUnavailableError);
+    expect((error as ChainEvidenceUnavailableError).kind).toBe('CANONICAL_BLOCK_UNAVAILABLE');
+    expect((error as ChainEvidenceUnavailableError).hold.reason).toBe('CHAIN_EVIDENCE_UNAVAILABLE');
+
+    // No divergence is proven: every stored row and the checkpoint survive.
+    expect(countRows(db, 'chain_reorgs')).toBe(0);
+    expect(countRows(db, 'chain_reorg_impacts')).toBe(0);
+    expect(countRows(db, 'market_snapshots')).toBe(1);
+    expect(countRows(db, 'strategy_evaluations')).toBe(1);
+    expect(getSnapshotAtBlockAny(db, TEST_POOL.id, 100)!.quarantined).toBe(false);
+    expect(getEvaluation(db, evaluation.id)).not.toBeNull();
+    expect(checkpointFor(db)).toEqual(before);
+    expect(auditActions(db)).not.toContain('chain.reorg.detected');
     expect(db.prepare("SELECT value FROM automation_state WHERE key = 'new_entries_halted'").get()).toEqual({ value: 'true' });
+    expect(db.prepare("SELECT value FROM automation_state WHERE key = 'new_entries_halted_reason'").get()).toEqual({
+      value: 'CHAIN_EVIDENCE_UNAVAILABLE',
+    });
+
+    // A repeated tick keeps the same state and writes no duplicate halt audit.
+    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ChainEvidenceUnavailableError);
+    expect(auditActions(db).filter((action) => action === 'system.halt.engaged')).toHaveLength(1);
   });
 });
 
@@ -322,5 +347,181 @@ describe('AT-04 reorg transaction boundary', () => {
     expect(stored!.quarantined).toBe(false);
     expect(checkpointFor(db)!.blockNumber).toBe(100);
     expect(db.prepare("SELECT value FROM automation_state WHERE key = 'new_entries_halted'").get()).not.toEqual({ value: 'true' });
+  });
+});
+
+describe('AT-04 proven rollback rewinds every row above the canonical head', () => {
+  async function ingestHead(
+    db: ReturnType<typeof makeDb>,
+    chain: ReturnType<typeof createFakeChain>,
+    blocks: ReturnType<typeof fakeBlock>[],
+  ) {
+    chain.setCanonical(blocks);
+    chain.setHead(blocks[blocks.length - 1]!);
+    return market(db, chain).takeSnapshot();
+  }
+
+  it('removes rows 110 and 120 when the confirmed head is 105, then re-anchors at 100', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const b110 = fakeBlock(110, 'bb', b100.hash);
+    const b120 = fakeBlock(120, 'cc', b110.hash);
+    const chain = createFakeChain([b100]);
+    await ingestHead(db, chain, [b100]);
+    await ingestHead(db, chain, [b100, b110]);
+    await ingestHead(db, chain, [b100, b110, b120]);
+    expect(countRows(db, 'market_snapshots')).toBe(3);
+
+    // The canonical head rolls back below two stored rows.
+    const b105 = fakeBlock(105, 'dd', fakeBlock(104, 'ee').hash);
+    chain.setCanonical([b100, b105]);
+    chain.setHead(b105);
+
+    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ReorgDetectedError);
+
+    // Both orphaned heights are gone, 100 survives, and the checkpoint moves
+    // down to it before any new ingest.
+    expect(getSnapshotAtBlockAny(db, TEST_POOL.id, 110)).toBeNull();
+    expect(getSnapshotAtBlockAny(db, TEST_POOL.id, 120)).toBeNull();
+    const latest = getLatestSnapshot(db, TEST_POOL.id);
+    expect(latest).not.toBeNull();
+    expect(latest!.blockNumber).toBe(100);
+    expect(latest!.blockHash).toBe(b100.hash);
+    expect(checkpointFor(db)!.blockNumber).toBe(100);
+    expect(checkpointFor(db)!.blockHash).toBe(b100.hash);
+
+    const reorg = listReorgs(db)[0]!;
+    expect(reorg['kind']).toBe('CHAIN_ROLLBACK');
+    expect(reorg['divergence_block']).toBe(106);
+    expect(reorg['rewound_snapshots']).toBe(2);
+    expect(db.prepare("SELECT value FROM automation_state WHERE key = 'new_entries_halted_reason'").get()).toEqual({
+      value: 'CHAIN_REORG',
+    });
+
+    // Restart/failover: a fresh service continues from the re-anchor, keeps one
+    // row per height, and never reports an orphan as the latest read.
+    const restarted = market(db, chain);
+    const snapshot = await restarted.takeSnapshot();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot!.blockNumber).toBe(105);
+    expect(snapshot!.blockHash).toBe(b105.hash);
+    expect(getLatestSnapshot(db, TEST_POOL.id)!.blockNumber).toBe(105);
+    expect(countRows(db, 'market_snapshots')).toBe(2);
+    const aboveHead = db
+      .prepare('SELECT COUNT(*) AS count FROM market_snapshots WHERE pool_id = ? AND block_number > ? AND quarantined_at IS NULL')
+      .get(TEST_POOL.id, 105) as { count: number | bigint };
+    expect(Number(aboveHead.count)).toBe(0);
+    const duplicates = db
+      .prepare('SELECT block_number, COUNT(*) AS count FROM market_snapshots GROUP BY block_number HAVING count > 1')
+      .all();
+    expect(duplicates).toHaveLength(0);
+  });
+
+  it('quarantines referenced rows above the canonical head instead of deleting them', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const b110 = fakeBlock(110, 'bb', b100.hash);
+    const b120 = fakeBlock(120, 'cc', b110.hash);
+    const chain = createFakeChain([b100]);
+    await ingestHead(db, chain, [b100]);
+    const snap110 = await ingestHead(db, chain, [b100, b110]);
+    const snap120 = await ingestHead(db, chain, [b100, b110, b120]);
+
+    // A pending intent references 110; a completed fill references 120.
+    const evaluation110 = seedEvaluation(db, snap110!, 'BUY', '500000000');
+    createIntentFromEvaluation(db, { evaluation: evaluation110, idempotencyKey: 'rollback-110', correlationId: 'seed', mode: 'PAPER' });
+    const evaluation120 = seedEvaluation(db, snap120!, 'BUY', '500000000');
+    const intent120 = createIntentFromEvaluation(db, {
+      evaluation: evaluation120,
+      idempotencyKey: 'rollback-120',
+      correlationId: 'seed',
+      mode: 'PAPER',
+    });
+    await executeIntent(
+      { db, quote: createFakeQuotePort({ headBlock: 120 }), pool: TEST_POOL, config: DEFAULT_STRATEGY_CONFIG, mode: 'PAPER', correlationId: 'seed' },
+      intent120.id,
+    );
+    expect(countRows(db, 'fills')).toBe(1);
+
+    const b105 = fakeBlock(105, 'dd', fakeBlock(104, 'ee').hash);
+    chain.setCanonical([b100, b105]);
+    chain.setHead(b105);
+    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ReorgDetectedError);
+
+    // Referenced rows survive for provenance and become visibly quarantined.
+    for (const blockNumber of [110, 120]) {
+      const stored = getSnapshotAtBlockAny(db, TEST_POOL.id, blockNumber);
+      expect(stored).not.toBeNull();
+      expect(stored!.quarantined).toBe(true);
+    }
+    expect(countRows(db, 'fills')).toBe(1);
+    const reorg = listReorgs(db)[0]!;
+    expect(reorg['kind']).toBe('CHAIN_ROLLBACK');
+    expect(reorg['quarantined_snapshots']).toBe(2);
+    expect(reorg['affected_intents']).toBe(2);
+    expect(auditActions(db)).toContain('paper.execution.reorg_review_required');
+    const impacts = listReorgImpacts(db, reorg['id'] as string);
+    expect(impacts.filter((row) => row['disposition'] === 'QUARANTINED')).toHaveLength(6); // 2 snapshots + 2 evaluations + 2 intents
+    expect(impacts.filter((row) => row['entity'] === 'order_intent')).toHaveLength(2);
+    expect(checkpointFor(db)!.blockNumber).toBe(100);
+    expect(getLatestSnapshot(db, TEST_POOL.id)!.blockNumber).toBe(100);
+  });
+
+  it('holds a lower head that the provider cannot confirm instead of rewinding it', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const chain = createFakeChain([b100]);
+    await market(db, chain).takeSnapshot();
+    const before = checkpointFor(db);
+
+    // The reported head is below the checkpoint, but the provider cannot return
+    // that block, so no rollback is proven.
+    const b90 = fakeBlock(90, 'ff');
+    chain.setHead(b90);
+    chain.hideBlock(90);
+
+    const error = await market(db, chain)
+      .takeSnapshot()
+      .catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(ChainEvidenceUnavailableError);
+    expect((error as ChainEvidenceUnavailableError).kind).toBe('CHAIN_ROLLBACK');
+    expect(countRows(db, 'chain_reorgs')).toBe(0);
+    expect(getSnapshotAtBlockAny(db, TEST_POOL.id, 100)!.quarantined).toBe(false);
+    expect(checkpointFor(db)).toEqual(before);
+    expect(db.prepare("SELECT value FROM automation_state WHERE key = 'new_entries_halted_reason'").get()).toEqual({
+      value: 'CHAIN_EVIDENCE_UNAVAILABLE',
+    });
+  });
+
+  it('resumes from the held checkpoint once a provider can prove it again', async () => {
+    const db = makeDb();
+    const b100 = fakeBlock(100, 'aa');
+    const chain = createFakeChain([b100]);
+    await market(db, chain).takeSnapshot();
+
+    const far = fakeBlock(120, 'cc');
+    chain.setCanonical([far]);
+    chain.setHead(far);
+    chain.hideBlock(100);
+    await expect(market(db, chain).takeSnapshot()).rejects.toBeInstanceOf(ChainEvidenceUnavailableError);
+    expect(checkpointFor(db)!.blockNumber).toBe(100);
+
+    // Failover to a provider that still serves the checkpoint block.
+    chain.setCanonical([b100, far]);
+    chain.setHead(far);
+    const snapshot = await market(db, chain).takeSnapshot();
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot!.blockNumber).toBe(120);
+    expect(snapshot!.blockHash).toBe(far.hash);
+    expect(checkpointFor(db)!.blockNumber).toBe(120);
+    // The frozen rows survived, no height duplicated, and no reorg was invented.
+    expect(countRows(db, 'market_snapshots')).toBe(2);
+    expect(countRows(db, 'chain_reorgs')).toBe(0);
+    expect(getLatestSnapshot(db, TEST_POOL.id)!.blockNumber).toBe(120);
+    const duplicates = db
+      .prepare('SELECT block_number, COUNT(*) AS count FROM market_snapshots GROUP BY block_number HAVING count > 1')
+      .all();
+    expect(duplicates).toHaveLength(0);
   });
 });

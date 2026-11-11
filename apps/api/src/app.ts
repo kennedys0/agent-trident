@@ -6,6 +6,7 @@ import type { Db } from './db/index.js';
 import { withTransaction } from './db/index.js';
 import {
   appendAudit,
+  engageHalt,
   getEvaluation,
   getFillByOrder,
   getIntentById,
@@ -19,7 +20,7 @@ import {
   KILL_SWITCH_KEY,
   listEvaluations,
   listJournal,
-  setState,
+  releaseHalt,
 } from './db/repositories.js';
 import { AppError } from './errors.js';
 import { effectiveStatus } from './domain/snapshot.js';
@@ -283,18 +284,31 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.post('/api/v1/system/halt', async (request, reply) => {
     const requestId = requestIdOf(request);
     const body = haltBodySchema.parse(request.body);
-    // AT-16: the automation state and its audit event commit together, so a
-    // crash cannot change the kill switch without a journal entry.
+    // AT-16: the automation state, its reason, and its audit event commit
+    // together, so a crash cannot change the kill switch without a journal entry.
     withTransaction(deps.db, () => {
-      setState(deps.db, KILL_SWITCH_KEY, String(body.engaged));
-      maybeInjectFault(deps.faults, 'automation.state');
-      appendAudit(deps.db, {
-        actor: 'operator',
-        action: body.engaged ? 'system.halt.engaged' : 'system.halt.released',
-        entity: 'automation_state',
-        entityId: KILL_SWITCH_KEY,
-        correlationId: requestId,
-      });
+      if (body.engaged) {
+        engageHalt(deps.db, 'OPERATOR');
+        maybeInjectFault(deps.faults, 'automation.state');
+        appendAudit(deps.db, {
+          actor: 'operator',
+          action: 'system.halt.engaged',
+          entity: 'automation_state',
+          entityId: KILL_SWITCH_KEY,
+          correlationId: requestId,
+          payload: { reason: 'OPERATOR' },
+        });
+      } else {
+        releaseHalt(deps.db);
+        maybeInjectFault(deps.faults, 'automation.state');
+        appendAudit(deps.db, {
+          actor: 'operator',
+          action: 'system.halt.released',
+          entity: 'automation_state',
+          entityId: KILL_SWITCH_KEY,
+          correlationId: requestId,
+        });
+      }
     });
     return reply.send({ data: { killSwitchEngaged: body.engaged }, meta: meta(requestId) });
   });

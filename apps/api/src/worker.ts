@@ -3,7 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Config } from './config.js';
 import type { Db } from './db/index.js';
 import type { MarketService } from './services/market.js';
-import { ReorgDetectedError } from './services/market.js';
+import { ChainEvidenceUnavailableError, ReorgDetectedError } from './services/market.js';
 
 export const SNAPSHOT_INTERVAL_MS = 10_000;
 
@@ -44,6 +44,20 @@ export function startWorker(input: {
         'market tick',
       );
     } catch (error) {
+      if (error instanceof ChainEvidenceUnavailableError) {
+        // No divergence is proven: state and checkpoint stay untouched, and a
+        // later tick retries once the provider can answer for the checkpoint.
+        input.logger.error(
+          {
+            kind: error.kind,
+            reason: error.hold.reason,
+            checkpointBlock: error.hold.checkpointBlock,
+            detail: error.detail,
+          },
+          'chain evidence unavailable; data frozen and new entries halted',
+        );
+        return;
+      }
       if (error instanceof ReorgDetectedError) {
         // The service already rewound the projections and engaged the kill
         // switch; log the audit trail link and wait for a canonical re-anchor.

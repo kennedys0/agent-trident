@@ -6,9 +6,9 @@ import {
   countFillsForSnapshot,
   deleteEvaluation,
   deleteSnapshot,
+  engageHalt,
   getHighestCanonicalSnapshotBelow,
   insertReorg,
-  KILL_SWITCH_KEY,
   listCanonicalSnapshotsFrom,
   listEvaluationsForSnapshot,
   listIntentsForSnapshot,
@@ -16,10 +16,9 @@ import {
   quarantineSnapshot,
   recordReorgImpact,
   saveCheckpoint,
-  setState,
   type ReorgRecord,
 } from '../db/repositories.js';
-import type { ChainCheckpoint, CheckpointVerification } from '../chain/checkpoint.js';
+import type { ChainCheckpoint, CheckpointVerification, ReorgKind } from '../chain/checkpoint.js';
 import { maybeInjectFault, type FaultHooks } from './faults.js';
 
 type Divergence = Extract<CheckpointVerification, { canonical: false }>;
@@ -34,6 +33,60 @@ export type ReorgRecovery = {
   readonly quarantinedEvaluations: number;
   readonly affectedIntents: number;
 };
+
+export type ReorgHold = {
+  readonly reason: 'CHAIN_EVIDENCE_UNAVAILABLE';
+  readonly kind: ReorgKind;
+  readonly checkpointBlock: number | null;
+  /** False when the switch was already held for this reason. */
+  readonly transitioned: boolean;
+};
+
+/**
+ * Fail-closed freeze for a checkpoint the provider cannot prove wrong.
+ *
+ * Nothing chain-derived is deleted, quarantined, cleared, or re-anchored: the
+ * snapshots, evaluations, and checkpoint stay exactly as they were so a later
+ * verified read can decide. Only new entries are halted, with a reason that
+ * tells the operator this is missing evidence, not a confirmed reorg. A repeat
+ * tick stays silent because the state and audit are written on transition only.
+ */
+export function holdNewEntries(input: {
+  readonly db: Db;
+  readonly poolId: string;
+  readonly verification: Divergence;
+  readonly correlationId: string;
+  readonly faults?: FaultHooks | undefined;
+}): ReorgHold {
+  const { db, verification } = input;
+  return withTransaction(db, () => {
+    const transitioned = engageHalt(db, 'CHAIN_EVIDENCE_UNAVAILABLE');
+    if (transitioned) {
+      appendAudit(db, {
+        actor: 'system',
+        action: 'system.halt.engaged',
+        entity: 'automation_state',
+        entityId: 'new_entries_halted',
+        correlationId: input.correlationId,
+        payload: {
+          reason: 'CHAIN_EVIDENCE_UNAVAILABLE',
+          kind: verification.kind,
+          detail: verification.detail,
+          checkpointBlock: verification.checkpointBlock,
+          checkpointHash: verification.checkpointHash,
+          poolId: input.poolId,
+        },
+      });
+    }
+    maybeInjectFault(input.faults, 'chain.hold');
+    return {
+      reason: 'CHAIN_EVIDENCE_UNAVAILABLE' as const,
+      kind: verification.kind,
+      checkpointBlock: verification.checkpointBlock,
+      transitioned,
+    };
+  });
+}
 
 /**
  * Rewinds chain-derived rows from the first non-canonical block in one
@@ -200,15 +253,16 @@ export function recoverFromReorg(input: {
       },
     });
 
-    setState(db, KILL_SWITCH_KEY, 'true');
-    appendAudit(db, {
-      actor: 'system',
-      action: 'system.halt.engaged',
-      entity: 'automation_state',
-      entityId: KILL_SWITCH_KEY,
-      correlationId: input.correlationId,
-      payload: { reason: 'CHAIN_REORG', reorgId },
-    });
+    if (engageHalt(db, 'CHAIN_REORG')) {
+      appendAudit(db, {
+        actor: 'system',
+        action: 'system.halt.engaged',
+        entity: 'automation_state',
+        entityId: 'new_entries_halted',
+        correlationId: input.correlationId,
+        payload: { reason: 'CHAIN_REORG', reorgId, kind: verification.kind },
+      });
+    }
 
     maybeInjectFault(input.faults, 'chain.reorg');
 

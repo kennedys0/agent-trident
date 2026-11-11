@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { AppError } from '../errors.js';
 import { nowIso, type Db } from './index.js';
 import { quoteValueOf } from '../domain/price.js';
 import type { ChainCheckpoint, ReorgKind } from '../chain/checkpoint.js';
@@ -364,12 +365,24 @@ export function createIntent(
       input.expiresAt,
       nowIso(),
     );
-  // A concurrent writer may have won either unique key, so read back by both
-  // business keys instead of trusting the insert.
-  const row = db
-    .prepare('SELECT * FROM order_intents WHERE idempotency_key = ? OR evaluation_id = ? LIMIT 1')
-    .get(input.idempotencyKey, input.evaluationId) as Row;
-  return { intent: mapIntent(row), created: Number(result.changes) === 1 };
+  // A concurrent writer may have won either unique key. Read back by the
+  // business key first (one evaluation can own at most one intent), then by the
+  // idempotency key. Two keys that point at different evaluations are a
+  // conflict, never an arbitrary `LIMIT 1` pick.
+  const byEvaluation = getIntentByEvaluationId(db, input.evaluationId);
+  const byKey = getIntentByIdempotencyKey(db, input.idempotencyKey);
+  if (byKey !== null && byKey.evaluationId !== input.evaluationId) {
+    throw new AppError('CONFLICT', 'Idempotency key already created an intent for a different evaluation', {
+      idempotencyKey: input.idempotencyKey,
+      existingEvaluationId: byKey.evaluationId,
+      requestedEvaluationId: input.evaluationId,
+    });
+  }
+  const intent = byEvaluation ?? byKey;
+  if (intent === null) {
+    throw new AppError('CONFLICT', 'Intent insert conflicted without a resolvable existing row');
+  }
+  return { intent, created: Number(result.changes) === 1 };
 }
 
 export function getIntentByIdempotencyKey(db: Db, key: string): IntentRecord | null {
@@ -612,7 +625,33 @@ export function setState(db: Db, key: string, value: string): void {
   ).run(key, value, nowIso());
 }
 
+export function clearState(db: Db, key: string): void {
+  db.prepare('DELETE FROM automation_state WHERE key = ?').run(key);
+}
+
 export const KILL_SWITCH_KEY = 'new_entries_halted';
+/** Why new entries are halted, so an operator can tell a reorg from a freeze. */
+export const HALT_REASON_KEY = 'new_entries_halted_reason';
+
+export type HaltReason = 'CHAIN_REORG' | 'CHAIN_EVIDENCE_UNAVAILABLE' | 'OPERATOR';
+
+/**
+ * Engages the kill switch and records the reason. Returns true only when this
+ * call transitioned the switch or changed the reason, so a repeated tick can
+ * stay silent instead of writing one audit row per poll.
+ */
+export function engageHalt(db: Db, reason: HaltReason): boolean {
+  const wasEngaged = getState(db, KILL_SWITCH_KEY) === 'true';
+  const priorReason = getState(db, HALT_REASON_KEY);
+  setState(db, KILL_SWITCH_KEY, 'true');
+  setState(db, HALT_REASON_KEY, reason);
+  return !wasEngaged || priorReason !== reason;
+}
+
+export function releaseHalt(db: Db): void {
+  setState(db, KILL_SWITCH_KEY, 'false');
+  clearState(db, HALT_REASON_KEY);
+}
 
 export function isKillSwitchEngaged(db: Db): boolean {
   try {
