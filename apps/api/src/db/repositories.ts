@@ -237,31 +237,45 @@ function mapIntent(row: Row): IntentRecord {
   };
 }
 
-export function createIntent(db: Db, input: Omit<IntentRecord, 'id' | 'createdAt' | 'status'>): IntentRecord {
-  db.prepare(
-    `INSERT INTO order_intents (id, evaluation_id, idempotency_key, mode, side, token_in_id, token_out_id, amount_in, min_amount_out, snapshot_id, expires_at, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
-     ON CONFLICT(idempotency_key) DO NOTHING`,
-  ).run(
-    randomUUID(),
-    input.evaluationId,
-    input.idempotencyKey,
-    input.mode,
-    input.side,
-    input.tokenInId,
-    input.tokenOutId,
-    input.amountIn,
-    input.minAmountOut,
-    input.snapshotId,
-    input.expiresAt,
-    nowIso(),
-  );
-  const row = db.prepare('SELECT * FROM order_intents WHERE idempotency_key = ?').get(input.idempotencyKey) as Row;
-  return mapIntent(row);
+export function createIntent(
+  db: Db,
+  input: Omit<IntentRecord, 'id' | 'createdAt' | 'status'>,
+): { intent: IntentRecord; created: boolean } {
+  const result = db
+    .prepare(
+      `INSERT INTO order_intents (id, evaluation_id, idempotency_key, mode, side, token_in_id, token_out_id, amount_in, min_amount_out, snapshot_id, expires_at, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+       ON CONFLICT DO NOTHING`,
+    )
+    .run(
+      randomUUID(),
+      input.evaluationId,
+      input.idempotencyKey,
+      input.mode,
+      input.side,
+      input.tokenInId,
+      input.tokenOutId,
+      input.amountIn,
+      input.minAmountOut,
+      input.snapshotId,
+      input.expiresAt,
+      nowIso(),
+    );
+  // A concurrent writer may have won either unique key, so read back by both
+  // business keys instead of trusting the insert.
+  const row = db
+    .prepare('SELECT * FROM order_intents WHERE idempotency_key = ? OR evaluation_id = ? LIMIT 1')
+    .get(input.idempotencyKey, input.evaluationId) as Row;
+  return { intent: mapIntent(row), created: Number(result.changes) === 1 };
 }
 
 export function getIntentByIdempotencyKey(db: Db, key: string): IntentRecord | null {
   const row = db.prepare('SELECT * FROM order_intents WHERE idempotency_key = ?').get(key) as Row | undefined;
+  return row ? mapIntent(row) : null;
+}
+
+export function getIntentByEvaluationId(db: Db, evaluationId: string): IntentRecord | null {
+  const row = db.prepare('SELECT * FROM order_intents WHERE evaluation_id = ?').get(evaluationId) as Row | undefined;
   return row ? mapIntent(row) : null;
 }
 

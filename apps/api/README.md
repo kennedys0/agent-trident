@@ -92,6 +92,13 @@ Error codes: `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`,
 7. **At most one effect per intent.** `order_intents.evaluation_id` is unique,
    `orders.intent_id` and `fills.order_id` are unique, and every ledger row has a
    unique `business_key`, so a replay is a read, not a write.
+   `evaluation_id` is the business key: a request that names an evaluation which
+   already produced an intent replays that stored execution (`200`,
+   `replayed: true`) even when it carries a new `idempotencyKey`. The insert uses
+   `ON CONFLICT DO NOTHING` and reads back by either key, so a concurrent
+   submission loses the unique constraint and falls back to the stored row
+   instead of failing. `executeIntent` re-reads the status inside the write
+   transaction, so only the winner writes risk/order/fill/ledger/audit rows.
 8. **Legacy block window.** The public RPC is not an archive node (~5,000 blocks
    of state), so `R14` rejects a snapshot more than `MAX_BLOCK_AGE` behind head.
 9. **Append-only audit.** SQLite triggers abort `UPDATE` and `DELETE` on
@@ -122,8 +129,12 @@ Offline coverage: money, integer price math, deterministic strategy (hash
 stability, stale/incomplete refusal), risk rules, paper execution (single fill,
 replay, restart, kill switch, audit immutability, buy→sell cycle), the
 `IntentExecution` envelope (executed and rejected), gas `AVAILABLE`/`UNAVAILABLE`
-mapping, and HTTP routes. The real-RPC suite proves chain id, testnet rejection,
-factory→pool derivation, and a block-pinned snapshot.
+mapping, and HTTP routes. Duplicate-evaluation coverage includes a repeated key,
+a new key on the same evaluation, three concurrent submissions, a rejected
+evaluation replayed after the kill switch is released, and a replay after a
+restart that asserts every table keeps its pre-replay row counts. The real-RPC
+suite proves chain id, testnet rejection, factory→pool derivation, and a
+block-pinned snapshot.
 
 ## Sanitized real-RPC evidence (11 Nov 2026, mainnet 4663)
 
@@ -143,6 +154,28 @@ factory→pool derivation, and a block-pinned snapshot.
   `gasQuoteCost` is sent because no ETH→USDG conversion is sourced.
 - Replay with the same `idempotencyKey` -> `200`, `replayed: true`, same order
   id and fill timestamp.
+
+### Duplicate-evaluation replay (11 Nov 2026, port 8092, fresh DB)
+
+The UI sends a new `idempotencyKey` on every submit, so the replay proof below
+uses new keys against one already-executed evaluation.
+
+- Three concurrent `POST /api/v1/intents` on the same evaluation with distinct
+  keys -> `200, 200, 201`; all three returned intent `528caf94…`, order
+  `8bcee306…`, and fill `18:22:49.019Z`. Delta row counts for that burst:
+  intents +1, orders +1, fills +1, risk decisions +1, ledger +6, audit +3,
+  positions +1 — one execution, not three.
+- A further request with a fourth new key -> `200`, `replayed: true`, zero row
+  deltas in every table.
+- Repeating the winning key -> `200`, `replayed: true`, zero row deltas.
+- Kill switch engaged -> fresh `200 REJECTED` with `order: null`, `fill: null`
+  (intents +1, risk +1, audit +2). Released, then a new key on the same
+  evaluation -> `200`, `replayed: true`, still `REJECTED`, zero row deltas.
+  A stored rejection is never re-evaluated.
+- Server restart on the same database, then a new key on the filled evaluation
+  -> `200`, `replayed: true`, same fill timestamp, zero row deltas.
+- SQL check: no `evaluation_id` holds more than one intent; no request in
+  either run returned `500`.
 - `/api/v1/portfolio` -> equity `9999850251` (≈ 9,999.85 USDG after the buy, fee,
   and price impact), position `VALUED`.
 

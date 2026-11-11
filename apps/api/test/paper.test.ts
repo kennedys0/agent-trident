@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { openDatabase, type Db } from '../src/db/index.js';
 import {
   appendAudit,
+  createIntent,
   getFillByOrder,
   getPortfolio,
   getPosition,
@@ -90,7 +91,7 @@ describe('paper execution and persistence', () => {
     expect(count(db, 'ledger_entries')).toBe(ledgerBefore);
   });
 
-  it('returns the same intent for a repeated idempotency key and refuses a second intent per evaluation', async () => {
+  it('returns the same intent for a repeated key and replays it for a new key on the same evaluation', async () => {
     const db = makeDb();
     const evaluation = seedEvaluation(db, makeSnapshot());
     const first = createIntentFromEvaluation(db, { evaluation, idempotencyKey: 'idem-same', correlationId: 'test', mode: 'PAPER' });
@@ -98,9 +99,100 @@ describe('paper execution and persistence', () => {
     expect(again.id).toBe(first.id);
     expect(count(db, 'order_intents')).toBe(1);
 
-    expect(() =>
-      createIntentFromEvaluation(db, { evaluation, idempotencyKey: 'idem-other', correlationId: 'test', mode: 'PAPER' }),
-    ).toThrow();
+    // `evaluation_id` is the business key: a new key must not insert or throw.
+    const differentKey = createIntentFromEvaluation(db, {
+      evaluation,
+      idempotencyKey: 'idem-other',
+      correlationId: 'test',
+      mode: 'PAPER',
+    });
+    expect(differentKey.id).toBe(first.id);
+    expect(count(db, 'order_intents')).toBe(1);
+  });
+
+  it('falls back to the existing row when two inserts race on the unique evaluation key', () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const input = {
+      evaluationId: evaluation.id,
+      mode: 'PAPER' as const,
+      side: 'BUY' as const,
+      tokenInId: 'USDG',
+      tokenOutId: 'WETH',
+      amountIn: '500000000',
+      minAmountOut: '0',
+      snapshotId: evaluation.snapshotId,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+
+    // Both writes carry a distinct idempotency key but the same evaluation, so
+    // the second INSERT hits the evaluation unique constraint.
+    const first = createIntent(db, { ...input, idempotencyKey: 'race-key-1' });
+    const second = createIntent(db, { ...input, idempotencyKey: 'race-key-2' });
+    expect(first.created).toBe(true);
+    expect(second.created).toBe(false);
+    expect(second.intent.id).toBe(first.intent.id);
+    expect(count(db, 'order_intents')).toBe(1);
+  });
+
+  it('replays a completed execution for a new key without new persistence effects', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const intent = createIntentFromEvaluation(db, { evaluation, idempotencyKey: 'idem-done-1', correlationId: 'test', mode: 'PAPER' });
+    const first = await executeIntent(deps(db), intent.id);
+    const before = {
+      intents: count(db, 'order_intents'),
+      orders: count(db, 'orders'),
+      fills: count(db, 'fills'),
+      ledger: count(db, 'ledger_entries'),
+      audit: count(db, 'audit_events'),
+    };
+
+    const replayIntent = createIntentFromEvaluation(db, {
+      evaluation,
+      idempotencyKey: 'idem-done-2',
+      correlationId: 'test',
+      mode: 'PAPER',
+    });
+    const replay = await executeIntent(deps(db), replayIntent.id);
+
+    expect(replayIntent.id).toBe(intent.id);
+    expect(replay.replayed).toBe(true);
+    expect(replay.fillId).toBe(first.fillId);
+    expect(count(db, 'order_intents')).toBe(before.intents);
+    expect(count(db, 'orders')).toBe(before.orders);
+    expect(count(db, 'fills')).toBe(before.fills);
+    expect(count(db, 'ledger_entries')).toBe(before.ledger);
+    expect(count(db, 'audit_events')).toBe(before.audit);
+  });
+
+  it('replays a rejected evaluation without re-evaluating it later', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const intent = createIntentFromEvaluation(db, { evaluation, idempotencyKey: 'idem-reject-1', correlationId: 'test', mode: 'PAPER' });
+    setState(db, KILL_SWITCH_KEY, 'true');
+    const rejected = await executeIntent(deps(db), intent.id);
+    expect(rejected.riskDecision?.verdict).toBe('REJECTED');
+    const auditBefore = count(db, 'audit_events');
+    const decisionsBefore = count(db, 'risk_decisions');
+
+    // Release the switch; the stored rejection must still replay as rejected.
+    setState(db, KILL_SWITCH_KEY, 'false');
+    const replayIntent = createIntentFromEvaluation(db, {
+      evaluation,
+      idempotencyKey: 'idem-reject-2',
+      correlationId: 'test',
+      mode: 'PAPER',
+    });
+    const replay = await executeIntent(deps(db), replayIntent.id);
+
+    expect(replay.replayed).toBe(true);
+    expect(replay.riskDecision?.verdict).toBe('REJECTED');
+    expect(replay.fillId).toBeNull();
+    expect(count(db, 'orders')).toBe(0);
+    expect(count(db, 'fills')).toBe(0);
+    expect(count(db, 'risk_decisions')).toBe(decisionsBefore);
+    expect(count(db, 'audit_events')).toBe(auditBefore);
   });
 
   it('rejects a stale snapshot and leaves no order behind', async () => {
@@ -132,24 +224,49 @@ describe('paper execution and persistence', () => {
     expect(count(db, 'fills')).toBe(0);
   });
 
-  it('survives a restart without duplicating fills or ledger entries', async () => {
+  it('survives a restart and replays a new key on the same evaluation without new effects', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'trident-db-'));
     tempDirs.push(dir);
     const path = join(dir, 'paper.sqlite');
 
     const first = seedTestDb(openDatabase(path));
     const evaluation = seedEvaluation(first, makeSnapshot());
-    const intent = createIntentFromEvaluation(first, { evaluation, idempotencyKey: 'idem-restart', correlationId: 'test', mode: 'PAPER' });
+    const intent = createIntentFromEvaluation(first, { evaluation, idempotencyKey: 'idem-restart-1', correlationId: 'test', mode: 'PAPER' });
     const view = await executeIntent(deps(first), intent.id);
-    const ledgerCount = count(first, 'ledger_entries');
+    const before = {
+      intents: count(first, 'order_intents'),
+      orders: count(first, 'orders'),
+      fills: count(first, 'fills'),
+      ledger: count(first, 'ledger_entries'),
+      audit: count(first, 'audit_events'),
+      risk: count(first, 'risk_decisions'),
+    };
     first.close();
 
     const reopened = openDatabase(path);
     const replay = await executeIntent(deps(reopened), intent.id);
     expect(replay.replayed).toBe(true);
     expect(replay.fillId).toBe(view.fillId);
-    expect(count(reopened, 'fills')).toBe(1);
-    expect(count(reopened, 'ledger_entries')).toBe(ledgerCount);
+
+    // A brand-new idempotency key after the restart must still resolve to the
+    // same stored execution, because `evaluation_id` is the business key.
+    const replayIntent = createIntentFromEvaluation(reopened, {
+      evaluation,
+      idempotencyKey: 'idem-restart-2',
+      correlationId: 'test',
+      mode: 'PAPER',
+    });
+    expect(replayIntent.id).toBe(intent.id);
+    const secondReplay = await executeIntent(deps(reopened), replayIntent.id);
+    expect(secondReplay.replayed).toBe(true);
+    expect(secondReplay.fillId).toBe(view.fillId);
+
+    expect(count(reopened, 'order_intents')).toBe(before.intents);
+    expect(count(reopened, 'orders')).toBe(before.orders);
+    expect(count(reopened, 'fills')).toBe(before.fills);
+    expect(count(reopened, 'ledger_entries')).toBe(before.ledger);
+    expect(count(reopened, 'audit_events')).toBe(before.audit);
+    expect(count(reopened, 'risk_decisions')).toBe(before.risk);
     reopened.close();
   });
 

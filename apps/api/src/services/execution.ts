@@ -5,8 +5,10 @@ import {
   countLedgerEntries,
   createIntent,
   getFillByOrder,
+  getIntentByEvaluationId,
   getIntentById,
   getIntentByIdempotencyKey,
+  getOrderByIntent,
   getPortfolio,
   getPosition,
   getRiskDecisionByIntent,
@@ -46,11 +48,30 @@ function assetById(id: string): AssetIdentity {
   return id === 'WETH' ? WETH : USDG;
 }
 
+/** The stored execution for an intent that already reached a terminal state. */
+function storedView(db: Db, intent: IntentRecord): IntentView {
+  const order = getOrderByIntent(db, intent.id);
+  const orderId = order === null ? null : (order['id'] as string);
+  const fill = orderId === null ? null : getFillByOrder(db, orderId);
+  return {
+    intent,
+    riskDecision: getRiskDecisionByIntent(db, intent.id),
+    orderId,
+    fillId: fill === null ? null : (fill['id'] as string),
+    replayed: true,
+  };
+}
+
 export function createIntentFromEvaluation(
   db: Db,
   input: { evaluation: EvaluationRecord; idempotencyKey: string; now?: Date; correlationId: string; mode: 'OBSERVE' | 'PAPER' },
 ): IntentRecord {
-  const existing = getIntentByIdempotencyKey(db, input.idempotencyKey);
+  // `evaluation_id` is the business key: one evaluation can produce at most one
+  // intent, so a new idempotency key must replay the stored intent instead of
+  // inserting a second one. The idempotency key is checked first so a repeated
+  // key still maps to whatever intent it originally created.
+  const existing =
+    getIntentByIdempotencyKey(db, input.idempotencyKey) ?? getIntentByEvaluationId(db, input.evaluation.id);
   if (existing) return existing;
 
   if ((input.evaluation.action !== 'BUY' && input.evaluation.action !== 'SELL') || input.evaluation.proposedAmountIn === null) {
@@ -67,7 +88,7 @@ export function createIntentFromEvaluation(
     throw new AppError('INTENT_NOT_ACTIONABLE', 'Evaluation sizes a trade smaller than one base unit at the snapshot price');
   }
   const now = input.now ?? new Date();
-  const intent = createIntent(db, {
+  const { intent, created } = createIntent(db, {
     evaluationId: input.evaluation.id,
     idempotencyKey: input.idempotencyKey,
     mode: input.mode,
@@ -79,14 +100,17 @@ export function createIntentFromEvaluation(
     snapshotId: input.evaluation.snapshotId,
     expiresAt: new Date(now.getTime() + INTENT_TTL_SECONDS * 1000).toISOString(),
   });
-  appendAudit(db, {
-    actor: 'operator',
-    action: 'intent.created',
-    entity: 'order_intent',
-    entityId: intent.id,
-    correlationId: input.correlationId,
-    payload: { side, amountIn: intent.amountIn, evaluationId: intent.evaluationId },
-  });
+  // Losing a concurrent insert is a replay, not a new effect: no intent audit.
+  if (created) {
+    appendAudit(db, {
+      actor: 'operator',
+      action: 'intent.created',
+      entity: 'order_intent',
+      entityId: intent.id,
+      correlationId: input.correlationId,
+      payload: { side, amountIn: intent.amountIn, evaluationId: intent.evaluationId },
+    });
+  }
   return intent;
 }
 
@@ -167,20 +191,10 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
   const intent = getIntentById(db, intentId);
   if (!intent) throw new AppError('NOT_FOUND', 'Intent not found');
 
-  if (intent.status === 'FILLED') {
-    const order = db.prepare('SELECT id FROM orders WHERE intent_id = ?').get(intentId) as { id: string } | undefined;
-    const fill = order ? getFillByOrder(db, order.id) : null;
-    return {
-      intent,
-      riskDecision: getRiskDecisionByIntent(db, intentId),
-      orderId: order?.id ?? null,
-      fillId: fill ? (fill['id'] as string) : null,
-      replayed: true,
-    };
-  }
+  if (intent.status === 'FILLED' || intent.status === 'REJECTED') return storedView(db, intent);
 
-  if (intent.status === 'REJECTED') {
-    return { intent, riskDecision: getRiskDecisionByIntent(db, intentId), orderId: null, fillId: null, replayed: true };
+  if (intent.status === 'EXPIRED') {
+    throw new AppError('INTENT_EXPIRED', 'Intent expired before it could be approved; request a new one');
   }
 
   if (clock().getTime() > new Date(intent.expiresAt).getTime()) {
@@ -280,6 +294,18 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
     risk.verdict === 'APPROVED' ? await estimateFillGas(deps, quote, snapshot ? snapshot.blockNumber : null) : null;
 
   const result = withTransaction(db, () => {
+    // A concurrent request may have completed this intent while we were
+    // quoting. Re-read inside the write transaction so only one writer can
+    // create effects; the loser returns the stored execution instead.
+    const current = getIntentById(db, intent.id);
+    if (current === null) throw new AppError('CONFLICT', 'Intent disappeared before execution');
+    if (current.status === 'FILLED' || current.status === 'REJECTED') {
+      return { replayed: true as const, view: storedView(db, current) };
+    }
+    if (current.status !== 'PENDING') {
+      throw new AppError('INTENT_EXPIRED', 'Intent is no longer executable; request a new one');
+    }
+
     const riskDecisionId = insertRiskDecision(db, {
       intentId: intent.id,
       decision: risk,
@@ -296,7 +322,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
 
     if (risk.verdict !== 'APPROVED' || !snapshot || !quote) {
       setIntentStatus(db, intent.id, 'REJECTED');
-      return { orderId: null, fillId: null, riskDecisionId };
+      return { replayed: false as const, orderId: null, fillId: null };
     }
     if (fillGas === null) throw new AppError('INTERNAL_ERROR', 'Approved execution is missing its gas estimate');
 
@@ -332,7 +358,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
         correlationId: deps.correlationId,
         payload: { side: 'BUY', amountIn: amountIn.toString(), amountOut: amountOut.toString(), fee: feeQuote.toString(), snapshotId: snapshot.id },
       });
-      return { orderId, fillId, riskDecisionId };
+      return { replayed: false as const, orderId, fillId };
     }
 
     const costBasis = getPosition(db, 'WETH');
@@ -374,8 +400,10 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       correlationId: deps.correlationId,
       payload: { side: 'SELL', amountIn: amountIn.toString(), amountOut: amountOut.toString(), fee: feeQuote.toString(), snapshotId: snapshot.id },
     });
-    return { orderId, fillId, riskDecisionId };
+    return { replayed: false as const, orderId, fillId };
   });
+
+  if (result.replayed) return result.view;
 
   const refreshed = getIntentById(db, intentId) ?? intent;
   return {

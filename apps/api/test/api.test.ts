@@ -58,6 +58,25 @@ function makeApp(overrides: Partial<AppDeps> = {}): FastifyInstance {
   return app;
 }
 
+/** Persistence effects that a replay must never add to. */
+function countEffects(db: ReturnType<typeof makeDb>): Record<string, number> {
+  const tables: Record<string, string> = {
+    intents: 'order_intents',
+    orders: 'orders',
+    fills: 'fills',
+    riskDecisions: 'risk_decisions',
+    ledger: 'ledger_entries',
+    audit: 'audit_events',
+    positions: 'positions',
+  };
+  const result: Record<string, number> = {};
+  for (const [key, table] of Object.entries(tables)) {
+    const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number | bigint };
+    result[key] = Number(row.count);
+  }
+  return result;
+}
+
 describe('HTTP API', () => {
   it('reports chain identity and mode on /health', async () => {
     const server = makeApp();
@@ -189,6 +208,107 @@ describe('HTTP API', () => {
     expect(detail.statusCode).toBe(200);
     expect(() => tradeIntentSchema.parse(detail.json().data.intent)).not.toThrow();
     expect(() => riskDecisionSchema.parse(detail.json().data.riskDecision)).not.toThrow();
+  });
+
+  it('replays the stored execution when a new key targets an evaluation that already ran', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const server = makeApp({ db });
+
+    const first = await server.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: evaluation.id, idempotencyKey: 'api-seq-1' },
+    });
+    expect(first.statusCode).toBe(201);
+    const firstBody = first.json();
+    const effects = countEffects(db);
+
+    // A different key on the same evaluation is a replay, never a second insert
+    // and never a 500 from the evaluation_id unique constraint.
+    const second = await server.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: evaluation.id, idempotencyKey: 'api-seq-2' },
+    });
+    expect(second.statusCode).toBe(200);
+    const replay = second.json();
+    expect(replay.meta.replayed).toBe(true);
+    expect(replay.data.intent.id).toBe(firstBody.data.intent.id);
+    expect(replay.data.order.id).toBe(firstBody.data.order.id);
+    expect(replay.data.fill.orderId).toBe(firstBody.data.fill.orderId);
+    expect(replay.data.fill.filledAt).toBe(firstBody.data.fill.filledAt);
+    expect(() => intentExecutionSchema.parse(replay.data)).not.toThrow();
+    expect(countEffects(db)).toEqual(effects);
+
+    // The same key keeps working too.
+    const third = await server.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: evaluation.id, idempotencyKey: 'api-seq-1' },
+    });
+    expect(third.statusCode).toBe(200);
+    expect(third.json().meta.replayed).toBe(true);
+    expect(third.json().data.intent.id).toBe(firstBody.data.intent.id);
+    expect(countEffects(db)).toEqual(effects);
+  });
+
+  it('serializes concurrent submissions of one evaluation into a single execution', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const server = makeApp({ db });
+
+    const responses = await Promise.all(
+      ['api-race-1', 'api-race-2', 'api-race-3'].map((idempotencyKey) =>
+        server.inject({ method: 'POST', url: '/api/v1/intents', payload: { evaluationId: evaluation.id, idempotencyKey } }),
+      ),
+    );
+
+    const bodies = responses.map((response) => response.json());
+    for (const response of responses) expect([200, 201]).toContain(response.statusCode);
+    expect(responses.filter((response) => response.statusCode === 201)).toHaveLength(1);
+    expect(new Set(bodies.map((body) => body.data.intent.id)).size).toBe(1);
+    expect(new Set(bodies.map((body) => body.data.fill.orderId)).size).toBe(1);
+    expect(bodies.filter((body) => body.meta.replayed === false)).toHaveLength(1);
+    for (const body of bodies) expect(() => intentExecutionSchema.parse(body.data)).not.toThrow();
+
+    const effects = countEffects(db);
+    expect(effects).toMatchObject({ intents: 1, orders: 1, fills: 1, riskDecisions: 1 });
+  });
+
+  it('replays a rejected evaluation as rejected even after the kill switch is released', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const server = makeApp({ db });
+    await server.inject({ method: 'POST', url: '/api/v1/system/halt', payload: { engaged: true } });
+
+    const rejected = await server.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: evaluation.id, idempotencyKey: 'api-reject-1' },
+    });
+    expect(rejected.statusCode).toBe(200);
+    const rejectedBody = rejected.json();
+    expect(rejectedBody.data.riskDecision.verdict).toBe('REJECTED');
+    expect(rejectedBody.data.fill).toBeNull();
+
+    // Releasing the switch writes its own audit entry, so measure after it.
+    await server.inject({ method: 'POST', url: '/api/v1/system/halt', payload: { engaged: false } });
+    const effects = countEffects(db);
+    const replay = await server.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: evaluation.id, idempotencyKey: 'api-reject-2' },
+    });
+    expect(replay.statusCode).toBe(200);
+    const replayBody = replay.json();
+    expect(replayBody.meta.replayed).toBe(true);
+    expect(replayBody.data.intent.id).toBe(rejectedBody.data.intent.id);
+    expect(replayBody.data.riskDecision.verdict).toBe('REJECTED');
+    expect(replayBody.data.order).toBeNull();
+    expect(replayBody.data.fill).toBeNull();
+    expect(() => intentExecutionSchema.parse(replayBody.data)).not.toThrow();
+    expect(countEffects(db)).toEqual(effects);
   });
 
   it('returns an explicit null order/fill when the risk gate rejects', async () => {
