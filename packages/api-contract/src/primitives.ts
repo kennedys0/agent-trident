@@ -17,6 +17,11 @@ export const baseUnitAmountSchema = z.object({
   decimals: z.number().int().min(0).max(255),
 }).strict();
 
+export const positiveBaseUnitAmountSchema = z.object({
+  value: positiveBaseUnitStringSchema,
+  decimals: z.number().int().min(0).max(255),
+}).strict();
+
 export const signedBaseUnitStringSchema = z
   .string()
   .regex(/^-?(0|[1-9][0-9]*)$/, 'Expected an integer base-unit string')
@@ -40,3 +45,4 @@ export const isoDateTimeSchema = z.string().datetime({ offset: true });
 export const idSchema = z.string().min(1).max(256);
 export const idempotencyKeySchema = z.string().min(8).max(256);
 export const executionModeSchema = z.enum(['OBSERVE', 'PAPER']);
+export const versionSchema = z.string().regex(/^\S+$/, 'Expected a nonempty version identifier').max(128);

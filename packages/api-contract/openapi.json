@@ -87,8 +87,8 @@
                   },
                   "configVersion": {
                     "type": "string",
-                    "maxLength": 256,
-                    "pattern": "^[1-9][0-9]*$"
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
                   },
                   "inputHash": {
                     "type": "string",
@@ -171,8 +171,8 @@
                   },
                   "configVersion": {
                     "type": "string",
-                    "maxLength": 256,
-                    "pattern": "^[1-9][0-9]*$"
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
                   },
                   "inputHash": {
                     "type": "string",
@@ -254,8 +254,8 @@
                   },
                   "configVersion": {
                     "type": "string",
-                    "maxLength": 256,
-                    "pattern": "^[1-9][0-9]*$"
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
                   },
                   "inputHash": {
                     "type": "string",
@@ -337,8 +337,8 @@
                   },
                   "configVersion": {
                     "type": "string",
-                    "maxLength": 256,
-                    "pattern": "^[1-9][0-9]*$"
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
                   },
                   "inputHash": {
                     "type": "string",
@@ -420,8 +420,8 @@
                   },
                   "configVersion": {
                     "type": "string",
-                    "maxLength": 256,
-                    "pattern": "^[1-9][0-9]*$"
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
                   },
                   "inputHash": {
                     "type": "string",
@@ -496,74 +496,11 @@
             "type": "string",
             "minLength": 8,
             "maxLength": 256
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "PAPER"
-            ]
-          },
-          "side": {
-            "type": "string",
-            "enum": [
-              "BUY",
-              "SELL"
-            ]
-          },
-          "token": {
-            "type": "string",
-            "pattern": "^0x[0-9a-fA-F]{40}$"
-          },
-          "quoteToken": {
-            "type": "string",
-            "pattern": "^0x[0-9a-fA-F]{40}$"
-          },
-          "baseQty": {
-            "type": "string",
-            "maxLength": 256,
-            "pattern": "^[1-9][0-9]*$"
-          },
-          "limitPrice": {
-            "type": "object",
-            "properties": {
-              "value": {
-                "type": "string",
-                "maxLength": 256,
-                "pattern": "^(0|[1-9][0-9]*)$"
-              },
-              "scale": {
-                "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
-              }
-            },
-            "required": [
-              "value",
-              "scale"
-            ],
-            "additionalProperties": false
-          },
-          "snapshotId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
           }
         },
         "required": [
           "evaluationId",
-          "idempotencyKey",
-          "mode",
-          "side",
-          "token",
-          "quoteToken",
-          "baseQty",
-          "limitPrice",
-          "snapshotId",
-          "expiresAt"
+          "idempotencyKey"
         ],
         "additionalProperties": false
       },
@@ -619,8 +556,8 @@
               },
               "configVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "inputHash": {
                 "type": "string",
@@ -703,8 +640,8 @@
               },
               "configVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "inputHash": {
                 "type": "string",
@@ -786,8 +723,8 @@
               },
               "configVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "inputHash": {
                 "type": "string",
@@ -869,8 +806,8 @@
               },
               "configVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "inputHash": {
                 "type": "string",
@@ -952,8 +889,8 @@
               },
               "configVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "inputHash": {
                 "type": "string",
@@ -1639,8 +1576,8 @@
           },
           "assumptionsVersion": {
             "type": "string",
-            "maxLength": 256,
-            "pattern": "^[1-9][0-9]*$"
+            "maxLength": 128,
+            "pattern": "^\\S+$"
           },
           "filledAt": {
             "type": "string",
@@ -1734,86 +1671,164 @@
           "positions": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "asset": {
-                  "type": "string",
-                  "pattern": "^0x[0-9a-fA-F]{40}$"
-                },
-                "quantity": {
+              "oneOf": [
+                {
                   "type": "object",
                   "properties": {
-                    "value": {
+                    "asset": {
                       "type": "string",
-                      "maxLength": 256,
-                      "pattern": "^(0|[1-9][0-9]*)$"
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
                     },
-                    "decimals": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 255
+                    "quantity": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "maxLength": 256,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "decimals": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "decimals"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "costBasisQuote": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "maxLength": 256,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "decimals": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "decimals"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "valuationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "VALUED"
+                      ]
+                    },
+                    "unrealizedPnlQuote": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "maxLength": 256,
+                          "pattern": "^-?(0|[1-9][0-9]*)$"
+                        },
+                        "decimals": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "decimals"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "valuationSnapshotId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
                     }
                   },
                   "required": [
-                    "value",
-                    "decimals"
+                    "asset",
+                    "quantity",
+                    "costBasisQuote",
+                    "valuationStatus",
+                    "unrealizedPnlQuote",
+                    "valuationSnapshotId"
                   ],
                   "additionalProperties": false
                 },
-                "costBasisQuote": {
+                {
                   "type": "object",
                   "properties": {
-                    "value": {
+                    "asset": {
                       "type": "string",
-                      "maxLength": 256,
-                      "pattern": "^(0|[1-9][0-9]*)$"
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
                     },
-                    "decimals": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 255
+                    "quantity": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "maxLength": 256,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "decimals": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "decimals"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "costBasisQuote": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "maxLength": 256,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "decimals": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "decimals"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "valuationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "UNPRICED"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "required": [
-                    "value",
-                    "decimals"
+                    "asset",
+                    "quantity",
+                    "costBasisQuote",
+                    "valuationStatus",
+                    "reason"
                   ],
                   "additionalProperties": false
-                },
-                "unrealizedPnlQuote": {
-                  "type": "object",
-                  "properties": {
-                    "value": {
-                      "type": "string",
-                      "maxLength": 256,
-                      "pattern": "^-?(0|[1-9][0-9]*)$"
-                    },
-                    "decimals": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 255
-                    }
-                  },
-                  "required": [
-                    "value",
-                    "decimals"
-                  ],
-                  "additionalProperties": false
-                },
-                "valuationSnapshotId": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 256
                 }
-              },
-              "required": [
-                "asset",
-                "quantity",
-                "costBasisQuote",
-                "unrealizedPnlQuote",
-                "valuationSnapshotId"
-              ],
-              "additionalProperties": false
+              ]
             }
           },
           "equityQuote": {
@@ -1900,13 +1915,13 @@
               },
               "policyVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "portfolioVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "reasons": {
                 "type": "array",
@@ -1925,10 +1940,114 @@
                   "APPROVED"
                 ]
               },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rule": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "observed": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "threshold": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PASS"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "rule",
+                    "observed",
+                    "threshold",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1
+              },
               "approvedBaseQty": {
-                "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                },
+                "required": [
+                  "value",
+                  "decimals"
+                ],
+                "additionalProperties": false
+              },
+              "maximumQuoteCost": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                },
+                "required": [
+                  "value",
+                  "decimals"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -1938,7 +2057,9 @@
               "reasons",
               "evaluatedAt",
               "verdict",
-              "approvedBaseQty"
+              "rules",
+              "approvedBaseQty",
+              "maximumQuoteCost"
             ],
             "additionalProperties": false
           },
@@ -1952,13 +2073,13 @@
               },
               "policyVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "portfolioVersion": {
                 "type": "string",
-                "maxLength": 256,
-                "pattern": "^[1-9][0-9]*$"
+                "maxLength": 128,
+                "pattern": "^\\S+$"
               },
               "reasons": {
                 "type": "array",
@@ -1977,6 +2098,211 @@
                 "enum": [
                   "REJECTED"
                 ]
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "rule": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "observed": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "threshold": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PASS"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "rule",
+                        "observed",
+                        "threshold",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "rule": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "observed": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "threshold": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "FAIL"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "rule",
+                        "observed",
+                        "threshold",
+                        "status",
+                        "reason"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "rule": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "observed": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "threshold": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "UNAVAILABLE"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "rule",
+                        "observed",
+                        "threshold",
+                        "status",
+                        "reason"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "minItems": 1
               }
             },
             "required": [
@@ -1985,7 +2311,8 @@
               "portfolioVersion",
               "reasons",
               "evaluatedAt",
-              "verdict"
+              "verdict",
+              "rules"
             ],
             "additionalProperties": false
           }
@@ -3092,8 +3419,8 @@
                                   },
                                   "configVersion": {
                                     "type": "string",
-                                    "maxLength": 256,
-                                    "pattern": "^[1-9][0-9]*$"
+                                    "maxLength": 128,
+                                    "pattern": "^\\S+$"
                                   },
                                   "inputHash": {
                                     "type": "string",
@@ -3176,8 +3503,8 @@
                                   },
                                   "configVersion": {
                                     "type": "string",
-                                    "maxLength": 256,
-                                    "pattern": "^[1-9][0-9]*$"
+                                    "maxLength": 128,
+                                    "pattern": "^\\S+$"
                                   },
                                   "inputHash": {
                                     "type": "string",
@@ -3259,8 +3586,8 @@
                                   },
                                   "configVersion": {
                                     "type": "string",
-                                    "maxLength": 256,
-                                    "pattern": "^[1-9][0-9]*$"
+                                    "maxLength": 128,
+                                    "pattern": "^\\S+$"
                                   },
                                   "inputHash": {
                                     "type": "string",
@@ -3342,8 +3669,8 @@
                                   },
                                   "configVersion": {
                                     "type": "string",
-                                    "maxLength": 256,
-                                    "pattern": "^[1-9][0-9]*$"
+                                    "maxLength": 128,
+                                    "pattern": "^\\S+$"
                                   },
                                   "inputHash": {
                                     "type": "string",
@@ -3425,8 +3752,8 @@
                                   },
                                   "configVersion": {
                                     "type": "string",
-                                    "maxLength": 256,
-                                    "pattern": "^[1-9][0-9]*$"
+                                    "maxLength": 128,
+                                    "pattern": "^\\S+$"
                                   },
                                   "inputHash": {
                                     "type": "string",
@@ -3681,86 +4008,164 @@
                         "positions": {
                           "type": "array",
                           "items": {
-                            "type": "object",
-                            "properties": {
-                              "asset": {
-                                "type": "string",
-                                "pattern": "^0x[0-9a-fA-F]{40}$"
-                              },
-                              "quantity": {
+                            "oneOf": [
+                              {
                                 "type": "object",
                                 "properties": {
-                                  "value": {
+                                  "asset": {
                                     "type": "string",
-                                    "maxLength": 256,
-                                    "pattern": "^(0|[1-9][0-9]*)$"
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
                                   },
-                                  "decimals": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 255
+                                  "quantity": {
+                                    "type": "object",
+                                    "properties": {
+                                      "value": {
+                                        "type": "string",
+                                        "maxLength": 256,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      "decimals": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "decimals"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "costBasisQuote": {
+                                    "type": "object",
+                                    "properties": {
+                                      "value": {
+                                        "type": "string",
+                                        "maxLength": 256,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      "decimals": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "decimals"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "valuationStatus": {
+                                    "type": "string",
+                                    "enum": [
+                                      "VALUED"
+                                    ]
+                                  },
+                                  "unrealizedPnlQuote": {
+                                    "type": "object",
+                                    "properties": {
+                                      "value": {
+                                        "type": "string",
+                                        "maxLength": 256,
+                                        "pattern": "^-?(0|[1-9][0-9]*)$"
+                                      },
+                                      "decimals": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "decimals"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "valuationSnapshotId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
                                   }
                                 },
                                 "required": [
-                                  "value",
-                                  "decimals"
+                                  "asset",
+                                  "quantity",
+                                  "costBasisQuote",
+                                  "valuationStatus",
+                                  "unrealizedPnlQuote",
+                                  "valuationSnapshotId"
                                 ],
                                 "additionalProperties": false
                               },
-                              "costBasisQuote": {
+                              {
                                 "type": "object",
                                 "properties": {
-                                  "value": {
+                                  "asset": {
                                     "type": "string",
-                                    "maxLength": 256,
-                                    "pattern": "^(0|[1-9][0-9]*)$"
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
                                   },
-                                  "decimals": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 255
+                                  "quantity": {
+                                    "type": "object",
+                                    "properties": {
+                                      "value": {
+                                        "type": "string",
+                                        "maxLength": 256,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      "decimals": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "decimals"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "costBasisQuote": {
+                                    "type": "object",
+                                    "properties": {
+                                      "value": {
+                                        "type": "string",
+                                        "maxLength": 256,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      "decimals": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "decimals"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "valuationStatus": {
+                                    "type": "string",
+                                    "enum": [
+                                      "UNPRICED"
+                                    ]
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 1
                                   }
                                 },
                                 "required": [
-                                  "value",
-                                  "decimals"
+                                  "asset",
+                                  "quantity",
+                                  "costBasisQuote",
+                                  "valuationStatus",
+                                  "reason"
                                 ],
                                 "additionalProperties": false
-                              },
-                              "unrealizedPnlQuote": {
-                                "type": "object",
-                                "properties": {
-                                  "value": {
-                                    "type": "string",
-                                    "maxLength": 256,
-                                    "pattern": "^-?(0|[1-9][0-9]*)$"
-                                  },
-                                  "decimals": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 255
-                                  }
-                                },
-                                "required": [
-                                  "value",
-                                  "decimals"
-                                ],
-                                "additionalProperties": false
-                              },
-                              "valuationSnapshotId": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 256
                               }
-                            },
-                            "required": [
-                              "asset",
-                              "quantity",
-                              "costBasisQuote",
-                              "unrealizedPnlQuote",
-                              "valuationSnapshotId"
-                            ],
-                            "additionalProperties": false
+                            ]
                           }
                         },
                         "equityQuote": {
@@ -4142,74 +4547,11 @@
                     "type": "string",
                     "minLength": 8,
                     "maxLength": 256
-                  },
-                  "mode": {
-                    "type": "string",
-                    "enum": [
-                      "PAPER"
-                    ]
-                  },
-                  "side": {
-                    "type": "string",
-                    "enum": [
-                      "BUY",
-                      "SELL"
-                    ]
-                  },
-                  "token": {
-                    "type": "string",
-                    "pattern": "^0x[0-9a-fA-F]{40}$"
-                  },
-                  "quoteToken": {
-                    "type": "string",
-                    "pattern": "^0x[0-9a-fA-F]{40}$"
-                  },
-                  "baseQty": {
-                    "type": "string",
-                    "maxLength": 256,
-                    "pattern": "^[1-9][0-9]*$"
-                  },
-                  "limitPrice": {
-                    "type": "object",
-                    "properties": {
-                      "value": {
-                        "type": "string",
-                        "maxLength": 256,
-                        "pattern": "^(0|[1-9][0-9]*)$"
-                      },
-                      "scale": {
-                        "type": "string",
-                        "maxLength": 256,
-                        "pattern": "^[1-9][0-9]*$"
-                      }
-                    },
-                    "required": [
-                      "value",
-                      "scale"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "snapshotId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time"
                   }
                 },
                 "required": [
                   "evaluationId",
-                  "idempotencyKey",
-                  "mode",
-                  "side",
-                  "token",
-                  "quoteToken",
-                  "baseQty",
-                  "limitPrice",
-                  "snapshotId",
-                  "expiresAt"
+                  "idempotencyKey"
                 ],
                 "additionalProperties": false
               }

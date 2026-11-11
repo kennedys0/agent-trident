@@ -7,6 +7,8 @@ import {
   createTradeIntentSchema,
   evaluationSchema,
   marketSnapshotSchema,
+  paperFillSchema,
+  portfolioSchema,
   riskDecisionSchema,
   signedBaseUnitAmountSchema,
 } from '../src/index.js';
@@ -33,7 +35,7 @@ const buyEvaluation = {
   snapshotId: 'snapshot-1',
   snapshotStatus: 'COMPLETE',
   strategyId: 'momentum',
-  configVersion: '1',
+  configVersion: 'momentum-v1',
   inputHash: `0x${'b'.repeat(64)}`,
   signalStrength: 5000,
   invalidation: 'price below configured threshold',
@@ -67,26 +69,86 @@ test('rejects BUY unless its snapshot is COMPLETE', () => {
   }
 });
 
-test('risk rejection requires a reason and approval requires a positive amount', () => {
-  const base = {
-    intentId: 'intent-1', policyVersion: '1', portfolioVersion: '1',
-    reasons: [], evaluatedAt: '2026-11-11T03:00:03Z',
+test('accepts semantic version identifiers and rejects empty versions', () => {
+  assert.equal(evaluationSchema.parse(buyEvaluation).configVersion, 'momentum-v1');
+  assert.equal(evaluationSchema.safeParse({ ...buyEvaluation, configVersion: '' }).success, false);
+  const fill = {
+    orderId: 'order-1', snapshotId: 'snapshot-1', baseQty: '1', quoteQty: '2060',
+    feeQuote: { value: '1', decimals: 6 }, gasQuoteEstimate: { value: '1', decimals: 6 },
+    executionPrice: { value: '1', scale: '1' }, assumptionsVersion: 'paper-v1',
+    filledAt: '2026-11-11T03:00:03Z',
   };
-  assert.equal(riskDecisionSchema.safeParse({ ...base, verdict: 'REJECTED' }).success, false);
-  assert.equal(riskDecisionSchema.safeParse({ ...base, verdict: 'APPROVED', approvedBaseQty: '0' }).success, false);
-  assert.equal(riskDecisionSchema.safeParse({ ...base, verdict: 'APPROVED', approvedBaseQty: '1' }).success, true);
+  assert.deepEqual(paperFillSchema.parse(fill), fill);
+  assert.equal(paperFillSchema.safeParse({ ...fill, assumptionsVersion: 'paper v1' }).success, false);
 });
 
-test('external intent payloads reject unknown fields and non-paper modes', () => {
-  const intent = {
-    evaluationId: 'evaluation-1', idempotencyKey: 'unique-key-1', mode: 'PAPER', side: 'BUY',
-    token: completeSnapshot.baseToken, quoteToken: completeSnapshot.quoteToken,
-    baseQty: '1', limitPrice: { value: '1', scale: '1' }, snapshotId: 'snapshot-1',
-    expiresAt: '2026-11-11T03:01:00Z',
+test('risk decisions preserve per-rule evidence and distinct approval units', () => {
+  const passRule = {
+    rule: 'R01', observed: '10', threshold: '30', status: 'PASS',
   };
-  assert.equal(createTradeIntentSchema.safeParse(intent).success, true);
+  const approved = {
+    intentId: 'intent-1', policyVersion: 'paper-risk-v1', portfolioVersion: 'portfolio-v1',
+    reasons: [], evaluatedAt: '2026-11-11T03:00:03Z', verdict: 'APPROVED', rules: [passRule],
+    approvedBaseQty: { value: '1000000000000000000', decimals: 18 },
+    maximumQuoteCost: { value: '2061000000', decimals: 6 },
+  };
+  assert.deepEqual(riskDecisionSchema.parse(approved), approved);
+  assert.equal(riskDecisionSchema.safeParse({
+    ...approved,
+    rules: [{ ...passRule, status: 'FAIL', reason: 'stale quote' }],
+  }).success, false);
+  assert.equal(riskDecisionSchema.safeParse({
+    ...approved, approvedBaseQty: { value: '0', decimals: 18 },
+  }).success, false);
+  const rejected = {
+    intentId: approved.intentId,
+    policyVersion: approved.policyVersion,
+    portfolioVersion: approved.portfolioVersion,
+    evaluatedAt: approved.evaluatedAt,
+    verdict: 'REJECTED',
+    rules: [{ ...passRule, status: 'UNAVAILABLE', reason: 'quote unavailable' }],
+    reasons: ['R01 unavailable'],
+  };
+  assert.deepEqual(riskDecisionSchema.parse(rejected), rejected);
+  assert.equal(riskDecisionSchema.safeParse({ ...rejected, reasons: [] }).success, false);
+});
+
+test('create intent accepts only evaluation and idempotency references', () => {
+  const intent = { evaluationId: 'evaluation-1', idempotencyKey: 'unique-key-1' };
+  assert.deepEqual(createTradeIntentSchema.parse(intent), intent);
+  assert.equal(createTradeIntentSchema.safeParse({ ...intent, side: 'BUY' }).success, false);
+  assert.equal(createTradeIntentSchema.safeParse({ ...intent, baseQty: '1' }).success, false);
   assert.equal(createTradeIntentSchema.safeParse({ ...intent, mode: 'LIVE' }).success, false);
-  assert.equal(createTradeIntentSchema.safeParse({ ...intent, privateKey: 'forbidden' }).success, false);
+});
+
+test('portfolio positions round-trip valued and explicitly unpriced states', () => {
+  const basePosition = {
+    asset: completeSnapshot.baseToken,
+    quantity: { value: '1000000000000000000', decimals: 18 },
+    costBasisQuote: { value: '2060000000', decimals: 6 },
+  };
+  const portfolio = {
+    mode: 'PAPER', asOf: '2026-11-11T03:00:04Z', balances: [],
+    equityQuote: { value: '10000000000', decimals: 6 },
+    realizedPnlQuote: { value: '0', decimals: 6 },
+    unrealizedPnlQuote: { value: '-100000', decimals: 6 },
+    positions: [
+      {
+        ...basePosition, valuationStatus: 'VALUED', valuationSnapshotId: 'snapshot-1',
+        unrealizedPnlQuote: { value: '-100000', decimals: 6 },
+      },
+      { ...basePosition, valuationStatus: 'UNPRICED', reason: 'snapshot unavailable' },
+    ],
+  };
+  assert.deepEqual(portfolioSchema.parse(portfolio), portfolio);
+  assert.equal(portfolioSchema.safeParse({
+    ...portfolio,
+    positions: [{ ...basePosition, valuationStatus: 'UNPRICED', unrealizedPnlQuote: { value: '0', decimals: 6 } }],
+  }).success, false);
+  assert.equal(portfolioSchema.safeParse({
+    ...portfolio,
+    positions: [{ ...basePosition, valuationStatus: 'VALUED', unrealizedPnlQuote: { value: '0', decimals: 6 } }],
+  }).success, false);
 });
 
 test('audit payload remains unknown data rather than trusted domain content', () => {

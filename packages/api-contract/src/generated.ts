@@ -519,7 +519,7 @@ export interface paths {
                                         decimals: number;
                                     };
                                 }[];
-                                positions: {
+                                positions: ({
                                     asset: string;
                                     quantity: {
                                         value: string;
@@ -529,12 +529,27 @@ export interface paths {
                                         value: string;
                                         decimals: number;
                                     };
+                                    /** @enum {string} */
+                                    valuationStatus: "VALUED";
                                     unrealizedPnlQuote: {
                                         value: string;
                                         decimals: number;
                                     };
                                     valuationSnapshotId: string;
-                                }[];
+                                } | {
+                                    asset: string;
+                                    quantity: {
+                                        value: string;
+                                        decimals: number;
+                                    };
+                                    costBasisQuote: {
+                                        value: string;
+                                        decimals: number;
+                                    };
+                                    /** @enum {string} */
+                                    valuationStatus: "UNPRICED";
+                                    reason: string;
+                                })[];
                                 equityQuote: {
                                     value: string;
                                     decimals: number;
@@ -699,20 +714,6 @@ export interface paths {
                     "application/json": {
                         evaluationId: string;
                         idempotencyKey: string;
-                        /** @enum {string} */
-                        mode: "PAPER";
-                        /** @enum {string} */
-                        side: "BUY" | "SELL";
-                        token: string;
-                        quoteToken: string;
-                        baseQty: string;
-                        limitPrice: {
-                            value: string;
-                            scale: string;
-                        };
-                        snapshotId: string;
-                        /** Format: date-time */
-                        expiresAt: string;
                     };
                 };
             };
@@ -891,20 +892,6 @@ export interface components {
         CreateTradeIntent: {
             evaluationId: string;
             idempotencyKey: string;
-            /** @enum {string} */
-            mode: "PAPER";
-            /** @enum {string} */
-            side: "BUY" | "SELL";
-            token: string;
-            quoteToken: string;
-            baseQty: string;
-            limitPrice: {
-                value: string;
-                scale: string;
-            };
-            snapshotId: string;
-            /** Format: date-time */
-            expiresAt: string;
         };
         Error: {
             code: string;
@@ -1147,7 +1134,7 @@ export interface components {
                     decimals: number;
                 };
             }[];
-            positions: {
+            positions: ({
                 asset: string;
                 quantity: {
                     value: string;
@@ -1157,12 +1144,27 @@ export interface components {
                     value: string;
                     decimals: number;
                 };
+                /** @enum {string} */
+                valuationStatus: "VALUED";
                 unrealizedPnlQuote: {
                     value: string;
                     decimals: number;
                 };
                 valuationSnapshotId: string;
-            }[];
+            } | {
+                asset: string;
+                quantity: {
+                    value: string;
+                    decimals: number;
+                };
+                costBasisQuote: {
+                    value: string;
+                    decimals: number;
+                };
+                /** @enum {string} */
+                valuationStatus: "UNPRICED";
+                reason: string;
+            })[];
             equityQuote: {
                 value: string;
                 decimals: number;
@@ -1185,7 +1187,22 @@ export interface components {
             evaluatedAt: string;
             /** @enum {string} */
             verdict: "APPROVED";
-            approvedBaseQty: string;
+            rules: {
+                rule: string;
+                observed: string | number | boolean | null;
+                threshold: string | number | boolean | null;
+                /** @enum {string} */
+                status: "PASS";
+                reason?: string;
+            }[];
+            approvedBaseQty: {
+                value: string;
+                decimals: number;
+            };
+            maximumQuoteCost: {
+                value: string;
+                decimals: number;
+            };
         } | {
             intentId: string;
             policyVersion: string;
@@ -1195,6 +1212,28 @@ export interface components {
             evaluatedAt: string;
             /** @enum {string} */
             verdict: "REJECTED";
+            rules: ({
+                rule: string;
+                observed: string | number | boolean | null;
+                threshold: string | number | boolean | null;
+                /** @enum {string} */
+                status: "PASS";
+                reason?: string;
+            } | {
+                rule: string;
+                observed: string | number | boolean | null;
+                threshold: string | number | boolean | null;
+                /** @enum {string} */
+                status: "FAIL";
+                reason: string;
+            } | {
+                rule: string;
+                observed: string | number | boolean | null;
+                threshold: string | number | boolean | null;
+                /** @enum {string} */
+                status: "UNAVAILABLE";
+                reason: string;
+            })[];
         };
         TradeIntent: {
             id: string;

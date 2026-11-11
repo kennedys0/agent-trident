@@ -7,10 +7,12 @@ import {
   idempotencyKeySchema,
   idSchema,
   isoDateTimeSchema,
+  positiveBaseUnitAmountSchema,
   positiveBaseUnitStringSchema,
   scaledIntegerSchema,
   signedBaseUnitAmountSchema,
   transactionHashSchema,
+  versionSchema,
 } from './primitives.js';
 
 const observationSchema = z.object({
@@ -50,7 +52,7 @@ const evaluationBaseSchema = z.object({
   snapshotId: idSchema,
   snapshotStatus: z.enum(['COMPLETE', 'STALE', 'INCOMPLETE', 'UNAVAILABLE']),
   strategyId: idSchema,
-  configVersion: positiveBaseUnitStringSchema,
+  configVersion: versionSchema,
   inputHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   signalStrength: z.number().int().min(0).max(10_000),
   invalidation: z.string().min(1),
@@ -97,12 +99,48 @@ export const tradeIntentSchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'EXPIRED', 'ORDERED', 'FILLED', 'FAILED']),
 }).strict();
 
-export const createTradeIntentSchema = tradeIntentSchema.omit({ id: true, status: true });
+export const createTradeIntentSchema = tradeIntentSchema.pick({
+  evaluationId: true,
+  idempotencyKey: true,
+});
+
+const riskEvidenceValueSchema = z.union([
+  z.string(),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+]);
+
+const riskRuleBaseSchema = z.object({
+  rule: z.string().min(1).max(128),
+  observed: riskEvidenceValueSchema,
+  threshold: riskEvidenceValueSchema,
+});
+
+export const riskRuleSchema = z.discriminatedUnion('status', [
+  riskRuleBaseSchema.extend({
+    status: z.literal('PASS'),
+    reason: z.string().min(1).optional(),
+  }).strict(),
+  riskRuleBaseSchema.extend({
+    status: z.literal('FAIL'),
+    reason: z.string().min(1),
+  }).strict(),
+  riskRuleBaseSchema.extend({
+    status: z.literal('UNAVAILABLE'),
+    reason: z.string().min(1),
+  }).strict(),
+]);
+
+const passingRiskRuleSchema = riskRuleBaseSchema.extend({
+  status: z.literal('PASS'),
+  reason: z.string().min(1).optional(),
+}).strict();
 
 const riskBaseSchema = z.object({
   intentId: idSchema,
-  policyVersion: positiveBaseUnitStringSchema,
-  portfolioVersion: positiveBaseUnitStringSchema,
+  policyVersion: versionSchema,
+  portfolioVersion: versionSchema,
   reasons: z.array(z.string().min(1)),
   evaluatedAt: isoDateTimeSchema,
 });
@@ -110,10 +148,13 @@ const riskBaseSchema = z.object({
 export const riskDecisionSchema = z.discriminatedUnion('verdict', [
   riskBaseSchema.extend({
     verdict: z.literal('APPROVED'),
-    approvedBaseQty: positiveBaseUnitStringSchema,
+    rules: z.array(passingRiskRuleSchema).min(1),
+    approvedBaseQty: positiveBaseUnitAmountSchema,
+    maximumQuoteCost: positiveBaseUnitAmountSchema,
   }).strict(),
   riskBaseSchema.extend({
     verdict: z.literal('REJECTED'),
+    rules: z.array(riskRuleSchema).min(1),
     reasons: z.array(z.string().min(1)).min(1),
   }).strict(),
 ]);
@@ -126,7 +167,7 @@ export const paperFillSchema = z.object({
   feeQuote: baseUnitAmountSchema,
   gasQuoteEstimate: baseUnitAmountSchema,
   executionPrice: scaledIntegerSchema,
-  assumptionsVersion: positiveBaseUnitStringSchema,
+  assumptionsVersion: versionSchema,
   filledAt: isoDateTimeSchema,
 }).strict();
 
@@ -136,13 +177,23 @@ const assetBalanceSchema = z.object({
   reserved: baseUnitAmountSchema,
 }).strict();
 
-const positionSchema = z.object({
+const positionBaseSchema = z.object({
   asset: evmAddressSchema,
   quantity: baseUnitAmountSchema,
   costBasisQuote: baseUnitAmountSchema,
-  unrealizedPnlQuote: signedBaseUnitAmountSchema,
-  valuationSnapshotId: idSchema,
-}).strict();
+});
+
+const positionSchema = z.discriminatedUnion('valuationStatus', [
+  positionBaseSchema.extend({
+    valuationStatus: z.literal('VALUED'),
+    unrealizedPnlQuote: signedBaseUnitAmountSchema,
+    valuationSnapshotId: idSchema,
+  }).strict(),
+  positionBaseSchema.extend({
+    valuationStatus: z.literal('UNPRICED'),
+    reason: z.string().min(1),
+  }).strict(),
+]);
 
 export const portfolioSchema = z.object({
   mode: z.literal('PAPER'),
