@@ -90,6 +90,11 @@ export function OverviewPage(): ReactNode {
             <span className="row__value">
               {snapshot.isLoading ? (
                 <span className="meta">Loading snapshot…</span>
+              ) : snapshotData === null && snapshot.error !== null ? (
+                <span className="inline">
+                  <SnapshotBadge status="UNAVAILABLE" />
+                  <span className="meta">no canonical snapshot · {snapshot.error.message}</span>
+                </span>
               ) : snapshotData === null ? (
                 <Badge tone="muted">None recorded</Badge>
               ) : (

@@ -71,15 +71,19 @@ export function IntentAction({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [manualReview, setManualReview] = useState<{ message: string; requestId: string | null; reorg: boolean } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
 
   const tradable = evaluation.action === 'BUY' || evaluation.action === 'SELL';
   const eligible = tradable && evaluation.snapshotStatus === 'COMPLETE';
-  const disabledReason = !tradable
-    ? `This evaluation is ${evaluation.action}; the strategy did not propose a trade.`
-    : evaluation.snapshotStatus !== 'COMPLETE'
-      ? `The snapshot is ${evaluation.snapshotStatus}; a ${evaluation.action} intent requires a COMPLETE snapshot.`
-      : null;
+  const disabledReason =
+    manualReview !== null
+      ? 'This evaluation is under manual review; resubmitting is blocked.'
+      : !tradable
+        ? `This evaluation is ${evaluation.action}; the strategy did not propose a trade.`
+        : evaluation.snapshotStatus !== 'COMPLETE'
+          ? `The snapshot is ${evaluation.snapshotStatus}; a ${evaluation.action} intent requires a COMPLETE snapshot.`
+          : null;
 
   const submit = async (): Promise<void> => {
     setBusy(true);
@@ -98,6 +102,17 @@ export function IntentAction({
         setError(
           'The backend response does not match the intent-execution contract: it must return intent, riskDecision, order, and fill.',
         );
+      } else if (cause instanceof ApiError && cause.status === 409 && cause.code === 'CONFLICT') {
+        // A reorg-quarantined evaluation is refused with 409. This is not a
+        // transient failure: never retry, never claim success, and keep the
+        // control disabled until an operator clears the review.
+        setResult(null);
+        setOpen(false);
+        setManualReview({
+          message: cause.message,
+          requestId: cause.requestId,
+          reorg: /reorg|quarantin/i.test(cause.message),
+        });
       } else {
         setError(cause instanceof Error ? cause.message : 'The intent request failed');
       }
@@ -132,7 +147,7 @@ export function IntentAction({
         <button
           type="button"
           className="btn btn--primary"
-          disabled={!eligible}
+          disabled={!eligible || manualReview !== null}
           onClick={() => {
             setError(null);
             setOpen(true);
@@ -155,6 +170,33 @@ export function IntentAction({
         <p className="meta" id="intent-disabled-reason" data-testid="intent-disabled-reason">
           Disabled: {disabledReason}
         </p>
+      )}
+
+      {manualReview === null ? null : (
+        <section
+          className="banner banner--danger"
+          role="alert"
+          aria-labelledby="intent-manual-review-title"
+          data-testid="intent-manual-review"
+        >
+          <div className="inline" style={{ justifyContent: 'space-between' }}>
+            <Badge tone="danger">MANUAL REVIEW REQUIRED</Badge>
+            <span className="meta mono">HTTP 409 · CONFLICT</span>
+          </div>
+          <h3 className="panel__title" id="intent-manual-review-title">
+            {manualReview.reorg ? 'This evaluation was quarantined by a chain reorg' : 'This evaluation is no longer actionable'}
+          </h3>
+          <p>
+            {manualReview.reorg
+              ? 'The chain reorganised and this evaluation or its snapshot was quarantined. The backend refused the intent, so no paper order, fill, or ledger entry was created. An operator must review the reorg and release the halt before this evaluation can be used again.'
+              : 'The backend refused the intent because this evaluation or its snapshot is not canonical. No paper order, fill, or ledger entry was created. An operator must review it before this evaluation can be used again.'}
+          </p>
+          <p className="meta">
+            Backend message: {manualReview.message}
+            {manualReview.requestId === null ? '' : ` · request ${manualReview.requestId}`}
+          </p>
+          <p className="meta">Do not resubmit. This control stays disabled until the review is cleared.</p>
+        </section>
       )}
 
       {error === null ? null : (

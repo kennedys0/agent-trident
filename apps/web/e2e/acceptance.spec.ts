@@ -216,6 +216,192 @@ test.describe('truthful states (intercepted transport, clearly test-only)', () =
     await shot(page, 'state-stale-desktop');
   });
 
+  test('a reorg-quarantined evaluation stops at manual review instead of a generic error', async ({ page, request }) => {
+    const liveCandidates = await (await request.get('/api/v1/candidates?limit=5')).json();
+    const liveHealth = await (await request.get('/health')).json();
+    const base = liveCandidates.data[0] as {
+      token: string;
+      snapshotId: string;
+      evaluation: {
+        snapshotId: string;
+        strategyId: string;
+        configVersion: string;
+        inputHash: string;
+        evaluatedAt: string;
+      };
+    };
+    const candidate = {
+      token: base.token,
+      snapshotId: base.snapshotId,
+      evaluation: {
+        id: 'eval-reorg',
+        snapshotId: base.snapshotId,
+        snapshotStatus: 'COMPLETE',
+        strategyId: base.evaluation.strategyId,
+        configVersion: base.evaluation.configVersion,
+        inputHash: base.evaluation.inputHash,
+        action: 'BUY',
+        signalStrength: 6250,
+        invalidation: 'Fixture: price falls below the entry band',
+        reasons: ['Fixture evaluation for the reorg conflict state'],
+        evaluatedAt: base.evaluation.evaluatedAt,
+        proposedBaseQty: '243530914141316398',
+      },
+    };
+
+    await page.route('**/api/v1/candidates?limit=50', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: [candidate], meta: liveCandidates.meta }),
+      }),
+    );
+    await page.route('**/health', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: liveHealth.data, meta: { ...liveHealth.meta, killSwitchEngaged: true } }),
+      }),
+    );
+    let intentPosts = 0;
+    await page.route('**/api/v1/intents', (route) => {
+      intentPosts += 1;
+      return route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: {
+            code: 'CONFLICT',
+            message: 'Evaluation was quarantined by a chain reorg and requires manual review',
+            details: null,
+            requestId: 'req-reorg-playwright',
+          },
+        }),
+      });
+    });
+
+    await page.goto('/candidates/eval-reorg');
+    await waitForChain(page);
+    // The reorg halt is visible, not just implied by the refused intent.
+    await expect(page.getByText('Entries stopped').first()).toBeVisible();
+
+    const action = page.getByTestId('create-intent');
+    await expect(action).toBeEnabled();
+    await action.click();
+    await page.getByTestId('confirm-dialog-confirm').click();
+
+    const review = page.getByTestId('intent-manual-review');
+    await expect(review).toBeVisible();
+    await expect(review).toContainText('MANUAL REVIEW REQUIRED');
+    await expect(review).toContainText(/quarantined by a chain reorg/i);
+    await expect(review).toContainText(/no paper order, fill, or ledger entry was created/i);
+    await expect(page.getByTestId('intent-result')).toHaveCount(0);
+    await expect(page.getByTestId('intent-error')).toHaveCount(0);
+    await expect(action).toBeDisabled();
+    await expect(page.getByTestId('intent-disabled-reason')).toContainText(/manual review/i);
+    // One refusal only: no automatic retry loop.
+    expect(intentPosts).toBe(1);
+    await shot(page, 'intent-reorg-manual-review');
+  });
+
+  test('an unavailable snapshot keeps health, portfolio and entry controls truthful', async ({ page, request }) => {
+    const liveCandidates = await (await request.get('/api/v1/candidates?limit=5')).json();
+    const liveHealth = await (await request.get('/health')).json();
+    const livePortfolio = await (await request.get('/api/v1/portfolio')).json();
+    const base = liveCandidates.data[0];
+    const [quoteBalance, baseBalance] = livePortfolio.data.balances;
+    const candidate = {
+      ...base,
+      evaluation: { ...base.evaluation, id: 'eval-unavailable', action: 'SELL', snapshotStatus: 'UNAVAILABLE' },
+    };
+    const portfolioFixture = {
+      mode: 'PAPER',
+      asOf: '2026-11-11T18:00:00.000Z',
+      balances: [
+        quoteBalance,
+        {
+          asset: baseBalance.asset,
+          available: { value: '243530914141316398', decimals: 18 },
+          reserved: { value: '0', decimals: 18 },
+        },
+      ],
+      positions: [
+        {
+          asset: baseBalance.asset,
+          quantity: { value: '243530914141316398', decimals: 18 },
+          costBasisQuote: { value: '500050000', decimals: 6 },
+          valuationStatus: 'UNPRICED',
+          reason: 'No canonical snapshot is available to value this position',
+        },
+      ],
+      equityQuote: quoteBalance.available,
+      realizedPnlQuote: { value: '0', decimals: 6 },
+      unrealizedPnlQuote: { value: '0', decimals: 6 },
+    };
+
+    await page.route('**/api/v1/candidates?limit=50', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: [candidate], meta: liveCandidates.meta }),
+      }),
+    );
+    await page.route('**/api/v1/markets/weth-usdg/snapshot', (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: {
+            code: 'NOT_FOUND',
+            message: 'No market snapshot has been recorded yet',
+            details: null,
+            requestId: 'req-snapshot-unavailable',
+          },
+        }),
+      }),
+    );
+    await page.route('**/api/v1/portfolio', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: portfolioFixture,
+          meta: { priceStatus: 'UNAVAILABLE', priceAsOf: null, simulated: true },
+        }),
+      }),
+    );
+    await page.route('**/health', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: liveHealth.data, meta: { ...liveHealth.meta, killSwitchEngaged: true } }),
+      }),
+    );
+
+    await page.goto('/portfolio');
+    await expect(page.getByTestId('portfolio-price-status')).toContainText('Valuation unavailable');
+    await expect(page.getByTestId('portfolio-price-status')).toContainText(/no complete canonical market snapshot/);
+    await expect(page.getByTestId('portfolio-unrealized')).toHaveText('Unavailable');
+    await expect(page.getByText('UNPRICED', { exact: true })).toBeVisible();
+    await expect(page.getByText(/excludes unpriced positions/)).toBeVisible();
+    await expect(page.getByText('Entries stopped').first()).toBeVisible();
+
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+    const freshness = page.locator('.row', { hasText: 'Snapshot freshness' });
+    await expect(freshness.getByText('Unavailable')).toBeVisible();
+    await expect(freshness).toContainText('no canonical snapshot');
+    const reference = page.locator('.row', { hasText: 'Reference price' });
+    await expect(reference.getByText('Unavailable')).toBeVisible();
+    const entries = page.locator('.row', { hasText: 'New entries' });
+    await expect(entries.getByText('STOPPED')).toBeVisible();
+    await shot(page, 'state-snapshot-unavailable');
+
+    await page.goto('/candidates/eval-unavailable');
+    await expect(page.getByTestId('create-intent')).toBeDisabled();
+    await expect(page.getByTestId('intent-disabled-reason')).toContainText(/UNAVAILABLE/);
+  });
+
   test('loading state is announced and shows no invented numbers', async ({ page }) => {
     await page.route('**/api/v1/portfolio', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 4000));

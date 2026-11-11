@@ -124,6 +124,29 @@ describe('PortfolioView', () => {
     expect(screen.queryByText('+0.00')).not.toBeInTheDocument();
   });
 
+  it('labels an unavailable canonical price and never shows a zero unrealized PnL', () => {
+    render(
+      <MemoryRouter>
+        <PortfolioView portfolio={unpricedPortfolio} venues={null} priceStatus="UNAVAILABLE" priceAsOf={null} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('portfolio-price-status')).toHaveTextContent('Valuation unavailable');
+    expect(screen.getByTestId('portfolio-price-status')).toHaveTextContent(/no complete canonical market snapshot/);
+    expect(screen.getByTestId('portfolio-unrealized')).toHaveTextContent('Unavailable');
+    expect(screen.getByText(/excludes unpriced positions/)).toBeInTheDocument();
+    expect(screen.queryByText('+0.00')).not.toBeInTheDocument();
+  });
+
+  it('labels a stale price without claiming the values are live', () => {
+    render(
+      <MemoryRouter>
+        <PortfolioView portfolio={portfolio} venues={null} priceStatus="STALE" priceAsOf="2026-11-11T03:00:00Z" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('portfolio-price-status')).toHaveTextContent('Prices are stale');
+    expect(screen.getByTestId('portfolio-unrealized')).toHaveTextContent('−0.10');
+  });
+
   it('labels assumptions the backend does not expose as unavailable', () => {
     render(
       <MemoryRouter>
@@ -369,5 +392,59 @@ describe('IntentAction', () => {
     expect(screen.getByTestId('gas-estimate')).toHaveTextContent('91542 gas');
     expect(screen.getByTestId('gas-estimate')).toHaveTextContent('1833220092000 wei');
     expect(screen.queryByText(/CONTRACT_MISMATCH|does not match the amended/)).not.toBeInTheDocument();
+  });
+
+  it('stops at manual review on a reorg 409 and never retries', async () => {
+    let calls = 0;
+    setTransport(async () => {
+      calls += 1;
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: 'CONFLICT',
+            message: 'Evaluation was quarantined by a chain reorg and requires manual review',
+            details: null,
+            requestId: 'req-reorg-1',
+          },
+        }),
+        { status: 409, headers: { 'content-type': 'application/json' } },
+      );
+    });
+
+    render(
+      <MemoryRouter>
+        <IntentAction candidate={buyCandidate} />
+      </MemoryRouter>,
+    );
+
+    await userEvent.click(screen.getByTestId('create-intent'));
+    await userEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    const review = await screen.findByTestId('intent-manual-review');
+    expect(review).toHaveTextContent('MANUAL REVIEW REQUIRED');
+    expect(review).toHaveTextContent(/quarantined by a chain reorg/i);
+    expect(review).toHaveTextContent(/no paper order, fill, or ledger entry was created/i);
+    expect(review).toHaveTextContent('req-reorg-1');
+    expect(screen.queryByTestId('intent-result')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('intent-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('create-intent')).toBeDisabled();
+    expect(screen.getByTestId('intent-disabled-reason')).toHaveTextContent(/manual review/i);
+    expect(calls).toBe(1);
+  });
+
+  it('disables the entry action when the evaluation snapshot is unavailable', () => {
+    const unavailableCandidate = candidateSchema.parse({
+      ...buyCandidate,
+      evaluation: { ...buyCandidate.evaluation, action: 'SELL', snapshotStatus: 'UNAVAILABLE', proposedBaseQty: undefined },
+    });
+
+    render(
+      <MemoryRouter>
+        <IntentAction candidate={unavailableCandidate} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId('create-intent')).toBeDisabled();
+    expect(screen.getByTestId('intent-disabled-reason')).toHaveTextContent(/UNAVAILABLE/);
   });
 });

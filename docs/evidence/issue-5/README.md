@@ -1,10 +1,12 @@
 # Issue #5 — PAPER operational UI: evidence
 
 Run date: 2026-11-11 (UTC). Branch `feat/issue-5-operational-ui`, rebased onto
-`feat/issue-2-paper-backend` at `24e39e8`, which is itself stacked on the
-contract amendment `0fb7be6` from PR #7. The contract package is a real
-dependency here, not a copy: `24e39e8` contains `packages/api-contract` at
-`0fb7be6`, so the UI and the API are validated against the same schemas.
+`feat/issue-2-paper-backend` at `11c1808`, which is itself stacked on the
+contract amendment `0fb7be6` from PR #7. `11c1808` adds the backend checkpoint
+and reorg recovery; it changes only `apps/api/**`, and
+`packages/api-contract` is byte-identical to `0fb7be6`, so this rebase is
+contract-neutral. The contract package is a real dependency here, not a copy:
+the UI and the API are validated against the same schemas.
 
 Everything below was produced on this machine against a real backend process
 and the real Robinhood Chain mainnet RPC. Nothing in `apps/web` fakes market
@@ -25,9 +27,9 @@ tests are labelled "intercepted transport, clearly test-only".
 | Command | Result |
 |---|---|
 | `pnpm -r typecheck` | PASS (3 packages) |
-| `pnpm -r test` | PASS — contract 17, API 50 passed / 4 skipped (real-RPC tests need `RUN_RPC_TESTS=1`), web 38 |
-| `pnpm -r build` | PASS — web 390.68 kB JS / 114.93 kB gzip, 13.24 kB CSS / 3.14 kB gzip |
-| `npx playwright test` (apps/web) | 22 passed |
+| `pnpm -r test` | PASS — contract 17, API 73 passed / 4 skipped (real-RPC tests need `RUN_RPC_TESTS=1`), web 42 |
+| `pnpm -r build` | PASS — web 393.70 kB JS / 115.93 kB gzip, 13.24 kB CSS / 3.14 kB gzip |
+| `npx playwright test` (apps/web) | 24 passed |
 
 ## Live intent evidence — four honest phases
 
@@ -114,6 +116,68 @@ and requires the same order/fill plus the `intent-replayed` badge. The
 `REPLAYED` copy also appears in `apps/web/test/views.test.tsx`, but the browser
 run above is the live proof.
 
+## Reorg-quarantined evaluation — manual review, no retry
+
+`POST /api/v1/intents` on an evaluation quarantined by a chain reorg now returns
+`409` with `error.code: "CONFLICT"` and the message "Evaluation was quarantined
+by a chain reorg and requires manual review". The backend makes this check
+before it creates an intent, so no order, fill, or ledger entry exists for the
+refused request.
+
+- `IntentAction` has a dedicated `manualReview` state. It clears any prior
+  result, closes the confirm dialog, and renders
+  `intent-manual-review`: a `MANUAL REVIEW REQUIRED` badge, `HTTP 409 · CONFLICT`,
+  the heading "This evaluation was quarantined by a chain reorg", the statement
+  that no paper order/fill/ledger entry was created, the backend message and
+  request id, and "Do not resubmit. This control stays disabled until the review
+  is cleared."
+- The entry control is disabled and `intent-disabled-reason` says the evaluation
+  is under manual review. There is no automatic retry: the Playwright test
+  counts exactly one `POST /api/v1/intents`.
+- A `409 CONFLICT` whose message does not mention reorg/quarantine gets the same
+  manual-review treatment with generic "no longer actionable" wording, so an
+  unexpected conflict can never fall through to a generic success or error.
+- Screenshot: `intent-reorg-manual-review.png`. The `ENTRIES STOPPED` badge is
+  visible in the same view, so the reorg halt is shown, not merely implied by
+  the refused intent.
+
+Unit coverage: `apps/web/test/views.test.tsx` "stops at manual review on a reorg
+409 and never retries" asserts the badge, the reorg copy, the absence of
+`intent-result`/`intent-error`, the disabled control, and exactly one transport
+call.
+
+## Unavailable snapshot — truthful health, portfolio, and entry
+
+A quarantined snapshot is excluded by `getLatestSnapshot`, so the snapshot
+endpoint can `404` and the portfolio reports `meta.priceStatus: "UNAVAILABLE"`
+with unpriced positions. The UI now reads that meta instead of inventing a
+valuation.
+
+- `PortfolioPage` validates `meta.priceStatus` against
+  `COMPLETE | STALE | INCOMPLETE | UNAVAILABLE` and passes `priceAsOf` through.
+- `PortfolioView` renders `portfolio-price-status`: stale prices say the values
+  are the last known valuation, not live; unavailable/incomplete prices say
+  there is no complete canonical snapshot. Equity notes "excludes unpriced
+  positions" or "no canonical price", and unrealized PnL shows `Unavailable` —
+  never a fabricated `0.00`.
+- `OverviewPage` renders `SnapshotBadge status="UNAVAILABLE"` plus "no canonical
+  snapshot · {backend message}" for a 404/error snapshot instead of
+  "None recorded". `Reference price` shows `Unavailable`; `New entries` shows
+  `STOPPED` while the reorg halt is engaged.
+- Screenshot: `state-snapshot-unavailable.png`. It shows head block, RPC health,
+  and chain id still true, with freshness/reference price unavailable and the
+  paper portfolio equity excluding the unpriced position.
+- The candidate with `snapshotStatus: "UNAVAILABLE"` has its entry action
+  disabled with the reason naming the status. Because the contract only permits
+  a non-`COMPLETE` snapshot on `SELL`/`HOLD`/`WAIT`/`AVOID`, the fixture uses
+  `SELL`; `BUY` with a non-`COMPLETE` snapshot is unrepresentable by design.
+
+Unit coverage: "labels an unavailable canonical price and never shows a zero
+unrealized PnL", "labels a stale price without claiming the values are live",
+and "disables the entry action when the evaluation snapshot is unavailable".
+Playwright: "an unavailable snapshot keeps health, portfolio and entry controls
+truthful".
+
 ## Live API data observed during this run
 
 - `/health`: `mode PAPER`, `chainId 4663`, `rpcStatus HEALTHY`, head blocks
@@ -128,7 +192,7 @@ run above is the live proof.
 - `/api/v1/journal`: real `strategy.evaluation.recorded`,
   `market.snapshot.persisted`, `risk.decision.recorded` and ledger events.
 
-## Browser acceptance (22 tests)
+## Browser acceptance (24 tests)
 
 1. Overview renders the head block, the pinned snapshot block, the latest
    action, and the strategy id from the same HTTP responses it consumed.
@@ -148,17 +212,24 @@ run above is the live proof.
 7. Offline/error state keeps prior values labelled and offers retry.
 8. An empty evaluation list renders as Empty, not Error.
 9. A stale snapshot is labelled `Stale` and cannot look healthy.
-10. Loading is announced with `aria-busy` and shows no invented numbers.
-11–15. Overview at 320, 375, 768, 1024, 1280 px, light and dark.
-16. Official brand mark follows the theme, with favicon and social metadata.
-17. Brand mark leads the top bar at 320 px with zero overflow.
-18. Route screenshots for candidates, candidate detail, risk, portfolio,
+10. A reorg-quarantined evaluation stops at `MANUAL REVIEW REQUIRED`, shows the
+    chain-reorg copy, creates no result/error state, disables the control, and
+    sends exactly one intent POST.
+11. An unavailable snapshot keeps health, portfolio, and entry controls
+    truthful: `UNAVAILABLE` freshness with the backend message, `Unavailable`
+    reference price and unrealized PnL, `STOPPED` entries, and a disabled entry
+    action.
+12. Loading is announced with `aria-busy` and shows no invented numbers.
+13–17. Overview at 320, 375, 768, 1024, 1280 px, light and dark.
+18. Official brand mark follows the theme, with favicon and social metadata.
+19. Brand mark leads the top bar at 320 px with zero overflow.
+20. Route screenshots for candidates, candidate detail, risk, portfolio,
     journal, more.
-19. axe scan of Overview: 0 serious/critical violations.
-20. axe scan of candidate detail, risk, portfolio, journal: 0 serious/critical.
-21. Keyboard: first Tab focuses the skip link, second Tab focuses `Overview`
+21. axe scan of Overview: 0 serious/critical violations.
+22. axe scan of candidate detail, risk, portfolio, journal: 0 serious/critical.
+23. Keyboard: first Tab focuses the skip link, second Tab focuses `Overview`
     navigation.
-22. No button whose name starts with "Live"; the build states there is no LIVE
+24. No button whose name starts with "Live"; the build states there is no LIVE
     control.
 
 ## Viewports
@@ -256,4 +327,10 @@ with provenance — never as zero.
    `500 UNIQUE constraint failed: order_intents.evaluation_id`. At `24e39e8` the
    same request returns `200 replayed: true` with the stored execution; the
    duplicate scenario above proves the UI shows that without a 500 or a
-   `CONTRACT_MISMATCH`. A typed `409` is no longer needed for this case.
+   `CONTRACT_MISMATCH`. A typed `409` is not needed for this case.
+8. **The reorg 409 is fixture-proven, not reproduced by a destructive live
+   reorg.** The backend's real reorg and quarantine path is covered by
+   `apps/api/test/reorg.test.ts` (10 cases) and its `409` contract was read from
+   `apps/api/src/app.ts`; this branch's browser test intercepts the `409` so the
+   UI state is deterministic. A deliberate reorg against the public chain was
+   not performed.

@@ -1,12 +1,20 @@
 import { type ReactNode } from 'react';
 import { endpoints } from '../../lib/api/endpoints.js';
 import { useResource } from '../../lib/api/hooks.js';
+import { readString } from '../../lib/api/system.js';
 import { PAIR } from '../../lib/pair.js';
 import { useStatus } from '../../app/StatusProvider.js';
 import { Panel } from '../../components/Panel.js';
 import { StateView, isOfflineError } from '../../components/StateView.js';
 import { SubjectHeader } from '../../components/SubjectHeader.js';
-import { PortfolioView } from './PortfolioView.js';
+import { PortfolioView, type PriceStatus } from './PortfolioView.js';
+
+const PRICE_STATUSES: readonly PriceStatus[] = ['COMPLETE', 'STALE', 'INCOMPLETE', 'UNAVAILABLE'];
+
+function priceStatusOf(meta: Record<string, unknown>): PriceStatus | null {
+  const value = readString(meta, 'priceStatus');
+  return value !== null && (PRICE_STATUSES as readonly string[]).includes(value) ? (value as PriceStatus) : null;
+}
 
 export function PortfolioPage(): ReactNode {
   const { online } = useStatus();
@@ -41,7 +49,12 @@ export function PortfolioPage(): ReactNode {
         ) : portfolio.data === null ? (
           <StateView kind="empty" title="No portfolio projection yet" testId="portfolio-empty" />
         ) : (
-          <PortfolioView portfolio={portfolio.data} venues={venues.data} />
+          <PortfolioView
+            portfolio={portfolio.data}
+            venues={venues.data}
+            priceStatus={priceStatusOf(portfolio.meta)}
+            priceAsOf={readString(portfolio.meta, 'priceAsOf')}
+          />
         )}
       </Panel>
     </>

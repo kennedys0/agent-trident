@@ -1,23 +1,33 @@
 import type { ReactNode } from 'react';
-import type { Portfolio } from '@trident/api-contract';
+import type { MarketSnapshot, Portfolio } from '@trident/api-contract';
 import type { Venue } from '../../lib/api/endpoints.js';
 import { Link } from 'react-router-dom';
 import { PAIR, symbolFor } from '../../lib/pair.js';
 import { formatMoney, formatUtc } from '../../lib/format.js';
 import { Badge } from '../../components/Badge.js';
 import { AddressChip } from '../../components/AddressChip.js';
+import { SnapshotBadge } from '../../components/SnapshotBadge.js';
+
+export type PriceStatus = MarketSnapshot['status'];
 
 export function PortfolioView({
   portfolio,
   venues,
   compact = false,
+  priceStatus = null,
+  priceAsOf = null,
 }: {
   readonly portfolio: Portfolio;
   readonly venues: Venue[] | null;
   readonly compact?: boolean;
+  readonly priceStatus?: PriceStatus | null;
+  readonly priceAsOf?: string | null;
 }): ReactNode {
   const quoteBalance = portfolio.balances.find((balance) => balance.asset.toLowerCase() === PAIR.quote.address);
   const fee = venues?.[0]?.fee ?? null;
+  const unpriced = portfolio.positions.some((position) => position.valuationStatus === 'UNPRICED');
+  const noCanonicalPrice = priceStatus === 'UNAVAILABLE' || priceStatus === 'INCOMPLETE';
+  const unvaluable = unpriced || noCanonicalPrice;
 
   return (
     <div className="stack">
@@ -26,13 +36,45 @@ export function PortfolioView({
         <span className="meta mono">as of {formatUtc(portfolio.asOf)} · mode {portfolio.mode}</span>
       </div>
 
+      {priceStatus === null || priceStatus === 'COMPLETE' ? null : (
+        <p
+          className={`banner ${priceStatus === 'STALE' ? 'banner--info' : 'banner--danger'}`}
+          role="status"
+          data-testid="portfolio-price-status"
+        >
+          <span className="inline">
+            <SnapshotBadge status={priceStatus} />
+            <strong>
+              {priceStatus === 'STALE' ? 'Prices are stale' : priceStatus === 'INCOMPLETE' ? 'Prices are incomplete' : 'Valuation unavailable'}
+            </strong>
+          </span>{' '}
+          {priceStatus === 'STALE' ? (
+            <>
+              The backend priced this projection with a snapshot from {priceAsOf === null ? 'an unknown time' : formatUtc(priceAsOf)}.
+              Values below are the last known valuation, not live prices.
+            </>
+          ) : (
+            <>
+              The backend has no complete canonical market snapshot, so open positions cannot be priced.
+              {unpriced ? ' Equity below excludes unpriced position value.' : ''}
+            </>
+          )}
+        </p>
+      )}
+
       <div className="stats">
         <div className="stat">
           <span className="stat__label">Equity</span>
           <span className="stat__value" data-testid="portfolio-equity">
             {formatMoney(portfolio.equityQuote, { maxFrac: 2 })}
           </span>
-          <span className="meta">{PAIR.quote.symbol}</span>
+          <span className="meta">
+            {unpriced
+              ? `${PAIR.quote.symbol} · excludes unpriced positions`
+              : noCanonicalPrice
+                ? `${PAIR.quote.symbol} · no canonical price`
+                : PAIR.quote.symbol}
+          </span>
         </div>
         <div className="stat">
           <span className="stat__label">Cash (quote)</span>
@@ -51,9 +93,9 @@ export function PortfolioView({
         <div className="stat">
           <span className="stat__label">Unrealized PnL</span>
           <span className="stat__value" data-testid="portfolio-unrealized">
-            {formatMoney(portfolio.unrealizedPnlQuote, { maxFrac: 2, signed: true })}
+            {unvaluable ? 'Unavailable' : formatMoney(portfolio.unrealizedPnlQuote, { maxFrac: 2, signed: true })}
           </span>
-          <span className="meta">{PAIR.quote.symbol}</span>
+          <span className="meta">{unvaluable ? 'cannot be valued without a canonical snapshot' : PAIR.quote.symbol}</span>
         </div>
       </div>
 
