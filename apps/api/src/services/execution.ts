@@ -18,6 +18,7 @@ import {
   markOrderFilled,
   setIntentStatus,
   upsertPosition,
+  type FillGas,
   type IntentRecord,
   type RiskDecisionRecord,
 } from '../db/repositories.js';
@@ -87,6 +88,62 @@ export function createIntentFromEvaluation(
     payload: { side, amountIn: intent.amountIn, evaluationId: intent.evaluationId },
   });
   return intent;
+}
+
+/**
+ * Gas is emitted only when both halves are sourced from the pinned block:
+ * QuoterV2's gas estimate and that block's baseFeePerGas. Anything missing is
+ * UNAVAILABLE with the reason, never a placeholder price.
+ */
+async function estimateFillGas(
+  deps: ExecutionDeps,
+  quote: { readonly gasEstimate: bigint } | null,
+  blockNumber: number | null,
+): Promise<FillGas> {
+  if (quote === null || blockNumber === null) {
+    return {
+      status: 'UNAVAILABLE',
+      reason: 'No QuoterV2 quote was produced for this intent',
+      provenance: 'QuoterV2 quoteExactInputSingle was not called',
+    };
+  }
+
+  const quoteProvenance = `QuoterV2 quoteExactInputSingle gasEstimate simulated at block ${blockNumber}`;
+
+  if (quote.gasEstimate <= 0n) {
+    return {
+      status: 'UNAVAILABLE',
+      reason: `QuoterV2 returned a non-positive gas estimate at block ${blockNumber}`,
+      provenance: quoteProvenance,
+    };
+  }
+
+  let baseFee: bigint | null;
+  try {
+    baseFee = await deps.quote.baseFeePerGasAt(blockNumber);
+  } catch {
+    return {
+      status: 'UNAVAILABLE',
+      reason: `Base fee for block ${blockNumber} could not be read from the RPC`,
+      provenance: `eth_getBlockByNumber(${blockNumber}) baseFeePerGas failed`,
+    };
+  }
+
+  if (baseFee === null) {
+    return {
+      status: 'UNAVAILABLE',
+      reason: `Block ${blockNumber} did not report baseFeePerGas`,
+      provenance: `eth_getBlockByNumber(${blockNumber}) baseFeePerGas absent`,
+    };
+  }
+
+  return {
+    status: 'AVAILABLE',
+    gasUnits: quote.gasEstimate.toString(),
+    gasPriceWei: baseFee.toString(),
+    gasCostWei: (quote.gasEstimate * baseFee).toString(),
+    provenance: `${quoteProvenance} + eth_getBlockByNumber baseFeePerGas at block ${blockNumber}; priority fee not included`,
+  };
 }
 
 export type ExecutionDeps = {
@@ -218,6 +275,10 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
     poolMatchesAllowlist: snapshot !== null && snapshot.poolId.toLowerCase() === pool.id.toLowerCase(),
   });
 
+  // Sourced only for an approved execution; a rejected intent does not pay gas.
+  const fillGas =
+    risk.verdict === 'APPROVED' ? await estimateFillGas(deps, quote, snapshot ? snapshot.blockNumber : null) : null;
+
   const result = withTransaction(db, () => {
     const riskDecisionId = insertRiskDecision(db, {
       intentId: intent.id,
@@ -237,9 +298,9 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       setIntentStatus(db, intent.id, 'REJECTED');
       return { orderId: null, fillId: null, riskDecisionId };
     }
+    if (fillGas === null) throw new AppError('INTERNAL_ERROR', 'Approved execution is missing its gas estimate');
 
     const orderId = insertOrder(db, { intentId: intent.id, riskDecisionId });
-    const gasCostWei = (quote.gasEstimate * 20_000_000_000n) / 1_000_000_000n;
     const amountIn = BigInt(intent.amountIn);
     const amountOut = quote.amountOut;
 
@@ -251,8 +312,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
         amountOut: amountOut.toString(),
         executionPriceScaled: executionPrice!.toString(),
         feeAmount: feeQuote.toString(),
-        gasUnits: quote.gasEstimate.toString(),
-        gasCostWei: gasCostWei.toString(),
+        gas: fillGas,
         assumptionsVersion: ASSUMPTIONS_VERSION,
       });
       postBuy(db, { fillId, amountInUsdg: amountIn.toString(), amountOutWeth: amountOut.toString(), feeUsdg: feeQuote.toString() });
@@ -288,8 +348,7 @@ export async function executeIntent(deps: ExecutionDeps, intentId: string): Prom
       amountOut: amountOut.toString(),
       executionPriceScaled: executionPrice!.toString(),
       feeAmount: feeQuote.toString(),
-      gasUnits: quote.gasEstimate.toString(),
-      gasCostWei: gasCostWei.toString(),
+      gas: fillGas,
       assumptionsVersion: ASSUMPTIONS_VERSION,
     });
     postSell(db, {

@@ -66,7 +66,9 @@ export function seedEvaluation(db: Db, snapshot: PoolSnapshot, action: Evaluatio
 }
 
 /** Deterministic stand-in for QuoterV2 at the observed ≈2,060 USDG/WETH price. */
-export function createFakeQuotePort(options: { headBlock?: number; amountOut?: bigint } = {}): QuotePort {
+export function createFakeQuotePort(
+  options: { headBlock?: number; amountOut?: bigint; baseFeePerGas?: bigint | null } = {},
+): QuotePort {
   return {
     async quote(request: QuoteRequest) {
       const amountOut =
@@ -79,8 +81,8 @@ export function createFakeQuotePort(options: { headBlock?: number; amountOut?: b
     async headBlockNumber() {
       return options.headBlock ?? 111_408_301;
     },
-    async baseFeePerGas() {
-      return 20_014_000n;
+    async baseFeePerGasAt() {
+      return options.baseFeePerGas === undefined ? 20_014_000n : options.baseFeePerGas;
     },
   };
 }

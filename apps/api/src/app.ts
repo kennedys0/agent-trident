@@ -6,8 +6,10 @@ import type { Db } from './db/index.js';
 import {
   appendAudit,
   getEvaluation,
+  getFillByOrder,
   getIntentById,
   getLatestSnapshot,
+  getOrderById,
   getPortfolio,
   getRiskDecisionByIntent,
   getSnapshotById,
@@ -23,8 +25,20 @@ import type { PoolIdentity, StrategyConfig } from './domain/types.js';
 import type { MarketService } from './services/market.js';
 import { createIntentFromEvaluation, executeIntent } from './services/execution.js';
 import type { QuotePort } from './services/ports.js';
-import { USDG, VERIFIED_FEE, VERIFIED_VENUE, WETH } from './chain/venue.js';
-import { toCandidate, toHealth, toJournal, toPortfolio, toRiskDecision, toSnapshot, toTradeIntent, toVenue } from './api/contract.js';
+import { USDG, VERIFIED_VENUE, WETH } from './chain/venue.js';
+import {
+  toCandidate,
+  toHealth,
+  toIntentExecution,
+  toJournal,
+  toPaperFill,
+  toPaperOrder,
+  toPortfolio,
+  toRiskDecision,
+  toSnapshot,
+  toTradeIntent,
+  toVenue,
+} from './api/contract.js';
 
 export type HealthProbe = () => Promise<{ chainId: number; headBlock: number; latencyMs: number }>;
 
@@ -191,13 +205,18 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     if (stored === null || view.riskDecision === null) {
       throw new AppError('CONFLICT', 'Intent executed without its snapshot or risk decision');
     }
+    const order = view.orderId === null ? null : getOrderById(deps.db, view.orderId);
+    const fill = order === null ? null : getFillByOrder(deps.db, order['id'] as string);
+    const execution = toIntentExecution({
+      intent: toTradeIntent(view.intent, deps.pool, stored),
+      riskDecision: toRiskDecision(view.riskDecision),
+      order: order === null ? null : toPaperOrder(order),
+      fill: order === null || fill === null ? null : toPaperFill(fill, view.intent.side, stored.priceScale),
+    });
     const status = view.riskDecision.verdict === 'APPROVED' ? 201 : 200;
     return reply.status(view.replayed ? 200 : status).send({
-      data: {
-        intent: toTradeIntent(view.intent, deps.pool, stored),
-        riskDecision: toRiskDecision(view.riskDecision),
-      },
-      meta: meta(requestId, { fee: VERIFIED_FEE, orderId: view.orderId, fillId: view.fillId, replayed: view.replayed }),
+      data: execution,
+      meta: meta(requestId, { replayed: view.replayed }),
     });
   });
 

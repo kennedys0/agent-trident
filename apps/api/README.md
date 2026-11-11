@@ -52,7 +52,7 @@ Envelope: `{ "data": ..., "meta": { "requestId", "observedAt" } }` on success an
 | GET | `/api/v1/venues` | allowlist: tokens, factory, quoter, router, factory-derived pool (`data` is an array) |
 | GET | `/api/v1/markets/weth-usdg/snapshot` | latest stored snapshot, freshness recomputed at read time; `404` before the first observation |
 | GET | `/api/v1/candidates?limit=` | latest strategy evaluations (`data` is an array) |
-| POST | `/api/v1/intents` | request `{ evaluationId, idempotencyKey }` only; server derives side, size, and limit. `201` approved, `200` replayed or rejected |
+| POST | `/api/v1/intents` | request `{ evaluationId, idempotencyKey }` only; server derives side, size, and limit. Returns `IntentExecution` (`intent`, `riskDecision`, `order`, `fill`), with `order`/`fill` explicitly `null` on `REJECTED`. `201` fresh approval, `200` replay or rejection; meta is `{ requestId, observedAt, replayed }` |
 | GET | `/api/v1/intents/:id` | stored intent plus its risk decision |
 | GET | `/api/v1/portfolio` | simulated cash, positions (`VALUED`/`UNPRICED`), realized/unrealized PnL |
 | GET | `/api/v1/journal?limit=&before=` | append-only audit journal, newest first |
@@ -62,7 +62,8 @@ Every `data` payload is the type owned by `@trident/api-contract` and is produce
 through the mappers in `src/api/contract.ts`, which call the contract's zod
 schema. A contract change therefore fails the API build or its tests instead of
 drifting quietly. Facts the contract does not model (kill switch, RPC latency,
-`sqrtPriceX96`, pool liquidity, snapshot id, order/fill ids) travel in `meta`.
+`sqrtPriceX96`, pool liquidity) travel in `meta`; order, fill, and risk-decision
+ids live in `data`, so the intent route meta stays strict.
 
 Error codes: `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`,
 `INTENT_NOT_ACTIONABLE`, `INTENT_EXPIRED`, `CHAIN_UNAVAILABLE`,
@@ -110,7 +111,7 @@ carry `quantity` and `cost_basis` in base units; unrealized PnL is
 ## Tests
 
 ```bash
-pnpm --filter @trident/api test           # 42 offline tests, 4 skipped
+pnpm --filter @trident/api test           # 44 offline tests, 4 skipped
 RUN_RPC_TESTS=1 pnpm --filter @trident/api test   # adds 4 real-RPC tests
 ```
 
@@ -119,23 +120,31 @@ that stops matching `@trident/api-contract` fails the suite.
 
 Offline coverage: money, integer price math, deterministic strategy (hash
 stability, stale/incomplete refusal), risk rules, paper execution (single fill,
-replay, restart, kill switch, audit immutability, buy→sell cycle), and HTTP
-routes. The real-RPC suite proves chain id, testnet rejection, factory→pool
-derivation, and a block-pinned snapshot.
+replay, restart, kill switch, audit immutability, buy→sell cycle), the
+`IntentExecution` envelope (executed and rejected), gas `AVAILABLE`/`UNAVAILABLE`
+mapping, and HTTP routes. The real-RPC suite proves chain id, testnet rejection,
+factory→pool derivation, and a block-pinned snapshot.
 
 ## Sanitized real-RPC evidence (11 Nov 2026, mainnet 4663)
 
-- `/health` -> `chainId 4663`, `chainOk true`, head block `111443036`.
+- `/health` -> `chainId 4663`, `chainOk true`, head block `111728517`.
 - Factory `0x1f7d…2efa` + `getPool(WETH, USDG, 100)` -> `0x52e6…71Ca`.
-- Snapshot at block `111443294`, hash `0xe534…7501`, tick `-199986`,
-  liquidity `2689363089049072348`, `priceScaled 2066128901262464931431`
-  (≈ `2066.13` USDG/WETH at scale 18), status `COMPLETE`.
-- `POST /api/v1/intents` -> `201`, verdict `APPROVED`, no failed rules, fill
-  recorded; replay with the same `idempotencyKey` -> `200` `replayed: true` and
-  the same `fillId`.
-- `/api/v1/portfolio` -> cash `9499950000` (9,499.95 USDG after a 500 USDG buy
-  plus the 0.01% fee), position `241973264603445919` wei WETH,
-  unrealized PnL `-102267` base units (≈ `-0.10` USDG, fee + price impact).
+- Snapshot at block `111728517`, status `COMPLETE`, price
+  `2048679247722938193489` at scale 18 (≈ `2048.68` USDG/WETH).
+- `POST /api/v1/intents` with the kill switch engaged -> `200`, verdict
+  `REJECTED`, `order: null`, `fill: null`, intent status `REJECTED`
+  (`R02_kill_switch`).
+- `POST /api/v1/intents` after release -> `201`, verdict `APPROVED`, 15/15 rules
+  `PASS`, order `FILLED`. Fill: `baseQty 243511960236305145` wei WETH,
+  `quoteQty 500000000` (500 USDG), `feeQuote 50000` (0.01%).
+- Gas from the quote block `111728418`: `AVAILABLE`, `91542` units,
+  `20026000` wei base fee, `gasCostWei 1833220092000`. The base fee was
+  re-fetched independently with `eth_getBlockByNumber` and matched. No
+  `gasQuoteCost` is sent because no ETH→USDG conversion is sourced.
+- Replay with the same `idempotencyKey` -> `200`, `replayed: true`, same order
+  id and fill timestamp.
+- `/api/v1/portfolio` -> equity `9999850251` (≈ 9,999.85 USDG after the buy, fee,
+  and price impact), position `VALUED`.
 
 - **Contract type names are not re-declared here.** `src/domain/types.ts` keeps
   only engine-internal types (`PoolSnapshot`, `EvaluationRecord`, `RiskOutcome`,
@@ -143,10 +152,10 @@ derivation, and a block-pinned snapshot.
   `Evaluation`, `RiskDecision`, `Portfolio`, `AuditEvent`) come from
   `@trident/api-contract`; the earlier local copies of those names were deleted.
 
-### Contract conformance with PR #7 (`acf1295`)
+### Contract conformance with PR #7 (`0fb7be6`)
 
-The backend is based on the amended contract, and all five integration findings
-from the first round are closed on the contract side and used here:
+The backend is based on the amended contract, and all seven integration findings
+from both rounds are closed on the contract side and used here:
 
 1. **Semantic versions.** `configVersion`, `policyVersion`, `portfolioVersion`,
    and `assumptionsVersion` are validated by `versionSchema` (nonempty, no
@@ -168,17 +177,28 @@ from the first round are closed on the contract side and used here:
 5. **`VALUED` / `UNPRICED` positions.** A position with a stored snapshot is
    `VALUED` with `valuationSnapshotId` and unrealized PnL; without one it is
    `UNPRICED` with a `reason`. `meta.unpricedPosition` is gone.
+6. **Full `IntentExecution` response.** The route assembles `{ intent,
+   riskDecision, order, fill }` and parses the whole object with
+   `intentExecutionSchema`, so the cross-field invariants (order.intentId,
+   fill.orderId, fill.snapshotId, verdict/status pairing) are enforced before
+   the response leaves the process. A rejection carries explicit `null`
+   `order`/`fill`; the old `meta.orderId`/`meta.fillId`/`meta.fee` workaround is
+   deleted and meta is strict `{ requestId, observedAt, replayed }`.
+7. **Truthful gas estimate.** `PaperFill.gasEstimate` is a discriminated union.
+   `AVAILABLE` needs both the QuoterV2 `gasEstimate` and that same pinned block's
+   `baseFeePerGas`; the stored `gasCostWei` is exactly `gasUnits *
+   gasPriceWei`, and provenance names the block and states that no priority fee
+   is included. Any missing half yields `UNAVAILABLE` with a reason and where it
+   was checked. The hardcoded 20 gwei is gone; `gasQuoteCost` stays absent until
+   an ETH→USDG conversion is sourced.
 
-Remaining wire notes, both recorded for the contract owner rather than worked
-around:
+Remaining follow-ups, recorded for the contract owner rather than worked around:
 
-- **`POST /api/v1/intents` has no response schema in the OpenAPI document.** The
-  route returns `{ intent: TradeIntent, riskDecision: RiskDecision }` (both
-  contract entities), with `orderId`, `fillId`, and `replayed` in `meta`.
-- **`PaperFill` is not emitted.** `gasQuoteEstimate` is quote-denominated, while
-  the fill records gas in ETH wei; converting needs an ETH/USDG price this slice
-  does not have, so gas is reported as units and wei instead of inventing a
-  quote value.
+- **`GET /api/v1/intents/:id` still has no contract path.** It keeps returning
+  `{ intent, riskDecision }` (used for inspection), and `MIGRATION.md` says not
+  to reuse `IntentExecution` for it as-is.
+- **`gasQuoteCost` is not emitted.** Converting wei to USDG needs a sourced
+  ETH→USDG price, which this slice does not have.
 
 ## Deviations from `ARCHITECTURE.md` (for review)
 
@@ -203,8 +223,6 @@ around:
 
 ## Known blockers
 
-- `POST /api/v1/intents` response shape and `PaperFill` gas units still need a
-  contract decision (see the wire notes above).
 - No auth/CSRF: do not expose beyond loopback.
 - No container/runtime manifest for this API yet.
 - The snapshot worker polls every 10 s (`SNAPSHOT_INTERVAL_MS`); the public RPC

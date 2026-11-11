@@ -182,9 +182,14 @@ export class ChainClient {
     return { amountOut: tuple[0], gasEstimate: tuple[3] };
   }
 
-  async getBaseFeePerGas(): Promise<bigint> {
-    const block = await this.run(() => this.client.getBlock({ blockTag: 'latest' }));
-    return block.baseFeePerGas ?? 0n;
+  /**
+   * Base fee of the same block the quote was taken at. Returns null when the
+   * block does not report one, so callers can emit UNAVAILABLE instead of
+   * inventing a price.
+   */
+  async getBaseFeePerGasAt(blockNumber: number): Promise<bigint | null> {
+    const block = await this.run(() => this.client.getBlock({ blockNumber: BigInt(blockNumber) }));
+    return block.baseFeePerGas ?? null;
   }
 }
 

@@ -328,6 +328,20 @@ export function insertOrder(db: Db, input: { intentId: string; riskDecisionId: s
   return row['id'] as string;
 }
 
+export type FillGas =
+  | {
+      readonly status: 'AVAILABLE';
+      readonly gasUnits: string;
+      readonly gasPriceWei: string;
+      readonly gasCostWei: string;
+      readonly provenance: string;
+    }
+  | {
+      readonly status: 'UNAVAILABLE';
+      readonly reason: string;
+      readonly provenance: string;
+    };
+
 export type FillInput = {
   readonly orderId: string;
   readonly snapshotId: string;
@@ -335,16 +349,16 @@ export type FillInput = {
   readonly amountOut: string;
   readonly executionPriceScaled: string;
   readonly feeAmount: string;
-  readonly gasUnits: string;
-  readonly gasCostWei: string;
+  readonly gas: FillGas;
   readonly assumptionsVersion: string;
 };
 
 export function insertFill(db: Db, input: FillInput): string {
   const id = randomUUID();
+  const gas = input.gas;
   db.prepare(
-    `INSERT INTO fills (id, order_id, snapshot_id, amount_in, amount_out, execution_price_scaled, fee_amount, gas_units, gas_cost_wei, assumptions_version, executed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(order_id) DO NOTHING`,
+    `INSERT INTO fills (id, order_id, snapshot_id, amount_in, amount_out, execution_price_scaled, fee_amount, gas_status, gas_units, gas_price_wei, gas_cost_wei, gas_reason, gas_provenance, assumptions_version, executed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(order_id) DO NOTHING`,
   ).run(
     id,
     input.orderId,
@@ -353,8 +367,12 @@ export function insertFill(db: Db, input: FillInput): string {
     input.amountOut,
     input.executionPriceScaled,
     input.feeAmount,
-    input.gasUnits,
-    input.gasCostWei,
+    gas.status,
+    gas.status === 'AVAILABLE' ? gas.gasUnits : null,
+    gas.status === 'AVAILABLE' ? gas.gasPriceWei : null,
+    gas.status === 'AVAILABLE' ? gas.gasCostWei : null,
+    gas.status === 'UNAVAILABLE' ? gas.reason : null,
+    gas.provenance,
     input.assumptionsVersion,
     nowIso(),
   );
@@ -364,6 +382,14 @@ export function insertFill(db: Db, input: FillInput): string {
 
 export function markOrderFilled(db: Db, orderId: string): void {
   db.prepare("UPDATE orders SET status = 'FILLED' WHERE id = ?").run(orderId);
+}
+
+export function getOrderById(db: Db, orderId: string): Row | null {
+  return (db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId) as Row | undefined) ?? null;
+}
+
+export function getOrderByIntent(db: Db, intentId: string): Row | null {
+  return (db.prepare('SELECT * FROM orders WHERE intent_id = ?').get(intentId) as Row | undefined) ?? null;
 }
 
 export function getFillByOrder(db: Db, orderId: string): Row | null {

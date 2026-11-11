@@ -2,15 +2,21 @@ import {
   candidateSchema,
   evaluationSchema,
   healthSchema,
+  intentExecutionSchema,
   journalPageSchema,
   marketSnapshotSchema,
+  paperFillSchema,
+  paperOrderSchema,
   portfolioSchema,
   riskDecisionSchema,
   tradeIntentSchema,
   venueSchema,
   type AuditEvent,
   type Evaluation,
+  type IntentExecution,
   type MarketSnapshot,
+  type PaperFill,
+  type PaperOrder,
   type Portfolio,
   type RiskDecision,
   type TradeIntent,
@@ -314,6 +320,69 @@ export function toPortfolio(
     realizedPnlQuote: { value: state.realizedPnlUsdg, decimals: USDC_DECIMALS },
     unrealizedPnlQuote: { value: unrealized.toString(), decimals: USDC_DECIMALS },
   });
+}
+
+/**
+ * Row mappers for the intent-execution response. Gas is stored as a
+ * discriminated status, so a fill can never describe an unsourced price as
+ * AVAILABLE. `gasQuoteCost` stays absent: no ETH→USDG conversion is sourced.
+ */
+export function toPaperOrder(row: Record<string, unknown>): PaperOrder {
+  return paperOrderSchema.parse({
+    id: String(row['id']),
+    intentId: String(row['intent_id']),
+    riskDecisionId: String(row['risk_decision_id']),
+    status: String(row['status']),
+    createdAt: String(row['created_at']),
+  });
+}
+
+export function toPaperFill(
+  row: Record<string, unknown>,
+  side: 'BUY' | 'SELL',
+  priceScale: number,
+): PaperFill {
+  const amountIn = BigInt(String(row['amount_in']));
+  const amountOut = BigInt(String(row['amount_out']));
+  const gas: unknown =
+    String(row['gas_status']) === 'AVAILABLE'
+      ? {
+          status: 'AVAILABLE',
+          gasUnits: String(row['gas_units']),
+          gasPriceWei: String(row['gas_price_wei']),
+          gasCostWei: String(row['gas_cost_wei']),
+          provenance: String(row['gas_provenance']),
+        }
+      : {
+          status: 'UNAVAILABLE',
+          reason: String(row['gas_reason']),
+          provenance: String(row['gas_provenance']),
+        };
+
+  return paperFillSchema.parse({
+    orderId: String(row['order_id']),
+    snapshotId: String(row['snapshot_id']),
+    baseQty: (side === 'BUY' ? amountOut : amountIn).toString(),
+    quoteQty: (side === 'BUY' ? amountIn : amountOut).toString(),
+    feeQuote: amount(BigInt(String(row['fee_amount'])), USDC_DECIMALS),
+    gasEstimate: gas,
+    executionPrice: scaled(String(row['execution_price_scaled']), priceScale),
+    assumptionsVersion: String(row['assumptions_version']),
+    filledAt: String(row['executed_at']),
+  });
+}
+
+/**
+ * Cross-field invariants (order.intentId, fill.orderId, fill.snapshotId and the
+ * verdict/status pairing) are enforced by the contract itself.
+ */
+export function toIntentExecution(input: {
+  readonly intent: TradeIntent;
+  readonly riskDecision: RiskDecision;
+  readonly order: PaperOrder | null;
+  readonly fill: PaperFill | null;
+}): IntentExecution {
+  return intentExecutionSchema.parse(input);
 }
 
 export function toJournal(

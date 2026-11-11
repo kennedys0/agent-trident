@@ -194,4 +194,42 @@ ALTER TABLE risk_decisions RENAME COLUMN approved_amount_in TO approved_base_qty
 ALTER TABLE risk_decisions RENAME COLUMN approved_amount_out TO approved_quote_amount;
 `,
   },
+  {
+    version: '003_truthful_gas_estimate',
+    // Gas is a discriminated estimate, never a placeholder. Legacy rows keep
+    // their quoted units but lose the unsourced 20 gwei cost.
+    sql: `
+ALTER TABLE fills RENAME TO fills_legacy;
+
+CREATE TABLE fills (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL UNIQUE REFERENCES orders(id),
+  snapshot_id TEXT NOT NULL REFERENCES market_snapshots(id),
+  amount_in TEXT NOT NULL,
+  amount_out TEXT NOT NULL,
+  execution_price_scaled TEXT NOT NULL,
+  fee_amount TEXT NOT NULL,
+  gas_status TEXT NOT NULL CHECK (gas_status IN ('AVAILABLE','UNAVAILABLE')),
+  gas_units TEXT,
+  gas_price_wei TEXT,
+  gas_cost_wei TEXT,
+  gas_reason TEXT,
+  gas_provenance TEXT NOT NULL,
+  assumptions_version TEXT NOT NULL,
+  executed_at TEXT NOT NULL,
+  CHECK (
+    (gas_status = 'AVAILABLE' AND gas_units IS NOT NULL AND gas_price_wei IS NOT NULL AND gas_cost_wei IS NOT NULL AND gas_reason IS NULL)
+    OR (gas_status = 'UNAVAILABLE' AND gas_units IS NULL AND gas_price_wei IS NULL AND gas_cost_wei IS NULL AND gas_reason IS NOT NULL)
+  )
+);
+
+INSERT INTO fills (id, order_id, snapshot_id, amount_in, amount_out, execution_price_scaled, fee_amount, gas_status, gas_units, gas_price_wei, gas_cost_wei, gas_reason, gas_provenance, assumptions_version, executed_at)
+SELECT id, order_id, snapshot_id, amount_in, amount_out, execution_price_scaled, fee_amount, 'UNAVAILABLE', NULL, NULL, NULL,
+  'Fill predates truthful gas estimation; its 20 gwei placeholder was not sourced from chain data',
+  'migration 003_truthful_gas_estimate', assumptions_version, executed_at
+FROM fills_legacy;
+
+DROP TABLE fills_legacy;
+`,
+  },
 ];

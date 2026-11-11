@@ -19,7 +19,8 @@ export type QuoteResponse = {
 export type QuotePort = {
   quote(request: QuoteRequest): Promise<QuoteResponse>;
   headBlockNumber(): Promise<number>;
-  baseFeePerGas(): Promise<bigint>;
+  /** Base fee of exactly `blockNumber`; null when the block reports none. */
+  baseFeePerGasAt(blockNumber: number): Promise<bigint | null>;
 };
 
 export function createQuotePort(chain: ChainClient, venue: Venue): QuotePort {
@@ -35,8 +36,8 @@ export function createQuotePort(chain: ChainClient, venue: Venue): QuotePort {
     async headBlockNumber() {
       return (await chain.getHead()).number;
     },
-    async baseFeePerGas() {
-      return chain.getBaseFeePerGas();
+    async baseFeePerGasAt(blockNumber) {
+      return chain.getBaseFeePerGasAt(blockNumber);
     },
   };
 }

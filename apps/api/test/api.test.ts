@@ -9,6 +9,7 @@ import type { MarketService } from '../src/services/market.js';
 import {
   candidateSchema,
   healthSchema,
+  intentExecutionSchema,
   journalPageSchema,
   marketSnapshotSchema,
   portfolioSchema,
@@ -142,26 +143,94 @@ describe('HTTP API', () => {
     const first = await server.inject({ method: 'POST', url: '/api/v1/intents', payload });
     expect(first.statusCode).toBe(201);
     const firstBody = first.json();
-    expect(firstBody.data.riskDecision.verdict).toBe('APPROVED');
-    expect(firstBody.meta.fillId).toBeTruthy();
-    // Both payload halves are the ratified contract shapes.
+
+    // The whole envelope is the ratified IntentExecution contract.
+    expect(() => intentExecutionSchema.parse(firstBody.data)).not.toThrow();
     expect(() => tradeIntentSchema.parse(firstBody.data.intent)).not.toThrow();
     expect(() => riskDecisionSchema.parse(firstBody.data.riskDecision)).not.toThrow();
+    // The route meta is strict: no fee/orderId/fillId workaround survives.
+    expect(Object.keys(firstBody.meta).sort()).toEqual(['observedAt', 'replayed', 'requestId']);
+    expect(firstBody.meta.replayed).toBe(false);
+
     const approved = firstBody.data.riskDecision;
+    expect(approved.verdict).toBe('APPROVED');
+    expect(firstBody.data.intent.status).toBe('FILLED');
     expect(approved.approvedBaseQty.decimals).toBe(18);
     expect(approved.maximumQuoteCost.decimals).toBe(6);
     expect(approved.rules.length).toBeGreaterThan(0);
     expect(approved.rules.every((rule: { status: string }) => rule.status === 'PASS')).toBe(true);
 
+    expect(firstBody.data.order).not.toBeNull();
+    expect(firstBody.data.order.intentId).toBe(firstBody.data.intent.id);
+    expect(firstBody.data.order.status).toBe('FILLED');
+    const fill = firstBody.data.fill;
+    expect(fill).not.toBeNull();
+    expect(fill.orderId).toBe(firstBody.data.order.id);
+    expect(fill.snapshotId).toBe(firstBody.data.intent.snapshotId);
+    expect(fill.feeQuote.decimals).toBe(6);
+    // Gas is sourced from the pinned block, and the cost is consistent with it.
+    expect(fill.gasEstimate.status).toBe('AVAILABLE');
+    expect(BigInt(fill.gasEstimate.gasCostWei)).toBe(
+      BigInt(fill.gasEstimate.gasUnits) * BigInt(fill.gasEstimate.gasPriceWei),
+    );
+    expect(fill.gasEstimate.gasPriceWei).toBe('20014000');
+    expect(fill.gasEstimate.gasQuoteCost).toBeUndefined();
+
     const second = await server.inject({ method: 'POST', url: '/api/v1/intents', payload });
     expect(second.statusCode).toBe(200);
-    expect(second.json().meta.replayed).toBe(true);
-    expect(second.json().meta.fillId).toBe(firstBody.meta.fillId);
+    const replay = second.json();
+    expect(replay.meta.replayed).toBe(true);
+    expect(replay.data.fill.orderId).toBe(fill.orderId);
+    expect(replay.data.fill.filledAt).toBe(fill.filledAt);
+    expect(() => intentExecutionSchema.parse(replay.data)).not.toThrow();
 
+    // Follow-up route keeps its own {intent, riskDecision} shape (recorded in MIGRATION.md).
     const detail = await server.inject({ method: 'GET', url: `/api/v1/intents/${firstBody.data.intent.id}` });
     expect(detail.statusCode).toBe(200);
     expect(() => tradeIntentSchema.parse(detail.json().data.intent)).not.toThrow();
     expect(() => riskDecisionSchema.parse(detail.json().data.riskDecision)).not.toThrow();
+  });
+
+  it('returns an explicit null order/fill when the risk gate rejects', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const server = makeApp({ db });
+    await server.inject({ method: 'POST', url: '/api/v1/system/halt', payload: { engaged: true } });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: evaluation.id, idempotencyKey: 'api-rejected-1' },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.data.riskDecision.verdict).toBe('REJECTED');
+    expect(body.data.intent.status).toBe('REJECTED');
+    expect(body.data.order).toBeNull();
+    expect(body.data.fill).toBeNull();
+    expect(Object.keys(body.meta).sort()).toEqual(['observedAt', 'replayed', 'requestId']);
+    expect(() => intentExecutionSchema.parse(body.data)).not.toThrow();
+  });
+
+  it('reports gas as UNAVAILABLE when the block exposes no base fee', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const server = makeApp({ db, quote: createFakeQuotePort({ baseFeePerGas: null }) });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: evaluation.id, idempotencyKey: 'api-gas-unavailable' },
+    });
+    expect(response.statusCode).toBe(201);
+    const body = response.json();
+    const gas = body.data.fill.gasEstimate;
+    expect(gas.status).toBe('UNAVAILABLE');
+    expect(gas.reason).toContain('did not report baseFeePerGas');
+    expect(gas.provenance).toContain('eth_getBlockByNumber');
+    expect(gas.gasUnits).toBeUndefined();
+    expect(gas.gasCostWei).toBeUndefined();
+    expect(() => intentExecutionSchema.parse(body.data)).not.toThrow();
   });
 
   it('reports a simulated portfolio and an append-only journal', async () => {
