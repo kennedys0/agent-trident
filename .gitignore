@@ -10,6 +10,8 @@ test-results/
 *.db-shm
 *.db-wal
 *.sqlite
+*.sqlite-wal
+*.sqlite-shm
 *.sqlite3
 *.log
 .DS_Store

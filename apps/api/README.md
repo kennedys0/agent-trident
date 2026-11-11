@@ -16,11 +16,15 @@ RPC (chain 4663) -> verifyVenue (factory.getPool) -> block-pinned snapshot
 ## Run
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm --filter @trident/api build
-cp apps/api/.env.example apps/api/.env      # then export the values
-node apps/api/dist/server.js
+cp .env.example .env                        # RPC_URL is required
+node --env-file=.env apps/api/dist/server.js
 ```
+
+Run the last command from the repository root: `DATABASE_PATH` and the SQLite
+`data/` directory resolve against the working directory. The full walkthrough,
+including the web console, is in the [root README](../../README.md).
 
 Boot fails closed when the RPC chain id is not `4663`, when the execution mode is
 not `OBSERVE`/`PAPER`, when the RPC URL is not HTTPS, or when the factory no
