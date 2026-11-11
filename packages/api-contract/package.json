@@ -1,0 +1,35 @@
+{
+  "name": "@trident/api-contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./generated": {
+      "types": "./src/generated.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "generate": "tsx scripts/generate-openapi.ts && openapi-typescript openapi.json -o src/generated.ts",
+    "check:drift": "git diff --exit-code -- openapi.json src/generated.ts",
+    "test": "pnpm generate && pnpm check:drift && tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "openapi-typescript": "^7.10.1",
+    "openapi3-ts": "^4.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
