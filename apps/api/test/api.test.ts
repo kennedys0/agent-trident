@@ -1,0 +1,164 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import { buildApp, type AppDeps } from '../src/app.js';
+import type { Config } from '../src/config.js';
+import { insertSnapshot } from '../src/db/repositories.js';
+import { DEFAULT_STRATEGY_CONFIG } from '../src/domain/strategy.js';
+import { createFakeQuotePort, makeDb, makeSnapshot, seedEvaluation, TEST_POOL } from './helpers.js';
+import type { MarketService } from '../src/services/market.js';
+
+const config: Config = {
+  mode: 'PAPER',
+  rpcUrl: 'https://rpc.mainnet.chain.robinhood.com',
+  expectedChainId: 4663,
+  databasePath: ':memory:',
+  port: 0,
+  host: '127.0.0.1',
+  logLevel: 'silent',
+  marketFreshnessSeconds: 30,
+  openingCashUsdgBase: '10000000000',
+};
+
+let app: FastifyInstance | null = null;
+
+afterEach(async () => {
+  await app?.close();
+  app = null;
+});
+
+function makeApp(overrides: Partial<AppDeps> = {}): FastifyInstance {
+  const db = makeDb();
+  const marketStub = {
+    takeSnapshot: async () => makeSnapshot(),
+    evaluate: () => {
+      throw new Error('not used in API tests');
+    },
+  } as unknown as MarketService;
+  app = buildApp({
+    db,
+    config,
+    pool: TEST_POOL,
+    strategyConfig: DEFAULT_STRATEGY_CONFIG,
+    market: marketStub,
+    quote: createFakeQuotePort(),
+    probe: async () => ({ chainId: 4663, headBlock: 111_408_301, latencyMs: 12 }),
+    ...overrides,
+  });
+  return app;
+}
+
+describe('HTTP API', () => {
+  it('reports chain identity and mode on /health', async () => {
+    const server = makeApp();
+    const response = await server.inject({ method: 'GET', url: '/health' });
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.data.chainId).toBe(4663);
+    expect(body.data.mode).toBe('PAPER');
+    expect(body.meta.requestId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('returns 503 when the chain probe reports the wrong chain id', async () => {
+    const server = makeApp({ probe: async () => ({ chainId: 46630, headBlock: 1, latencyMs: 5 }) });
+    const response = await server.inject({ method: 'GET', url: '/health' });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().data.chainOk).toBe(false);
+  });
+
+  it('exposes the verified venue and pool allowlist', async () => {
+    const server = makeApp();
+    const response = await server.inject({ method: 'GET', url: '/api/v1/venues' });
+    const body = response.json();
+    expect(response.statusCode).toBe(200);
+    expect(body.data.venues[0].pool.id).toBe(TEST_POOL.id);
+    expect(body.data.venues[0].chainId).toBe(4663);
+    expect(body.data.venues[0].assets).toHaveLength(2);
+  });
+
+  it('returns 404 for a market snapshot before any observation exists', async () => {
+    const server = makeApp();
+    const response = await server.inject({ method: 'GET', url: '/api/v1/markets/weth-usdg/snapshot' });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('NOT_FOUND');
+  });
+
+  it('serves a stored snapshot with derived freshness', async () => {
+    const db = makeDb();
+    insertSnapshot(db, makeSnapshot());
+    const server = makeApp({ db });
+    const response = await server.inject({ method: 'GET', url: '/api/v1/markets/weth-usdg/snapshot' });
+    const body = response.json();
+    expect(response.statusCode).toBe(200);
+    expect(body.data.status).toBe('COMPLETE');
+    expect(body.data.chainId).toBe(4663);
+    expect(body.data.blockHash).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+
+  it('rejects an intent with an unknown evaluation', async () => {
+    const server = makeApp();
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/v1/intents',
+      payload: { evaluationId: '00000000-0000-4000-8000-000000000000', idempotencyKey: 'abc12345' },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('validates the intent body at the boundary', async () => {
+    const server = makeApp();
+    const response = await server.inject({ method: 'POST', url: '/api/v1/intents', payload: { idempotencyKey: 'x' } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('executes a paper BUY and replays it idempotently', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const server = makeApp({ db });
+    const payload = { evaluationId: evaluation.id, idempotencyKey: 'api-idem-1' };
+
+    const first = await server.inject({ method: 'POST', url: '/api/v1/intents', payload });
+    expect(first.statusCode).toBe(201);
+    const firstBody = first.json();
+    expect(firstBody.data.riskDecision.verdict).toBe('APPROVED');
+    expect(firstBody.data.fillId).toBeTruthy();
+
+    const second = await server.inject({ method: 'POST', url: '/api/v1/intents', payload });
+    expect(second.statusCode).toBe(200);
+    expect(second.json().data.replayed).toBe(true);
+    expect(second.json().data.fillId).toBe(firstBody.data.fillId);
+  });
+
+  it('reports a simulated portfolio and an append-only journal', async () => {
+    const db = makeDb();
+    const evaluation = seedEvaluation(db, makeSnapshot());
+    const server = makeApp({ db });
+    await server.inject({ method: 'POST', url: '/api/v1/intents', payload: { evaluationId: evaluation.id, idempotencyKey: 'api-journal' } });
+
+    const portfolio = await server.inject({ method: 'GET', url: '/api/v1/portfolio' });
+    expect(portfolio.statusCode).toBe(200);
+    expect(portfolio.json().data.simulated).toBe(true);
+    expect(portfolio.json().data.positions).toHaveLength(1);
+
+    const journal = await server.inject({ method: 'GET', url: '/api/v1/journal?limit=10' });
+    expect(journal.statusCode).toBe(200);
+    const actions = (journal.json().data as { action: string }[]).map((row) => row.action);
+    expect(actions).toContain('paper.fill.recorded');
+    expect(actions).toContain('risk.decision.recorded');
+  });
+
+  it('engages and reports the persisted kill switch', async () => {
+    const server = makeApp();
+    const halt = await server.inject({ method: 'POST', url: '/api/v1/system/halt', payload: { engaged: true } });
+    expect(halt.statusCode).toBe(200);
+    const health = await server.inject({ method: 'GET', url: '/health' });
+    expect(health.json().data.killSwitchEngaged).toBe(true);
+  });
+
+  it('returns a structured 404 envelope for unknown routes', async () => {
+    const server = makeApp();
+    const response = await server.inject({ method: 'GET', url: '/api/v1/nope' });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error).toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
