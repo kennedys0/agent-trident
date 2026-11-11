@@ -192,7 +192,7 @@ describe('StateView', () => {
 const ORDER_ID = 'order-11111111-1111-4111-8111-111111111111';
 const INTENT_ID = 'intent-22222222-2222-4222-8222-222222222222';
 
-function executedBody(gas: Record<string, unknown>) {
+function executedBody(gas: Record<string, unknown>, meta: Record<string, unknown> = {}) {
   return {
     data: {
       intent: {
@@ -239,7 +239,7 @@ function executedBody(gas: Record<string, unknown>) {
         filledAt: '2026-11-11T04:00:01.000Z',
       },
     },
-    meta: { requestId: 'req-1', observedAt: '2026-11-11T04:00:02.000Z', replayed: false },
+    meta: { requestId: 'req-1', observedAt: '2026-11-11T04:00:02.000Z', replayed: false, ...meta },
   };
 }
 
@@ -332,5 +332,42 @@ describe('IntentAction', () => {
     expect(screen.getByTestId('intent-order')).toHaveTextContent('None — rejected');
     expect(screen.getByTestId('intent-fill')).toHaveTextContent('None — rejected');
     expect(screen.queryByTestId('gas-estimate')).not.toBeInTheDocument();
+  });
+
+  it('marks a replay as no new fill and renders a sourced gas estimate', async () => {
+    setTransport(async () =>
+      new Response(
+        JSON.stringify(
+          executedBody(
+            {
+              status: 'AVAILABLE',
+              gasUnits: '91542',
+              gasPriceWei: '20026000',
+              gasCostWei: '1833220092000',
+              provenance: 'QuoterV2 gasEstimate + baseFeePerGas pinned at block 111728418; priority fee not included',
+            },
+            { replayed: true },
+          ),
+        ),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    render(
+      <MemoryRouter>
+        <IntentAction candidate={buyCandidate} />
+      </MemoryRouter>,
+    );
+
+    await userEvent.click(screen.getByTestId('create-intent'));
+    await userEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    expect(await screen.findByTestId('intent-result')).toBeInTheDocument();
+    expect(screen.getByTestId('intent-replayed')).toHaveTextContent('REPLAYED — no new fill');
+    expect(screen.getByText('GAS ESTIMATED')).toBeInTheDocument();
+    expect(screen.getByTestId('intent-fill')).toHaveTextContent('2026-11-11 04:00:01Z');
+    expect(screen.getByTestId('gas-estimate')).toHaveTextContent('91542 gas');
+    expect(screen.getByTestId('gas-estimate')).toHaveTextContent('1833220092000 wei');
+    expect(screen.queryByText(/CONTRACT_MISMATCH|does not match the amended/)).not.toBeInTheDocument();
   });
 });

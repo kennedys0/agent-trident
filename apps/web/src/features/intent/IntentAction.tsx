@@ -7,7 +7,7 @@ import type { Candidate } from '../../lib/api/endpoints.js';
 import type { IntentExecution } from '../../lib/api/endpoints.js';
 import { readFlag } from '../../lib/api/system.js';
 import { PAIR } from '../../lib/pair.js';
-import { formatMoney, formatScaled } from '../../lib/format.js';
+import { formatMoney, formatScaled, formatUtc } from '../../lib/format.js';
 import { Badge } from '../../components/Badge.js';
 import { ConfirmDialog } from '../../components/ConfirmDialog.js';
 import { RiskDecisionView } from '../risk/RiskDecisionView.js';
@@ -200,7 +200,7 @@ export function IntentAction({
             <div className="fact">
               <dt>Fill</dt>
               <dd className="mono" data-testid="intent-fill">
-                {result.execution.fill === null ? 'None — rejected' : result.execution.fill.orderId}
+                {result.execution.fill === null ? 'None — rejected' : formatUtc(result.execution.fill.filledAt)}
               </dd>
             </div>
             {approval === null ? null : (
