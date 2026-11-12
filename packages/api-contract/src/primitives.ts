@@ -1,3 +1,4 @@
+import './zod-openapi.js';
 import { z } from 'zod';
 
 export const baseUnitStringSchema = z
