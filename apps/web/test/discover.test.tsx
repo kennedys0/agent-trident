@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { StatusProvider } from '../src/app/StatusProvider.js';
 import { DiscoverPage } from '../src/features/discover/DiscoverPage.js';
 import { PoolInspectorPage } from '../src/features/discover/PoolInspectorPage.js';
-import { orderPools } from '../src/features/discover/components/PoolTable.js';
+import { orderPools, feeLabel } from '../src/features/discover/components/PoolTable.js';
 import {
   poolSummarySchema,
   watchlistMutationSchema,
@@ -245,6 +245,24 @@ describe('DiscoverPage', () => {
     expect(error).toHaveTextContent('Invalid query parameters');
   });
 
+  it('labels a 200 response that violates the contract as a contract mismatch', async () => {
+    useTransport(() => ({ body: { data: { pools: 'not-an-array' }, meta: {} } }));
+    renderAt('/discover');
+
+    const error = await screen.findByTestId('discover-error');
+    expect(error).toHaveTextContent('Contract mismatch');
+    expect(error).toHaveTextContent('does not match the S3-02 contract');
+  });
+
+  it('formats every fee tier without collapsing sub-basis-point fees to 0%', () => {
+    expect(feeLabel(100)).toBe('0.01%');
+    expect(feeLabel(500)).toBe('0.05%');
+    expect(feeLabel(3000)).toBe('0.3%');
+    expect(feeLabel(10000)).toBe('1%');
+    expect(feeLabel(10)).toBe('0.001%');
+    expect(feeLabel(1)).toBe('0.0001%');
+  });
+
   it('searches on the backend after the debounce', async () => {
     const { calls } = useTransport(() => ({ body: poolsBody([basePool]) }));
     renderAt('/discover');
@@ -337,6 +355,7 @@ describe('PoolInspectorPage', () => {
     expect(await screen.findByText('LOW CONFIDENCE')).toBeInTheDocument();
     expect(screen.getAllByText(/source: slot0 at block 123456/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/single Uniswap v3 pool/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'WETH / USDG' })).toBeInTheDocument();
     expect(calls).toContain(`GET /api/v1/pools/${POOL}`);
   });
 

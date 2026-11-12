@@ -152,6 +152,7 @@ export function PoolInspector({
 }): ReactNode {
   return (
     <Panel
+      titleTag="h1"
       title={`${pool.token0.symbol} / ${pool.token1.symbol}`}
       actions={
         <span className="inline">
@@ -245,7 +246,7 @@ export function PoolInspector({
       </div>
 
       <div className="stack stack--tight">
-        <h3 className="discover-section-title">Links</h3>
+        <h2 className="discover-section-title">Links</h2>
         <AddressChip address={pool.pool} label="Pool contract" full />
         <ExplorerLink address={pool.pool} />
       </div>

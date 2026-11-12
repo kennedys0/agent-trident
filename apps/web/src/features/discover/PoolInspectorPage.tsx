@@ -17,10 +17,16 @@ function metaRefreshError(meta: Readonly<Record<string, unknown>>): string | nul
 }
 
 function errorTitle(error: Error): string {
+  if (error instanceof ApiError && error.code === 'CONTRACT_MISMATCH') {
+    return 'Contract mismatch';
+  }
   return error instanceof ApiError && error.status >= 400 && error.status < 500 ? 'Request rejected' : 'Backend error';
 }
 
 function errorText(error: Error): string {
+  if (error instanceof ApiError && error.code === 'CONTRACT_MISMATCH') {
+    return 'The backend payload does not match the S3-02 contract and was not displayed.';
+  }
   return error instanceof ApiError && error.status >= 400 && error.status < 500
     ? error.message
     : 'The backend could not complete this request.';

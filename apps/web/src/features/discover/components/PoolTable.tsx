@@ -53,7 +53,10 @@ export function trimFraction(text: string): string {
 
 /** Fee is stored in millionths: 100 → 0.01%, 3000 → 0.3%, 10000 → 1%. */
 export function feeLabel(fee: number): string {
-  return `${(fee / 10_000).toFixed(2).replace(/\.?0+$/, '')}%`;
+  // Fee tiers below the known allowlist values need more precision than two
+  // decimals, or they collapse to a misleading "0%".
+  const percent = fee / 10_000;
+  return `${percent.toFixed(percent >= 0.01 ? 2 : 4).replace(/\.?0+$/, '')}%`;
 }
 
 const LIQUIDITY_RANK: Record<PoolStatus, number> = { AVAILABLE: 0, STALE: 1, UNAVAILABLE: 2 };
