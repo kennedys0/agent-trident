@@ -3335,6 +3335,1653 @@
           }
         ]
       },
+      "LiquidityMetric": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "blockNumber": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "sourceTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "observedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "provenance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "AVAILABLE"
+                ]
+              },
+              "liquidity": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "reserve0": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "reserve1": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "reserve0Decimals": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "reserve1Decimals": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "required": [
+              "blockNumber",
+              "sourceTime",
+              "observedAt",
+              "provenance",
+              "status",
+              "liquidity",
+              "reserve0",
+              "reserve1",
+              "reserve0Decimals",
+              "reserve1Decimals"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "blockNumber": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "sourceTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "observedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "provenance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "STALE"
+                ]
+              },
+              "liquidity": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "reserve0": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "reserve1": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "reserve0Decimals": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "reserve1Decimals": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "required": [
+              "blockNumber",
+              "sourceTime",
+              "observedAt",
+              "provenance",
+              "status",
+              "liquidity",
+              "reserve0",
+              "reserve1",
+              "reserve0Decimals",
+              "reserve1Decimals"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "UNAVAILABLE"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "status",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PoolList": {
+        "type": "object",
+        "properties": {
+          "pools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "chainId": {
+                  "type": "number",
+                  "enum": [
+                    4663
+                  ]
+                },
+                "pool": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "factory": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "fee": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000000
+                },
+                "token0": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "symbol": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "decimals": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    }
+                  },
+                  "required": [
+                    "address",
+                    "symbol",
+                    "decimals"
+                  ],
+                  "additionalProperties": false
+                },
+                "token1": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "symbol": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "decimals": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    }
+                  },
+                  "required": [
+                    "address",
+                    "symbol",
+                    "decimals"
+                  ],
+                  "additionalProperties": false
+                },
+                "venue": {
+                  "type": "string",
+                  "enum": [
+                    "verified-allowlist",
+                    "s3-01-registry"
+                  ]
+                },
+                "firstSeenBlock": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 256,
+                  "pattern": "^[1-9][0-9]*$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "AVAILABLE",
+                    "STALE",
+                    "UNAVAILABLE"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "metrics": {
+                  "type": "object",
+                  "properties": {
+                    "price": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "blockNumber": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^[1-9][0-9]*$"
+                            },
+                            "sourceTime": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "provenance": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "AVAILABLE"
+                              ]
+                            },
+                            "token1PerToken0": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "scale": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "scale"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "token0PerToken1": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "scale": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "scale"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "blockNumber",
+                            "sourceTime",
+                            "observedAt",
+                            "provenance",
+                            "status",
+                            "token1PerToken0",
+                            "token0PerToken1"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "blockNumber": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^[1-9][0-9]*$"
+                            },
+                            "sourceTime": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "provenance": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "STALE"
+                              ]
+                            },
+                            "token1PerToken0": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "scale": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "scale"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "token0PerToken1": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "scale": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^[1-9][0-9]*$"
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "scale"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "blockNumber",
+                            "sourceTime",
+                            "observedAt",
+                            "provenance",
+                            "status",
+                            "token1PerToken0",
+                            "token0PerToken1"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "UNAVAILABLE"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "reason"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "liquidity": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "blockNumber": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^[1-9][0-9]*$"
+                            },
+                            "sourceTime": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "provenance": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "AVAILABLE"
+                              ]
+                            },
+                            "liquidity": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            },
+                            "reserve0": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            },
+                            "reserve1": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            },
+                            "reserve0Decimals": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            },
+                            "reserve1Decimals": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "required": [
+                            "blockNumber",
+                            "sourceTime",
+                            "observedAt",
+                            "provenance",
+                            "status",
+                            "liquidity",
+                            "reserve0",
+                            "reserve1",
+                            "reserve0Decimals",
+                            "reserve1Decimals"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "blockNumber": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^[1-9][0-9]*$"
+                            },
+                            "sourceTime": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "provenance": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "STALE"
+                              ]
+                            },
+                            "liquidity": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            },
+                            "reserve0": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            },
+                            "reserve1": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            },
+                            "reserve0Decimals": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            },
+                            "reserve1Decimals": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "required": [
+                            "blockNumber",
+                            "sourceTime",
+                            "observedAt",
+                            "provenance",
+                            "status",
+                            "liquidity",
+                            "reserve0",
+                            "reserve1",
+                            "reserve0Decimals",
+                            "reserve1Decimals"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "UNAVAILABLE"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "reason"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "volume24h": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "blockNumber": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^[1-9][0-9]*$"
+                            },
+                            "sourceTime": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "provenance": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "AVAILABLE"
+                              ]
+                            },
+                            "volumeQuote24h": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "decimals": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 255
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "decimals"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "blockNumber",
+                            "sourceTime",
+                            "observedAt",
+                            "provenance",
+                            "status",
+                            "volumeQuote24h"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "blockNumber": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "pattern": "^[1-9][0-9]*$"
+                            },
+                            "sourceTime": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "provenance": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "STALE"
+                              ]
+                            },
+                            "volumeQuote24h": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "decimals": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 255
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "decimals"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "blockNumber",
+                            "sourceTime",
+                            "observedAt",
+                            "provenance",
+                            "status",
+                            "volumeQuote24h"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "UNAVAILABLE"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "reason"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "price",
+                    "liquidity",
+                    "volume24h"
+                  ],
+                  "additionalProperties": false
+                },
+                "confidence": {
+                  "type": "string",
+                  "enum": [
+                    "LOW"
+                  ]
+                },
+                "confidenceReason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "watched": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "chainId",
+                "pool",
+                "factory",
+                "fee",
+                "token0",
+                "token1",
+                "venue",
+                "firstSeenBlock",
+                "status",
+                "metrics",
+                "confidence",
+                "confidenceReason",
+                "watched"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "pools",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "PoolSummary": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "enum": [
+              4663
+            ]
+          },
+          "pool": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "factory": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "fee": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "token0": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "decimals": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "required": [
+              "address",
+              "symbol",
+              "decimals"
+            ],
+            "additionalProperties": false
+          },
+          "token1": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "decimals": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "required": [
+              "address",
+              "symbol",
+              "decimals"
+            ],
+            "additionalProperties": false
+          },
+          "venue": {
+            "type": "string",
+            "enum": [
+              "verified-allowlist",
+              "s3-01-registry"
+            ]
+          },
+          "firstSeenBlock": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 256,
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "STALE",
+              "UNAVAILABLE"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "price": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "blockNumber": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "sourceTime": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "observedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "AVAILABLE"
+                        ]
+                      },
+                      "token1PerToken0": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "scale": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^[1-9][0-9]*$"
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "scale"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "token0PerToken1": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "scale": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^[1-9][0-9]*$"
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "scale"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "blockNumber",
+                      "sourceTime",
+                      "observedAt",
+                      "provenance",
+                      "status",
+                      "token1PerToken0",
+                      "token0PerToken1"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "blockNumber": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "sourceTime": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "observedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "STALE"
+                        ]
+                      },
+                      "token1PerToken0": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "scale": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^[1-9][0-9]*$"
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "scale"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "token0PerToken1": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "scale": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^[1-9][0-9]*$"
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "scale"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "blockNumber",
+                      "sourceTime",
+                      "observedAt",
+                      "provenance",
+                      "status",
+                      "token1PerToken0",
+                      "token0PerToken1"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "UNAVAILABLE"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "liquidity": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "blockNumber": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "sourceTime": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "observedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "AVAILABLE"
+                        ]
+                      },
+                      "liquidity": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "reserve0": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "reserve1": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "reserve0Decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "reserve1Decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    },
+                    "required": [
+                      "blockNumber",
+                      "sourceTime",
+                      "observedAt",
+                      "provenance",
+                      "status",
+                      "liquidity",
+                      "reserve0",
+                      "reserve1",
+                      "reserve0Decimals",
+                      "reserve1Decimals"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "blockNumber": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "sourceTime": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "observedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "STALE"
+                        ]
+                      },
+                      "liquidity": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "reserve0": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "reserve1": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^(0|[1-9][0-9]*)$"
+                      },
+                      "reserve0Decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "reserve1Decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    },
+                    "required": [
+                      "blockNumber",
+                      "sourceTime",
+                      "observedAt",
+                      "provenance",
+                      "status",
+                      "liquidity",
+                      "reserve0",
+                      "reserve1",
+                      "reserve0Decimals",
+                      "reserve1Decimals"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "UNAVAILABLE"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "volume24h": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "blockNumber": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "sourceTime": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "observedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "AVAILABLE"
+                        ]
+                      },
+                      "volumeQuote24h": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "decimals": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "decimals"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "blockNumber",
+                      "sourceTime",
+                      "observedAt",
+                      "provenance",
+                      "status",
+                      "volumeQuote24h"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "blockNumber": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "sourceTime": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "observedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "STALE"
+                        ]
+                      },
+                      "volumeQuote24h": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "decimals": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "decimals"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "blockNumber",
+                      "sourceTime",
+                      "observedAt",
+                      "provenance",
+                      "status",
+                      "volumeQuote24h"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "UNAVAILABLE"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": [
+              "price",
+              "liquidity",
+              "volume24h"
+            ],
+            "additionalProperties": false
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "LOW"
+            ]
+          },
+          "confidenceReason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "chainId",
+          "pool",
+          "factory",
+          "fee",
+          "token0",
+          "token1",
+          "venue",
+          "firstSeenBlock",
+          "status",
+          "metrics",
+          "confidence",
+          "confidenceReason",
+          "watched"
+        ],
+        "additionalProperties": false
+      },
+      "PriceMetric": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "blockNumber": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "sourceTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "observedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "provenance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "AVAILABLE"
+                ]
+              },
+              "token1PerToken0": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "scale": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  }
+                },
+                "required": [
+                  "value",
+                  "scale"
+                ],
+                "additionalProperties": false
+              },
+              "token0PerToken1": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "scale": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  }
+                },
+                "required": [
+                  "value",
+                  "scale"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "blockNumber",
+              "sourceTime",
+              "observedAt",
+              "provenance",
+              "status",
+              "token1PerToken0",
+              "token0PerToken1"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "blockNumber": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "sourceTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "observedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "provenance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "STALE"
+                ]
+              },
+              "token1PerToken0": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "scale": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  }
+                },
+                "required": [
+                  "value",
+                  "scale"
+                ],
+                "additionalProperties": false
+              },
+              "token0PerToken1": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "scale": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^[1-9][0-9]*$"
+                  }
+                },
+                "required": [
+                  "value",
+                  "scale"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "blockNumber",
+              "sourceTime",
+              "observedAt",
+              "provenance",
+              "status",
+              "token1PerToken0",
+              "token0PerToken1"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "UNAVAILABLE"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "status",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "TokenRef": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "decimals": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "required": [
+          "address",
+          "symbol",
+          "decimals"
+        ],
+        "additionalProperties": false
+      },
       "TradeIntent": {
         "type": "object",
         "properties": {
@@ -3483,6 +5130,222 @@
           "token0",
           "token1",
           "provenance"
+        ],
+        "additionalProperties": false
+      },
+      "VolumeMetric": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "blockNumber": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "sourceTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "observedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "provenance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "AVAILABLE"
+                ]
+              },
+              "volumeQuote24h": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                },
+                "required": [
+                  "value",
+                  "decimals"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "blockNumber",
+              "sourceTime",
+              "observedAt",
+              "provenance",
+              "status",
+              "volumeQuote24h"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "blockNumber": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "sourceTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "observedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "provenance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "STALE"
+                ]
+              },
+              "volumeQuote24h": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                },
+                "required": [
+                  "value",
+                  "decimals"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "blockNumber",
+              "sourceTime",
+              "observedAt",
+              "provenance",
+              "status",
+              "volumeQuote24h"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "UNAVAILABLE"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "status",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "Watchlist": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "addedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "known": {
+                  "type": "boolean"
+                },
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "address",
+                "addedAt",
+                "known"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false
+      },
+      "WatchlistMutation": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "ADDED",
+              "EXISTING",
+              "REMOVED",
+              "ABSENT"
+            ]
+          }
+        },
+        "required": [
+          "address",
+          "result"
+        ],
+        "additionalProperties": false
+      },
+      "CreateWatchlistEntry": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          }
+        },
+        "required": [
+          "address"
         ],
         "additionalProperties": false
       }
@@ -5254,6 +7117,2167 @@
                         "equityQuote",
                         "realizedPnlQuote",
                         "unrealizedPnlQuote"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pools": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Discover pool list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "pools": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "chainId": {
+                                "type": "number",
+                                "enum": [
+                                  4663
+                                ]
+                              },
+                              "pool": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "factory": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "fee": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 1000000
+                              },
+                              "token0": {
+                                "type": "object",
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "symbol": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "decimals": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                  }
+                                },
+                                "required": [
+                                  "address",
+                                  "symbol",
+                                  "decimals"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "token1": {
+                                "type": "object",
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "symbol": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "decimals": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                  }
+                                },
+                                "required": [
+                                  "address",
+                                  "symbol",
+                                  "decimals"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "venue": {
+                                "type": "string",
+                                "enum": [
+                                  "verified-allowlist",
+                                  "s3-01-registry"
+                                ]
+                              },
+                              "firstSeenBlock": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 256,
+                                "pattern": "^[1-9][0-9]*$"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "AVAILABLE",
+                                  "STALE",
+                                  "UNAVAILABLE"
+                                ]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "metrics": {
+                                "type": "object",
+                                "properties": {
+                                  "price": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "blockNumber": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^[1-9][0-9]*$"
+                                          },
+                                          "sourceTime": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "observedAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "provenance": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 256
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "AVAILABLE"
+                                            ]
+                                          },
+                                          "token1PerToken0": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^(0|[1-9][0-9]*)$"
+                                              },
+                                              "scale": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^[1-9][0-9]*$"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "scale"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "token0PerToken1": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^(0|[1-9][0-9]*)$"
+                                              },
+                                              "scale": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^[1-9][0-9]*$"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "scale"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "blockNumber",
+                                          "sourceTime",
+                                          "observedAt",
+                                          "provenance",
+                                          "status",
+                                          "token1PerToken0",
+                                          "token0PerToken1"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "blockNumber": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^[1-9][0-9]*$"
+                                          },
+                                          "sourceTime": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "observedAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "provenance": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 256
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "STALE"
+                                            ]
+                                          },
+                                          "token1PerToken0": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^(0|[1-9][0-9]*)$"
+                                              },
+                                              "scale": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^[1-9][0-9]*$"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "scale"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "token0PerToken1": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^(0|[1-9][0-9]*)$"
+                                              },
+                                              "scale": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^[1-9][0-9]*$"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "scale"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "blockNumber",
+                                          "sourceTime",
+                                          "observedAt",
+                                          "provenance",
+                                          "status",
+                                          "token1PerToken0",
+                                          "token0PerToken1"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "UNAVAILABLE"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          }
+                                        },
+                                        "required": [
+                                          "status",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "liquidity": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "blockNumber": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^[1-9][0-9]*$"
+                                          },
+                                          "sourceTime": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "observedAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "provenance": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 256
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "AVAILABLE"
+                                            ]
+                                          },
+                                          "liquidity": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^(0|[1-9][0-9]*)$"
+                                          },
+                                          "reserve0": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^(0|[1-9][0-9]*)$"
+                                          },
+                                          "reserve1": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^(0|[1-9][0-9]*)$"
+                                          },
+                                          "reserve0Decimals": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 255
+                                          },
+                                          "reserve1Decimals": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 255
+                                          }
+                                        },
+                                        "required": [
+                                          "blockNumber",
+                                          "sourceTime",
+                                          "observedAt",
+                                          "provenance",
+                                          "status",
+                                          "liquidity",
+                                          "reserve0",
+                                          "reserve1",
+                                          "reserve0Decimals",
+                                          "reserve1Decimals"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "blockNumber": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^[1-9][0-9]*$"
+                                          },
+                                          "sourceTime": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "observedAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "provenance": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 256
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "STALE"
+                                            ]
+                                          },
+                                          "liquidity": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^(0|[1-9][0-9]*)$"
+                                          },
+                                          "reserve0": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^(0|[1-9][0-9]*)$"
+                                          },
+                                          "reserve1": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^(0|[1-9][0-9]*)$"
+                                          },
+                                          "reserve0Decimals": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 255
+                                          },
+                                          "reserve1Decimals": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 255
+                                          }
+                                        },
+                                        "required": [
+                                          "blockNumber",
+                                          "sourceTime",
+                                          "observedAt",
+                                          "provenance",
+                                          "status",
+                                          "liquidity",
+                                          "reserve0",
+                                          "reserve1",
+                                          "reserve0Decimals",
+                                          "reserve1Decimals"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "UNAVAILABLE"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          }
+                                        },
+                                        "required": [
+                                          "status",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "volume24h": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "blockNumber": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^[1-9][0-9]*$"
+                                          },
+                                          "sourceTime": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "observedAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "provenance": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 256
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "AVAILABLE"
+                                            ]
+                                          },
+                                          "volumeQuote24h": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^(0|[1-9][0-9]*)$"
+                                              },
+                                              "decimals": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 255
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "decimals"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "blockNumber",
+                                          "sourceTime",
+                                          "observedAt",
+                                          "provenance",
+                                          "status",
+                                          "volumeQuote24h"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "blockNumber": {
+                                            "type": "string",
+                                            "maxLength": 256,
+                                            "pattern": "^[1-9][0-9]*$"
+                                          },
+                                          "sourceTime": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "observedAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "provenance": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 256
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "STALE"
+                                            ]
+                                          },
+                                          "volumeQuote24h": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "maxLength": 256,
+                                                "pattern": "^(0|[1-9][0-9]*)$"
+                                              },
+                                              "decimals": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 255
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "decimals"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "blockNumber",
+                                          "sourceTime",
+                                          "observedAt",
+                                          "provenance",
+                                          "status",
+                                          "volumeQuote24h"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "UNAVAILABLE"
+                                            ]
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          }
+                                        },
+                                        "required": [
+                                          "status",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "price",
+                                  "liquidity",
+                                  "volume24h"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "confidence": {
+                                "type": "string",
+                                "enum": [
+                                  "LOW"
+                                ]
+                              },
+                              "confidenceReason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256
+                              },
+                              "watched": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "chainId",
+                              "pool",
+                              "factory",
+                              "fee",
+                              "token0",
+                              "token1",
+                              "venue",
+                              "firstSeenBlock",
+                              "status",
+                              "metrics",
+                              "confidence",
+                              "confidenceReason",
+                              "watched"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "offset": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 50
+                        }
+                      },
+                      "required": [
+                        "pools",
+                        "total",
+                        "offset",
+                        "limit"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pools/{address}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "required": true,
+            "name": "address",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Discover pool detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "chainId": {
+                          "type": "number",
+                          "enum": [
+                            4663
+                          ]
+                        },
+                        "pool": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "factory": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "fee": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000000
+                        },
+                        "token0": {
+                          "type": "object",
+                          "properties": {
+                            "address": {
+                              "type": "string",
+                              "pattern": "^0x[0-9a-fA-F]{40}$"
+                            },
+                            "symbol": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "decimals": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "symbol",
+                            "decimals"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "token1": {
+                          "type": "object",
+                          "properties": {
+                            "address": {
+                              "type": "string",
+                              "pattern": "^0x[0-9a-fA-F]{40}$"
+                            },
+                            "symbol": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "decimals": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "symbol",
+                            "decimals"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "venue": {
+                          "type": "string",
+                          "enum": [
+                            "verified-allowlist",
+                            "s3-01-registry"
+                          ]
+                        },
+                        "firstSeenBlock": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 256,
+                          "pattern": "^[1-9][0-9]*$"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "AVAILABLE",
+                            "STALE",
+                            "UNAVAILABLE"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "properties": {
+                            "price": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "blockNumber": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "sourceTime": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "observedAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "provenance": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "AVAILABLE"
+                                      ]
+                                    },
+                                    "token1PerToken0": {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "scale": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^[1-9][0-9]*$"
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "scale"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "token0PerToken1": {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "scale": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^[1-9][0-9]*$"
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "scale"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "blockNumber",
+                                    "sourceTime",
+                                    "observedAt",
+                                    "provenance",
+                                    "status",
+                                    "token1PerToken0",
+                                    "token0PerToken1"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "blockNumber": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "sourceTime": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "observedAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "provenance": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "STALE"
+                                      ]
+                                    },
+                                    "token1PerToken0": {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "scale": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^[1-9][0-9]*$"
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "scale"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "token0PerToken1": {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "scale": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^[1-9][0-9]*$"
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "scale"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "blockNumber",
+                                    "sourceTime",
+                                    "observedAt",
+                                    "provenance",
+                                    "status",
+                                    "token1PerToken0",
+                                    "token0PerToken1"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "UNAVAILABLE"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    }
+                                  },
+                                  "required": [
+                                    "status",
+                                    "reason"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "liquidity": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "blockNumber": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "sourceTime": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "observedAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "provenance": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "AVAILABLE"
+                                      ]
+                                    },
+                                    "liquidity": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "reserve0": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "reserve1": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "reserve0Decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    },
+                                    "reserve1Decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    }
+                                  },
+                                  "required": [
+                                    "blockNumber",
+                                    "sourceTime",
+                                    "observedAt",
+                                    "provenance",
+                                    "status",
+                                    "liquidity",
+                                    "reserve0",
+                                    "reserve1",
+                                    "reserve0Decimals",
+                                    "reserve1Decimals"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "blockNumber": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "sourceTime": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "observedAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "provenance": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "STALE"
+                                      ]
+                                    },
+                                    "liquidity": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "reserve0": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "reserve1": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "reserve0Decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    },
+                                    "reserve1Decimals": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    }
+                                  },
+                                  "required": [
+                                    "blockNumber",
+                                    "sourceTime",
+                                    "observedAt",
+                                    "provenance",
+                                    "status",
+                                    "liquidity",
+                                    "reserve0",
+                                    "reserve1",
+                                    "reserve0Decimals",
+                                    "reserve1Decimals"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "UNAVAILABLE"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    }
+                                  },
+                                  "required": [
+                                    "status",
+                                    "reason"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "volume24h": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "blockNumber": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "sourceTime": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "observedAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "provenance": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "AVAILABLE"
+                                      ]
+                                    },
+                                    "volumeQuote24h": {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "decimals": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "decimals"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "blockNumber",
+                                    "sourceTime",
+                                    "observedAt",
+                                    "provenance",
+                                    "status",
+                                    "volumeQuote24h"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "blockNumber": {
+                                      "type": "string",
+                                      "maxLength": 256,
+                                      "pattern": "^[1-9][0-9]*$"
+                                    },
+                                    "sourceTime": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "observedAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "provenance": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "STALE"
+                                      ]
+                                    },
+                                    "volumeQuote24h": {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "string",
+                                          "maxLength": 256,
+                                          "pattern": "^(0|[1-9][0-9]*)$"
+                                        },
+                                        "decimals": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "decimals"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "blockNumber",
+                                    "sourceTime",
+                                    "observedAt",
+                                    "provenance",
+                                    "status",
+                                    "volumeQuote24h"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "UNAVAILABLE"
+                                      ]
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    }
+                                  },
+                                  "required": [
+                                    "status",
+                                    "reason"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "price",
+                            "liquidity",
+                            "volume24h"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "confidence": {
+                          "type": "string",
+                          "enum": [
+                            "LOW"
+                          ]
+                        },
+                        "confidenceReason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "watched": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "chainId",
+                        "pool",
+                        "factory",
+                        "fee",
+                        "token0",
+                        "token1",
+                        "venue",
+                        "firstSeenBlock",
+                        "status",
+                        "metrics",
+                        "confidence",
+                        "confidenceReason",
+                        "watched"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown pool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/watchlist": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Watchlist entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "addedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "known": {
+                                "type": "boolean"
+                              },
+                              "symbol": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              }
+                            },
+                            "required": [
+                              "address",
+                              "addedAt",
+                              "known"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "entries"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  }
+                },
+                "required": [
+                  "address"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Address already on the watchlist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "result": {
+                          "type": "string",
+                          "enum": [
+                            "ADDED",
+                            "EXISTING",
+                            "REMOVED",
+                            "ABSENT"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "address",
+                        "result"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Address added to the watchlist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "result": {
+                          "type": "string",
+                          "enum": [
+                            "ADDED",
+                            "EXISTING",
+                            "REMOVED",
+                            "ABSENT"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "address",
+                        "result"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown asset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/watchlist/{address}": {
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "required": true,
+            "name": "address",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Watchlist remove result (idempotent)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "result": {
+                          "type": "string",
+                          "enum": [
+                            "ADDED",
+                            "EXISTING",
+                            "REMOVED",
+                            "ABSENT"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "address",
+                        "result"
                       ],
                       "additionalProperties": false
                     },

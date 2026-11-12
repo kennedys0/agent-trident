@@ -29,6 +29,22 @@ import { effectiveStatus } from './domain/snapshot.js';
 import type { PoolIdentity, StrategyConfig } from './domain/types.js';
 import type { MarketService } from './services/market.js';
 import { createIntentFromEvaluation, executeIntent } from './services/execution.js';
+import type { ChainReadPort } from './chain/client.js';
+import {
+  toPoolList,
+  toPoolSummaryFromRefresh,
+  toPoolSummaryFromStored,
+  toWatchlist,
+  toWatchlistMutation,
+} from './api/marketIntelMapper.js';
+import {
+  isWatchlisted,
+  listWatchlistEntries,
+  loadTrackedPools,
+  refreshTrackedPool,
+  storedStatus,
+} from './services/marketIntel.js';
+import { addWatchlistEntry, latestPoolMarketSnapshot, readDiscoveredPools, removeWatchlistEntry } from './db/marketIntelRepositories.js';
 import type { QuotePort } from './services/ports.js';
 import { maybeInjectFault, type FaultHooks } from './services/faults.js';
 import { USDG, VERIFIED_VENUE, WETH } from './chain/venue.js';
@@ -56,6 +72,8 @@ export type AppDeps = {
   readonly market: MarketService;
   readonly quote: QuotePort;
   readonly probe: HealthProbe;
+  /** Optional: enables pool-refresh reads for Discover detail. Absent in offline tests. */
+  readonly chain?: ChainReadPort | undefined;
   /** Test-only crash boundary seam; production leaves it undefined. */
   readonly faults?: FaultHooks | undefined;
 };
@@ -76,6 +94,20 @@ const intentBodySchema = z.object({
 });
 
 const haltBodySchema = z.object({ engaged: z.boolean() });
+
+// S3-02 Discover query/params schemas. Coercion on purpose: empty strings and
+// junk numbers become NaN and fail validation instead of silently becoming 0.
+const intelQuerySchema = z.object({
+  search: z.string().trim().min(1).max(128).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  offset: z.coerce.number().int().min(0).max(100_000).default(0),
+}).strict();
+const intelAddressParamsSchema = z.object({
+  address: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+}).strict();
+const createWatchlistEntryBodySchema = z.object({
+  address: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+}).strict();
 
 export function buildApp(deps: AppDeps): FastifyInstance {
   const app = Fastify({
@@ -206,6 +238,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       correlationId: requestId,
       mode: deps.config.mode,
       faults: deps.faults,
+      allowlistPoolId: deps.pool.id,
     });
     const view = await executeIntent(
       {
@@ -317,6 +350,175 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     });
     return reply.send({
       data: { killSwitchEngaged: body.engaged, haltReason: getState(deps.db, HALT_REASON_KEY) },
+      meta: meta(requestId),
+    });
+  });
+
+  const intelAssets = [WETH, USDG];
+  const intelVerified = () => ({
+    pool: deps.pool,
+    venueFactory: VERIFIED_VENUE.factory,
+    verifiedAssets: intelAssets,
+  });
+  const knownTokenMap = (): Map<string, string> => {
+    const map = new Map<string, string>();
+    for (const asset of intelAssets) map.set(asset.address.toLowerCase(), asset.symbol);
+    try {
+      for (const record of readDiscoveredPools(deps.db)) {
+        map.set(record.token0.toLowerCase(), record.token0Symbol);
+        map.set(record.token1.toLowerCase(), record.token1Symbol);
+      }
+    } catch {
+      // Registry unreadable: verified allowlist stays known, discovered list is empty + reported via meta.
+    }
+    return map;
+  };
+
+  app.get('/api/v1/pools', async (request, reply) => {
+    const requestId = requestIdOf(request);
+    const parsed = intelQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      throw new AppError('VALIDATION_ERROR', 'Invalid query parameters for pool discovery', {
+        issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+      });
+    }
+    const { search, limit, offset } = parsed.data;
+    const loaded = loadTrackedPools(deps.db, intelVerified());
+    const needle = search?.toLowerCase();
+    const matches = needle
+      ? loaded.pools.filter(
+          (pool) =>
+            pool.pool.includes(needle) ||
+            pool.token0.address.includes(needle) ||
+            pool.token1.address.includes(needle) ||
+            pool.token0.symbol.toLowerCase().includes(needle) ||
+            pool.token1.symbol.toLowerCase().includes(needle),
+        )
+      : loaded.pools;
+    const known = knownTokenMap();
+    const now = new Date();
+    const summaries = matches.map((pool) => {
+      const row = latestPoolMarketSnapshot(deps.db, pool.pool);
+      const stored = storedStatus(row, deps.config.marketFreshnessSeconds, now);
+      const watched =
+        isWatchlisted(deps.db, pool.token0.address.toLowerCase()) ||
+        isWatchlisted(deps.db, pool.token1.address.toLowerCase());
+      return toPoolSummaryFromStored(pool, row, stored.status, stored.reason, watched);
+    });
+    const total = summaries.length;
+    const page = summaries.slice(offset, offset + limit);
+    return reply.send({
+      data: toPoolList(page, offset, limit, total),
+      meta: meta(requestId, {
+        registryStatus: loaded.registryStatus,
+        registrySkipped: loaded.registrySkipped,
+        trackedPools: loaded.pools.length,
+        watchlistEntries: listWatchlistEntries(deps.db).length,
+      }),
+    });
+  });
+
+  app.get('/api/v1/pools/:address', async (request, reply) => {
+    const requestId = requestIdOf(request);
+    const params = intelAddressParamsSchema.safeParse(request.params ?? {});
+    if (!params.success) {
+      throw new AppError('VALIDATION_ERROR', 'Pool address parameter is malformed');
+    }
+    const address = params.data.address.toLowerCase();
+    const loaded = loadTrackedPools(deps.db, intelVerified());
+    const tracked = loaded.pools.find((pool) => pool.pool === address);
+    if (!tracked) {
+      throw new AppError('NOT_FOUND', 'Pool is not tracked by discovery or the verified allowlist');
+    }
+    const watched =
+      isWatchlisted(deps.db, tracked.token0.address.toLowerCase()) ||
+      isWatchlisted(deps.db, tracked.token1.address.toLowerCase());
+    const now = new Date();
+
+    if (deps.chain !== undefined) {
+      try {
+        const refreshed = await refreshTrackedPool({
+          db: deps.db,
+          chain: deps.chain,
+          tracked,
+          freshnessSeconds: deps.config.marketFreshnessSeconds,
+          now,
+        });
+        return reply.send({
+          data: toPoolSummaryFromRefresh(tracked, refreshed, watched),
+          meta: meta(requestId, { registryStatus: loaded.registryStatus, registrySkipped: loaded.registrySkipped }),
+        });
+      } catch (error) {
+        // Fall back to the latest stored observation when the refresh fails; never fabricate.
+        const row = latestPoolMarketSnapshot(deps.db, tracked.pool);
+        if (row !== null) {
+          const stored = storedStatus(row, deps.config.marketFreshnessSeconds, now);
+          return reply.send({
+            data: toPoolSummaryFromStored(tracked, row, stored.status, stored.reason, watched),
+            meta: meta(requestId, {
+              registryStatus: loaded.registryStatus,
+              refreshError: error instanceof Error ? error.message : String(error),
+            }),
+          });
+        }
+        return reply.send({
+          data: toPoolSummaryFromStored(tracked, null, 'UNAVAILABLE', 'pool observation unavailable; RPC refresh failed', watched),
+          meta: meta(requestId, {
+            registryStatus: loaded.registryStatus,
+            refreshError: error instanceof Error ? error.message : String(error),
+          }),
+        });
+      }
+    }
+
+    const row = latestPoolMarketSnapshot(deps.db, tracked.pool);
+    const stored = storedStatus(row, deps.config.marketFreshnessSeconds, now);
+    return reply.send({
+      data: toPoolSummaryFromStored(tracked, row, stored.status, stored.reason, watched),
+      meta: meta(requestId, { registryStatus: loaded.registryStatus }),
+    });
+  });
+
+  app.get('/api/v1/watchlist', async (request, reply) => {
+    const requestId = requestIdOf(request);
+    const known = knownTokenMap();
+    const entries = listWatchlistEntries(deps.db).map((entry) => ({
+      address: entry.address,
+      addedAt: entry.addedAt,
+      known: known.has(entry.address.toLowerCase()),
+      ...(known.has(entry.address.toLowerCase()) ? { symbol: known.get(entry.address.toLowerCase()) } : {}),
+    }));
+    return reply.send({ data: toWatchlist(entries, (address) => ({ known: known.has(address.toLowerCase()), symbol: known.get(address.toLowerCase()) })), meta: meta(requestId) });
+  });
+
+  app.post('/api/v1/watchlist', async (request, reply) => {
+    const requestId = requestIdOf(request);
+    const body = createWatchlistEntryBodySchema.safeParse(request.body ?? {});
+    if (!body.success) {
+      throw new AppError('VALIDATION_ERROR', 'Watchlist body must contain a valid 0x token address');
+    }
+    const address = body.data.address.toLowerCase();
+    const known = knownTokenMap();
+    if (!known.has(address)) {
+      throw new AppError('NOT_FOUND', 'Unknown asset; only tokens of tracked pools or the verified allowlist can be watched');
+    }
+    const result = addWatchlistEntry(deps.db, address);
+    return reply.status(result === 'ADDED' ? 201 : 200).send({
+      data: toWatchlistMutation(address, result),
+      meta: meta(requestId),
+    });
+  });
+
+  app.delete('/api/v1/watchlist/:address', async (request, reply) => {
+    const requestId = requestIdOf(request);
+    const params = intelAddressParamsSchema.safeParse(request.params ?? {});
+    if (!params.success) {
+      throw new AppError('VALIDATION_ERROR', 'Watchlist address parameter is malformed');
+    }
+    const address = params.data.address.toLowerCase();
+    const result = removeWatchlistEntry(deps.db, address);
+    return reply.send({
+      data: toWatchlistMutation(address, result),
       meta: meta(requestId),
     });
   });

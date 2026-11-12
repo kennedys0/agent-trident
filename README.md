@@ -147,7 +147,7 @@ The suite covers the desktop Chromium viewport only. It expects a reachable API 
 ## Project layout
 
 ```
-apps/api               Fastify API, chain client, strategy, risk gate, ledger, SQLite, worker
+apps/api               Fastify API, chain client, strategy, risk gate, ledger, SQLite, worker, Discover (read-only market intelligence, S3-02)
 apps/web               React + Vite operations console
 packages/api-contract  Zod schemas, generated OpenAPI document, and shared wire types
 docs/evidence          Committed acceptance evidence for issue #5

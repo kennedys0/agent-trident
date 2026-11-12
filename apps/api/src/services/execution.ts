@@ -72,6 +72,8 @@ export function createIntentFromEvaluation(
     correlationId: string;
     mode: 'OBSERVE' | 'PAPER';
     faults?: FaultHooks | undefined;
+    /** Verified allowlisted pool id; narrows what may ever produce a paper intent. */
+    allowlistPoolId?: string;
   },
 ): IntentRecord {
   // `evaluation_id` is the business key: one evaluation can produce at most one
@@ -97,6 +99,10 @@ export function createIntentFromEvaluation(
   const side = input.evaluation.action;
   const snapshot = getSnapshotById(db, input.evaluation.snapshotId);
   if (snapshot === null) throw new AppError('CONFLICT', 'Evaluation points at a snapshot that does not exist');
+  if (input.allowlistPoolId !== undefined && snapshot.poolId.toLowerCase() !== input.allowlistPoolId.toLowerCase()) {
+    // Discovered pools are observation-only; a spot price is never an order.
+    throw new AppError('INTENT_NOT_ACTIONABLE', 'Evaluation targets a pool outside the verified PAPER allowlist');
+  }
   const baseQty =
     side === 'BUY'
       ? quoteToBaseQty(BigInt(input.evaluation.proposedAmountIn), BigInt(snapshot.priceScaled), 18, 6, snapshot.priceScale)

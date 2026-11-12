@@ -95,3 +95,20 @@ export function quoteToBaseQty(
   if (priceScaled <= 0n) throw new PriceError('price must be positive');
   return (amountQuote * quoteDivisor(baseDecimals, quoteDecimals, scale)) / priceScaled;
 }
+
+/**
+ * Inverse spot price (token0 per token1) from sqrtPriceX96. Kept separate from
+ * `spotPriceScaled` so both directions stay integer-only; a round trip through
+ * both bounds loses at most a unit of scale.
+ */
+export function inverseSpotPriceScaled(
+  sqrtPriceX96: bigint,
+  token0Decimals: number,
+  token1Decimals: number,
+  scale = PRICE_SCALE,
+): bigint {
+  if (sqrtPriceX96 <= 0n) throw new PriceError('sqrtPriceX96 must be positive');
+  const exponent = token1Decimals - token0Decimals + scale;
+  if (exponent < 0) throw new PriceError('unsupported decimal configuration');
+  return (Q192 * 10n ** BigInt(exponent)) / (sqrtPriceX96 * sqrtPriceX96);
+}
