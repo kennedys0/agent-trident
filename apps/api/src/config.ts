@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertSafeRpcUrl, parseRpcAllowedHosts } from './chain/rpc-guard.js';
 
 export const SUPPORTED_MODES = ['OBSERVE', 'PAPER'] as const;
 export type ExecutionMode = (typeof SUPPORTED_MODES)[number];
@@ -9,7 +10,8 @@ export const ROBINHOOD_CHAIN_ID = 4663;
 
 const envSchema = z.object({
   EXECUTION_MODE: z.enum(SUPPORTED_MODES).default('PAPER'),
-  RPC_URL: z.string().url().startsWith('https://'),
+  RPC_URL: z.string().min(1),
+  RPC_ALLOWED_HOSTS: z.string().optional(),
   EXPECTED_CHAIN_ID: z.coerce.number().int().positive().default(ROBINHOOD_CHAIN_ID),
   DATABASE_PATH: z.string().min(1).default('./data/trident.sqlite'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
@@ -22,6 +24,7 @@ const envSchema = z.object({
 export type Config = {
   readonly mode: ExecutionMode;
   readonly rpcUrl: string;
+  readonly rpcAllowedHosts: readonly string[];
   readonly expectedChainId: number;
   readonly databasePath: string;
   readonly port: number;
@@ -32,8 +35,10 @@ export type Config = {
 };
 
 /**
- * Parses configuration and fails closed. An unknown execution mode, a non-HTTPS
- * RPC URL, or a chain id other than the verified Robinhood Chain id aborts boot.
+ * Parses configuration and fails closed. An unknown execution mode, an RPC URL
+ * that is not HTTPS, contains credentials/unsafe forms, sits outside
+ * RPC_ALLOWED_HOSTS, or a chain id other than the verified Robinhood Chain id
+ * aborts boot.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = envSchema.safeParse(env);
@@ -47,9 +52,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (value.EXPECTED_CHAIN_ID !== ROBINHOOD_CHAIN_ID) {
     throw new Error(`Expected chain id must be ${ROBINHOOD_CHAIN_ID}, received ${value.EXPECTED_CHAIN_ID}`);
   }
+  const rpcAllowedHosts = parseRpcAllowedHosts(value.RPC_ALLOWED_HOSTS);
+  const rpcUrl = assertSafeRpcUrl(value.RPC_URL, rpcAllowedHosts).toString();
   return {
     mode: value.EXECUTION_MODE,
-    rpcUrl: value.RPC_URL,
+    rpcUrl,
+    rpcAllowedHosts,
     expectedChainId: value.EXPECTED_CHAIN_ID,
     databasePath: value.DATABASE_PATH,
     port: value.PORT,
