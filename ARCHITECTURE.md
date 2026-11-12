@@ -16,6 +16,7 @@ TRIDENT is a single-instance TypeScript modular monolith: Node.js 24, Fastify, v
 - Ledger owns cash, positions, realized PnL, and append-only journal entries.
 - API exposes domain views, not RPC or database representations.
 - UI renders actual API states and never substitutes fixtures in production.
+- Market Intelligence (Discover) is read-only: it may observe any tracked pool (verified allowlist + discovered registry) but can never affect orders, fills, ledger, positions, or halts. Discovered assets are observation-only.
 
 ## Invariants
 

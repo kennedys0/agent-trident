@@ -609,6 +609,685 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                    limit?: number;
+                    offset?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Discover pool list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                pools: {
+                                    /** @enum {number} */
+                                    chainId: 4663;
+                                    pool: string;
+                                    factory: string;
+                                    fee: number;
+                                    token0: {
+                                        address: string;
+                                        symbol: string;
+                                        decimals: number;
+                                    };
+                                    token1: {
+                                        address: string;
+                                        symbol: string;
+                                        decimals: number;
+                                    };
+                                    /** @enum {string} */
+                                    venue: "verified-allowlist" | "s3-01-registry";
+                                    firstSeenBlock: string | null;
+                                    /** @enum {string} */
+                                    status: "AVAILABLE" | "STALE" | "UNAVAILABLE";
+                                    reason?: string;
+                                    metrics: {
+                                        price: {
+                                            blockNumber: string;
+                                            /** Format: date-time */
+                                            sourceTime: string;
+                                            /** Format: date-time */
+                                            observedAt: string;
+                                            provenance: string;
+                                            /** @enum {string} */
+                                            status: "AVAILABLE";
+                                            token1PerToken0: {
+                                                value: string;
+                                                scale: string;
+                                            };
+                                            token0PerToken1: {
+                                                value: string;
+                                                scale: string;
+                                            };
+                                        } | {
+                                            blockNumber: string;
+                                            /** Format: date-time */
+                                            sourceTime: string;
+                                            /** Format: date-time */
+                                            observedAt: string;
+                                            provenance: string;
+                                            /** @enum {string} */
+                                            status: "STALE";
+                                            token1PerToken0: {
+                                                value: string;
+                                                scale: string;
+                                            };
+                                            token0PerToken1: {
+                                                value: string;
+                                                scale: string;
+                                            };
+                                        } | {
+                                            /** @enum {string} */
+                                            status: "UNAVAILABLE";
+                                            reason: string;
+                                        };
+                                        liquidity: {
+                                            blockNumber: string;
+                                            /** Format: date-time */
+                                            sourceTime: string;
+                                            /** Format: date-time */
+                                            observedAt: string;
+                                            provenance: string;
+                                            /** @enum {string} */
+                                            status: "AVAILABLE";
+                                            liquidity: string;
+                                            reserve0: string;
+                                            reserve1: string;
+                                            reserve0Decimals: number;
+                                            reserve1Decimals: number;
+                                        } | {
+                                            blockNumber: string;
+                                            /** Format: date-time */
+                                            sourceTime: string;
+                                            /** Format: date-time */
+                                            observedAt: string;
+                                            provenance: string;
+                                            /** @enum {string} */
+                                            status: "STALE";
+                                            liquidity: string;
+                                            reserve0: string;
+                                            reserve1: string;
+                                            reserve0Decimals: number;
+                                            reserve1Decimals: number;
+                                        } | {
+                                            /** @enum {string} */
+                                            status: "UNAVAILABLE";
+                                            reason: string;
+                                        };
+                                        volume24h: {
+                                            blockNumber: string;
+                                            /** Format: date-time */
+                                            sourceTime: string;
+                                            /** Format: date-time */
+                                            observedAt: string;
+                                            provenance: string;
+                                            /** @enum {string} */
+                                            status: "AVAILABLE";
+                                            volumeQuote24h: {
+                                                value: string;
+                                                decimals: number;
+                                            };
+                                        } | {
+                                            blockNumber: string;
+                                            /** Format: date-time */
+                                            sourceTime: string;
+                                            /** Format: date-time */
+                                            observedAt: string;
+                                            provenance: string;
+                                            /** @enum {string} */
+                                            status: "STALE";
+                                            volumeQuote24h: {
+                                                value: string;
+                                                decimals: number;
+                                            };
+                                        } | {
+                                            /** @enum {string} */
+                                            status: "UNAVAILABLE";
+                                            reason: string;
+                                        };
+                                    };
+                                    /** @enum {string} */
+                                    confidence: "LOW";
+                                    confidenceReason: string;
+                                    watched: boolean;
+                                }[];
+                                total: number;
+                                offset: number;
+                                limit: number;
+                            };
+                            meta: {
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Internal error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pools/{address}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    address: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Discover pool detail */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @enum {number} */
+                                chainId: 4663;
+                                pool: string;
+                                factory: string;
+                                fee: number;
+                                token0: {
+                                    address: string;
+                                    symbol: string;
+                                    decimals: number;
+                                };
+                                token1: {
+                                    address: string;
+                                    symbol: string;
+                                    decimals: number;
+                                };
+                                /** @enum {string} */
+                                venue: "verified-allowlist" | "s3-01-registry";
+                                firstSeenBlock: string | null;
+                                /** @enum {string} */
+                                status: "AVAILABLE" | "STALE" | "UNAVAILABLE";
+                                reason?: string;
+                                metrics: {
+                                    price: {
+                                        blockNumber: string;
+                                        /** Format: date-time */
+                                        sourceTime: string;
+                                        /** Format: date-time */
+                                        observedAt: string;
+                                        provenance: string;
+                                        /** @enum {string} */
+                                        status: "AVAILABLE";
+                                        token1PerToken0: {
+                                            value: string;
+                                            scale: string;
+                                        };
+                                        token0PerToken1: {
+                                            value: string;
+                                            scale: string;
+                                        };
+                                    } | {
+                                        blockNumber: string;
+                                        /** Format: date-time */
+                                        sourceTime: string;
+                                        /** Format: date-time */
+                                        observedAt: string;
+                                        provenance: string;
+                                        /** @enum {string} */
+                                        status: "STALE";
+                                        token1PerToken0: {
+                                            value: string;
+                                            scale: string;
+                                        };
+                                        token0PerToken1: {
+                                            value: string;
+                                            scale: string;
+                                        };
+                                    } | {
+                                        /** @enum {string} */
+                                        status: "UNAVAILABLE";
+                                        reason: string;
+                                    };
+                                    liquidity: {
+                                        blockNumber: string;
+                                        /** Format: date-time */
+                                        sourceTime: string;
+                                        /** Format: date-time */
+                                        observedAt: string;
+                                        provenance: string;
+                                        /** @enum {string} */
+                                        status: "AVAILABLE";
+                                        liquidity: string;
+                                        reserve0: string;
+                                        reserve1: string;
+                                        reserve0Decimals: number;
+                                        reserve1Decimals: number;
+                                    } | {
+                                        blockNumber: string;
+                                        /** Format: date-time */
+                                        sourceTime: string;
+                                        /** Format: date-time */
+                                        observedAt: string;
+                                        provenance: string;
+                                        /** @enum {string} */
+                                        status: "STALE";
+                                        liquidity: string;
+                                        reserve0: string;
+                                        reserve1: string;
+                                        reserve0Decimals: number;
+                                        reserve1Decimals: number;
+                                    } | {
+                                        /** @enum {string} */
+                                        status: "UNAVAILABLE";
+                                        reason: string;
+                                    };
+                                    volume24h: {
+                                        blockNumber: string;
+                                        /** Format: date-time */
+                                        sourceTime: string;
+                                        /** Format: date-time */
+                                        observedAt: string;
+                                        provenance: string;
+                                        /** @enum {string} */
+                                        status: "AVAILABLE";
+                                        volumeQuote24h: {
+                                            value: string;
+                                            decimals: number;
+                                        };
+                                    } | {
+                                        blockNumber: string;
+                                        /** Format: date-time */
+                                        sourceTime: string;
+                                        /** Format: date-time */
+                                        observedAt: string;
+                                        provenance: string;
+                                        /** @enum {string} */
+                                        status: "STALE";
+                                        volumeQuote24h: {
+                                            value: string;
+                                            decimals: number;
+                                        };
+                                    } | {
+                                        /** @enum {string} */
+                                        status: "UNAVAILABLE";
+                                        reason: string;
+                                    };
+                                };
+                                /** @enum {string} */
+                                confidence: "LOW";
+                                confidenceReason: string;
+                                watched: boolean;
+                            };
+                            meta: {
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Unknown pool */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Internal error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Watchlist entries */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                entries: {
+                                    address: string;
+                                    /** Format: date-time */
+                                    addedAt: string;
+                                    known: boolean;
+                                    symbol?: string;
+                                }[];
+                            };
+                            meta: {
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Internal error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        address: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Address already on the watchlist */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                address: string;
+                                /** @enum {string} */
+                                result: "ADDED" | "EXISTING" | "REMOVED" | "ABSENT";
+                            };
+                            meta: {
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Address added to the watchlist */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                address: string;
+                                /** @enum {string} */
+                                result: "ADDED" | "EXISTING" | "REMOVED" | "ABSENT";
+                            };
+                            meta: {
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Unknown asset */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Internal error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/watchlist/{address}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    address: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Watchlist remove result (idempotent) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                address: string;
+                                /** @enum {string} */
+                                result: "ADDED" | "EXISTING" | "REMOVED" | "ABSENT";
+                            };
+                            meta: {
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Internal error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                requestId: string;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/journal": {
         parameters: {
             query?: never;
@@ -1716,6 +2395,352 @@ export interface components {
                 reason: string;
             })[];
         };
+        LiquidityMetric: {
+            blockNumber: string;
+            /** Format: date-time */
+            sourceTime: string;
+            /** Format: date-time */
+            observedAt: string;
+            provenance: string;
+            /** @enum {string} */
+            status: "AVAILABLE";
+            liquidity: string;
+            reserve0: string;
+            reserve1: string;
+            reserve0Decimals: number;
+            reserve1Decimals: number;
+        } | {
+            blockNumber: string;
+            /** Format: date-time */
+            sourceTime: string;
+            /** Format: date-time */
+            observedAt: string;
+            provenance: string;
+            /** @enum {string} */
+            status: "STALE";
+            liquidity: string;
+            reserve0: string;
+            reserve1: string;
+            reserve0Decimals: number;
+            reserve1Decimals: number;
+        } | {
+            /** @enum {string} */
+            status: "UNAVAILABLE";
+            reason: string;
+        };
+        PoolList: {
+            pools: {
+                /** @enum {number} */
+                chainId: 4663;
+                pool: string;
+                factory: string;
+                fee: number;
+                token0: {
+                    address: string;
+                    symbol: string;
+                    decimals: number;
+                };
+                token1: {
+                    address: string;
+                    symbol: string;
+                    decimals: number;
+                };
+                /** @enum {string} */
+                venue: "verified-allowlist" | "s3-01-registry";
+                firstSeenBlock: string | null;
+                /** @enum {string} */
+                status: "AVAILABLE" | "STALE" | "UNAVAILABLE";
+                reason?: string;
+                metrics: {
+                    price: {
+                        blockNumber: string;
+                        /** Format: date-time */
+                        sourceTime: string;
+                        /** Format: date-time */
+                        observedAt: string;
+                        provenance: string;
+                        /** @enum {string} */
+                        status: "AVAILABLE";
+                        token1PerToken0: {
+                            value: string;
+                            scale: string;
+                        };
+                        token0PerToken1: {
+                            value: string;
+                            scale: string;
+                        };
+                    } | {
+                        blockNumber: string;
+                        /** Format: date-time */
+                        sourceTime: string;
+                        /** Format: date-time */
+                        observedAt: string;
+                        provenance: string;
+                        /** @enum {string} */
+                        status: "STALE";
+                        token1PerToken0: {
+                            value: string;
+                            scale: string;
+                        };
+                        token0PerToken1: {
+                            value: string;
+                            scale: string;
+                        };
+                    } | {
+                        /** @enum {string} */
+                        status: "UNAVAILABLE";
+                        reason: string;
+                    };
+                    liquidity: {
+                        blockNumber: string;
+                        /** Format: date-time */
+                        sourceTime: string;
+                        /** Format: date-time */
+                        observedAt: string;
+                        provenance: string;
+                        /** @enum {string} */
+                        status: "AVAILABLE";
+                        liquidity: string;
+                        reserve0: string;
+                        reserve1: string;
+                        reserve0Decimals: number;
+                        reserve1Decimals: number;
+                    } | {
+                        blockNumber: string;
+                        /** Format: date-time */
+                        sourceTime: string;
+                        /** Format: date-time */
+                        observedAt: string;
+                        provenance: string;
+                        /** @enum {string} */
+                        status: "STALE";
+                        liquidity: string;
+                        reserve0: string;
+                        reserve1: string;
+                        reserve0Decimals: number;
+                        reserve1Decimals: number;
+                    } | {
+                        /** @enum {string} */
+                        status: "UNAVAILABLE";
+                        reason: string;
+                    };
+                    volume24h: {
+                        blockNumber: string;
+                        /** Format: date-time */
+                        sourceTime: string;
+                        /** Format: date-time */
+                        observedAt: string;
+                        provenance: string;
+                        /** @enum {string} */
+                        status: "AVAILABLE";
+                        volumeQuote24h: {
+                            value: string;
+                            decimals: number;
+                        };
+                    } | {
+                        blockNumber: string;
+                        /** Format: date-time */
+                        sourceTime: string;
+                        /** Format: date-time */
+                        observedAt: string;
+                        provenance: string;
+                        /** @enum {string} */
+                        status: "STALE";
+                        volumeQuote24h: {
+                            value: string;
+                            decimals: number;
+                        };
+                    } | {
+                        /** @enum {string} */
+                        status: "UNAVAILABLE";
+                        reason: string;
+                    };
+                };
+                /** @enum {string} */
+                confidence: "LOW";
+                confidenceReason: string;
+                watched: boolean;
+            }[];
+            total: number;
+            offset: number;
+            limit: number;
+        };
+        PoolSummary: {
+            /** @enum {number} */
+            chainId: 4663;
+            pool: string;
+            factory: string;
+            fee: number;
+            token0: {
+                address: string;
+                symbol: string;
+                decimals: number;
+            };
+            token1: {
+                address: string;
+                symbol: string;
+                decimals: number;
+            };
+            /** @enum {string} */
+            venue: "verified-allowlist" | "s3-01-registry";
+            firstSeenBlock: string | null;
+            /** @enum {string} */
+            status: "AVAILABLE" | "STALE" | "UNAVAILABLE";
+            reason?: string;
+            metrics: {
+                price: {
+                    blockNumber: string;
+                    /** Format: date-time */
+                    sourceTime: string;
+                    /** Format: date-time */
+                    observedAt: string;
+                    provenance: string;
+                    /** @enum {string} */
+                    status: "AVAILABLE";
+                    token1PerToken0: {
+                        value: string;
+                        scale: string;
+                    };
+                    token0PerToken1: {
+                        value: string;
+                        scale: string;
+                    };
+                } | {
+                    blockNumber: string;
+                    /** Format: date-time */
+                    sourceTime: string;
+                    /** Format: date-time */
+                    observedAt: string;
+                    provenance: string;
+                    /** @enum {string} */
+                    status: "STALE";
+                    token1PerToken0: {
+                        value: string;
+                        scale: string;
+                    };
+                    token0PerToken1: {
+                        value: string;
+                        scale: string;
+                    };
+                } | {
+                    /** @enum {string} */
+                    status: "UNAVAILABLE";
+                    reason: string;
+                };
+                liquidity: {
+                    blockNumber: string;
+                    /** Format: date-time */
+                    sourceTime: string;
+                    /** Format: date-time */
+                    observedAt: string;
+                    provenance: string;
+                    /** @enum {string} */
+                    status: "AVAILABLE";
+                    liquidity: string;
+                    reserve0: string;
+                    reserve1: string;
+                    reserve0Decimals: number;
+                    reserve1Decimals: number;
+                } | {
+                    blockNumber: string;
+                    /** Format: date-time */
+                    sourceTime: string;
+                    /** Format: date-time */
+                    observedAt: string;
+                    provenance: string;
+                    /** @enum {string} */
+                    status: "STALE";
+                    liquidity: string;
+                    reserve0: string;
+                    reserve1: string;
+                    reserve0Decimals: number;
+                    reserve1Decimals: number;
+                } | {
+                    /** @enum {string} */
+                    status: "UNAVAILABLE";
+                    reason: string;
+                };
+                volume24h: {
+                    blockNumber: string;
+                    /** Format: date-time */
+                    sourceTime: string;
+                    /** Format: date-time */
+                    observedAt: string;
+                    provenance: string;
+                    /** @enum {string} */
+                    status: "AVAILABLE";
+                    volumeQuote24h: {
+                        value: string;
+                        decimals: number;
+                    };
+                } | {
+                    blockNumber: string;
+                    /** Format: date-time */
+                    sourceTime: string;
+                    /** Format: date-time */
+                    observedAt: string;
+                    provenance: string;
+                    /** @enum {string} */
+                    status: "STALE";
+                    volumeQuote24h: {
+                        value: string;
+                        decimals: number;
+                    };
+                } | {
+                    /** @enum {string} */
+                    status: "UNAVAILABLE";
+                    reason: string;
+                };
+            };
+            /** @enum {string} */
+            confidence: "LOW";
+            confidenceReason: string;
+            watched: boolean;
+        };
+        PriceMetric: {
+            blockNumber: string;
+            /** Format: date-time */
+            sourceTime: string;
+            /** Format: date-time */
+            observedAt: string;
+            provenance: string;
+            /** @enum {string} */
+            status: "AVAILABLE";
+            token1PerToken0: {
+                value: string;
+                scale: string;
+            };
+            token0PerToken1: {
+                value: string;
+                scale: string;
+            };
+        } | {
+            blockNumber: string;
+            /** Format: date-time */
+            sourceTime: string;
+            /** Format: date-time */
+            observedAt: string;
+            provenance: string;
+            /** @enum {string} */
+            status: "STALE";
+            token1PerToken0: {
+                value: string;
+                scale: string;
+            };
+            token0PerToken1: {
+                value: string;
+                scale: string;
+            };
+        } | {
+            /** @enum {string} */
+            status: "UNAVAILABLE";
+            reason: string;
+        };
+        TokenRef: {
+            address: string;
+            symbol: string;
+            decimals: number;
+        };
         TradeIntent: {
             id: string;
             evaluationId: string;
@@ -1746,6 +2771,54 @@ export interface components {
             token0: string;
             token1: string;
             provenance: string[];
+        };
+        VolumeMetric: {
+            blockNumber: string;
+            /** Format: date-time */
+            sourceTime: string;
+            /** Format: date-time */
+            observedAt: string;
+            provenance: string;
+            /** @enum {string} */
+            status: "AVAILABLE";
+            volumeQuote24h: {
+                value: string;
+                decimals: number;
+            };
+        } | {
+            blockNumber: string;
+            /** Format: date-time */
+            sourceTime: string;
+            /** Format: date-time */
+            observedAt: string;
+            provenance: string;
+            /** @enum {string} */
+            status: "STALE";
+            volumeQuote24h: {
+                value: string;
+                decimals: number;
+            };
+        } | {
+            /** @enum {string} */
+            status: "UNAVAILABLE";
+            reason: string;
+        };
+        Watchlist: {
+            entries: {
+                address: string;
+                /** Format: date-time */
+                addedAt: string;
+                known: boolean;
+                symbol?: string;
+            }[];
+        };
+        WatchlistMutation: {
+            address: string;
+            /** @enum {string} */
+            result: "ADDED" | "EXISTING" | "REMOVED" | "ABSENT";
+        };
+        CreateWatchlistEntry: {
+            address: string;
         };
     };
     responses: never;
