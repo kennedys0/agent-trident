@@ -36,10 +36,15 @@ The gate validates its own input before deciding anything:
 
 - a report carrying a top-level `error` (for example a missing lockfile or an
   unreachable registry) fails the gate instead of counting as zero advisories;
-- a report with an unrecognised shape — no `advisories` object and not an
-  array — fails the gate;
-- a summary that claims high/critical vulnerabilities while listing no
-  advisory objects fails the gate;
+- a report with an unrecognised shape fails the gate, including a bare array
+  root — `pnpm audit` never emits one and no legacy array schema is defined;
+- every advisory must be an object with a `module_name` and a `severity` from
+  the fixed npm set (`info`, `low`, `moderate`, `high`, `critical`). A missing
+  or unrecognised severity fails the gate instead of becoming "unknown" and
+  being skipped;
+- a summary that claims more high/critical vulnerabilities than the blocking
+  advisories actually read from the report fails the gate, so a malformed
+  advisory cannot hide behind a clean-looking summary;
 - unreadable or unparsable audit output fails the gate.
 
 An advisory is tolerated only when `.github/audit-allowlist.json` names its
@@ -51,7 +56,7 @@ exception. An allowlist file that is not valid JSON, or whose `entries` is not
 an array, also fails the gate.
 
 `node --test scripts/audit-gate.test.mjs` (`pnpm audit:gate:test`) proves these
-paths with pinned fixtures and asserts the real CLI exit codes. The
+paths with pinned fixtures and asserts the real CLI exit codes (37 cases). The
 `Dependency security` job runs those tests before the live audit, so a
 regression in the gate itself turns the job red.
 

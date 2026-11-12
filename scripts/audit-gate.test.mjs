@@ -106,6 +106,64 @@ test('a summary claiming high vulnerabilities without advisory objects fails', (
   assert.match(problems[0], /claims 2 high\/critical/);
 });
 
+test('a bare array report is rejected as an unknown shape', () => {
+  for (const report of [[], [{}], [{ module_name: 'zod', severity: 'high' }]]) {
+    const { advisories, problems } = parseAuditReport(report);
+    assert.equal(advisories.length, 0);
+    assert.ok(problems.length > 0, `expected a problem for ${JSON.stringify(report)}`);
+    assert.match(problems[0], /bare array/);
+  }
+});
+
+test('an advisory without a severity is a problem, not severity "unknown"', () => {
+  const { severity, ...withoutSeverity } = zodAdvisory;
+  const { advisories, problems } = parseAuditReport(auditReport({ 1: withoutSeverity }));
+  assert.equal(advisories.length, 1);
+  assert.ok(
+    problems.some((p) => /advisories\[1\]\.severity must be one of/.test(p)),
+    problems.join('; '),
+  );
+});
+
+test('an advisory with an unrecognised severity is a problem', () => {
+  const { problems } = parseAuditReport(
+    auditReport({ 1: { ...zodAdvisory, severity: 'urgent' } }, { high: 1 }),
+  );
+  assert.ok(problems.some((p) => /severity must be one of/.test(p)), problems.join('; '));
+});
+
+test('an advisory without a package name is a problem', () => {
+  const { module_name, ...withoutPackage } = zodAdvisory;
+  const { problems } = parseAuditReport(auditReport({ 1: withoutPackage }, { high: 1 }));
+  assert.ok(problems.some((p) => /module_name is required/.test(p)), problems.join('; '));
+});
+
+test('a summary claiming more high advisories than the report lists fails', () => {
+  const { problems } = parseAuditReport(auditReport({ 1: zodAdvisory }, { high: 2 }));
+  assert.ok(
+    problems.some((p) => /claims 2 high\/critical .* only 1 blocking advisories/.test(p)),
+    problems.join('; '),
+  );
+});
+
+test('a malformed high advisory cannot hide a matching summary count', () => {
+  const { severity, module_name, ...malformed } = zodAdvisory;
+  const { problems } = parseAuditReport(auditReport({ 1: malformed }, { high: 1 }));
+  assert.ok(problems.length >= 2, problems.join('; '));
+  assert.ok(problems.some((p) => /only 0 blocking advisories/.test(p)), problems.join('; '));
+});
+
+test('a non-numeric summary counter is a problem', () => {
+  const { problems } = parseAuditReport({
+    advisories: {},
+    metadata: { vulnerabilities: { high: 'one', critical: 0 } },
+  });
+  assert.ok(
+    problems.some((p) => /metadata\.vulnerabilities\.high must be a non-negative number/.test(p)),
+    problems.join('; '),
+  );
+});
+
 // --- allowlist schema -------------------------------------------------------
 
 test('an allowlist entry without expires fails (no permanent exceptions)', () => {
@@ -276,6 +334,33 @@ test('CLI: an unknown high advisory exits 1', () => {
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /GHSA-mrhx-c7xc-m3w5/);
+});
+
+test('CLI: a bare array audit report exits 1', () => {
+  for (const report of [[], [{}]]) {
+    const result = runGate({ report, allowlist: allowlistText([]) });
+    assert.equal(result.status, 1, `expected exit 1 for ${JSON.stringify(report)}`);
+    assert.match(result.stderr, /bare array/);
+  }
+});
+
+test('CLI: a summary high with an advisory missing severity exits 1', () => {
+  const { severity, ...withoutSeverity } = zodAdvisory;
+  const result = runGate({
+    report: auditReport({ 1: withoutSeverity }, { high: 1 }),
+    allowlist: allowlistText([]),
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /severity must be one of/);
+});
+
+test('CLI: a malformed high advisory is not tolerated by an allowlist entry', () => {
+  const { severity, ...withoutSeverity } = zodAdvisory;
+  const result = runGate({
+    report: auditReport({ 1: withoutSeverity }, { high: 1 }),
+    allowlist: allowlistText([validEntry]),
+  });
+  assert.equal(result.status, 1);
 });
 
 test('CLI: a tracked, unexpired entry exits 0 and prints TOLERATED', () => {

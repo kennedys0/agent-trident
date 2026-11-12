@@ -8,8 +8,13 @@
  *
  * Design rules:
  * - Fail closed: an unreadable audit result, an error report, or an unknown
- *   report shape fails the gate. "No advisories key" is never read as clean.
- * - Fail on unknown risk: only advisories listed by id are tolerated.
+ *   report shape fails the gate. "No advisories key" is never read as clean,
+ *   and a bare array root is an unknown shape because pnpm never emits one.
+ * - Fail on unknown risk: only advisories listed by id are tolerated. Every
+ *   advisory must carry a package name and a severity from a fixed set, so a
+ *   partial or reformatted report cannot hide a high advisory as "unknown".
+ * - Cross-check the summary against the advisories that were actually read, so
+ *   a report that claims high/critical findings but lists fewer of them fails.
  * - Validate the allowlist: every entry needs advisory, package, tracking URL,
  *   and a real expiry date. A malformed entry fails the gate instead of
  *   silently becoming a permanent exception.
@@ -27,6 +32,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const BLOCKING_SEVERITIES = new Set(['high', 'critical']);
+const KNOWN_SEVERITIES = new Set(['info', 'low', 'moderate', 'high', 'critical']);
 const REQUIRED_ENTRY_FIELDS = ['advisory', 'package', 'tracking', 'expires'];
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -109,18 +115,88 @@ export function parseAllowlist(text) {
 }
 
 /**
+ * Validate one advisory object and normalise it. Missing or wrong-typed fields
+ * are pushed to `problems` so the gate fails; they are never silently widened
+ * into "unknown", because an unknown severity would be skipped by
+ * evaluateGate() and turn a high advisory into a pass.
+ */
+function normaliseAdvisory({ key, info, where, problems }) {
+  if (!isPlainObject(info)) {
+    problems.push(`${where} is not an object; cannot read the advisory`);
+    return null;
+  }
+
+  const moduleName = info.module_name;
+  if (typeof moduleName !== 'string' || moduleName.trim() === '') {
+    problems.push(`${where}.module_name is required and must be a non-empty string`);
+  }
+
+  const rawSeverity = info.severity;
+  const severity = typeof rawSeverity === 'string' ? rawSeverity.trim().toLowerCase() : '';
+  if (!KNOWN_SEVERITIES.has(severity)) {
+    problems.push(
+      `${where}.severity must be one of ${[...KNOWN_SEVERITIES].join(', ')}; ` +
+        `received ${JSON.stringify(rawSeverity ?? null)}`,
+    );
+  }
+
+  const githubId = info.github_advisory_id;
+  if (githubId !== undefined && githubId !== null) {
+    if (typeof githubId !== 'string' || githubId.trim() === '') {
+      problems.push(`${where}.github_advisory_id, when present, must be a non-empty string`);
+    }
+  }
+
+  const id = key ?? '';
+  if (typeof id !== 'string' || id.trim() === '') {
+    problems.push(`${where} has no advisory identifier`);
+  }
+
+  const hasGithubId = typeof githubId === 'string' && githubId.trim() !== '';
+
+  return {
+    id: String(id),
+    advisory: hasGithubId ? githubId : String(id),
+    package: typeof moduleName === 'string' && moduleName.trim() !== '' ? moduleName : 'unknown',
+    severity,
+    title: typeof info.title === 'string' ? info.title : '',
+    vulnerable: typeof info.vulnerable_versions === 'string' ? info.vulnerable_versions : '',
+    patched: typeof info.patched_versions === 'string' ? info.patched_versions : '',
+    url: typeof info.url === 'string' ? info.url : '',
+  };
+}
+
+/** Read a summary counter, failing closed on anything that is not a number. */
+function readCount(value, where, problems) {
+  if (value === undefined || value === null) return 0;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    problems.push(`${where} must be a non-negative number; received ${JSON.stringify(value)}`);
+    return 0;
+  }
+  return value;
+}
+
+/**
  * Validate the parsed audit report and normalise it into advisories.
- * Returns `{ advisories, problems }`. A report with a top-level `error` or an
- * unrecognised shape is a failure, not an empty result.
+ * Returns `{ advisories, problems }`. A report with a top-level `error`, a bare
+ * array root, or any other unrecognised shape is a failure, not an empty
+ * result.
  */
 export function parseAuditReport(report) {
   const problems = [];
 
-  if (!isPlainObject(report) && !Array.isArray(report)) {
-    return { advisories: [], problems: ['audit report is not a JSON object or array'] };
+  if (!isPlainObject(report)) {
+    return {
+      advisories: [],
+      problems: [
+        Array.isArray(report)
+          ? 'audit report is a bare array; pnpm emits {"advisories": {...}} and no legacy array schema is defined, refusing to guess'
+          : 'audit report is not a JSON object',
+      ],
+    };
   }
 
-  if (isPlainObject(report) && report.error !== undefined && report.error !== null) {
+  if (report.error !== undefined && report.error !== null) {
     let detail;
     if (typeof report.error === 'string') {
       detail = report.error;
@@ -133,68 +209,43 @@ export function parseAuditReport(report) {
     return { advisories: [], problems: [`pnpm audit reported an error: ${detail}`] };
   }
 
-  const advisories = [];
-
-  if (isPlainObject(report)) {
-    if (!isPlainObject(report.advisories)) {
-      return {
-        advisories: [],
-        problems: [
-          'audit report has no "advisories" object; refusing to read an unknown shape as clean',
-        ],
-      };
-    }
-
-    for (const [id, info] of Object.entries(report.advisories)) {
-      if (!isPlainObject(info)) {
-        problems.push(`advisory ${id} is not an object`);
-        continue;
-      }
-      advisories.push({
-        id: String(id),
-        advisory: info.github_advisory_id ?? `npm-${id}`,
-        package: info.module_name ?? 'unknown',
-        severity: String(info.severity ?? 'unknown').toLowerCase(),
-        title: info.title ?? '',
-        vulnerable: info.vulnerable_versions ?? '',
-        patched: info.patched_versions ?? '',
-        url: info.url ?? '',
-      });
-    }
-
-    // Cross-check: if the summary claims blocking vulnerabilities but no
-    // advisory objects came back, the report is inconsistent. Fail closed.
-    const summary = report.metadata?.vulnerabilities;
-    if (isPlainObject(summary)) {
-      const claimed = Number(summary.high ?? 0) + Number(summary.critical ?? 0);
-      if (claimed > 0 && advisories.length === 0) {
-        return {
-          advisories: [],
-          problems: [
-            `audit report claims ${claimed} high/critical vulnerabilities but lists no advisories`,
-          ],
-        };
-      }
-    }
-
-    return { advisories, problems };
+  if (!isPlainObject(report.advisories)) {
+    return {
+      advisories: [],
+      problems: [
+        'audit report has no "advisories" object; refusing to read an unknown shape as clean',
+      ],
+    };
   }
 
-  for (const info of report) {
-    if (!isPlainObject(info)) {
-      problems.push('audit report contains a non-object entry');
-      continue;
-    }
-    advisories.push({
-      id: String(info.id ?? info.github_advisory_id ?? 'unknown'),
-      advisory: info.github_advisory_id ?? String(info.id ?? 'unknown'),
-      package: info.module_name ?? 'unknown',
-      severity: String(info.severity ?? 'unknown').toLowerCase(),
-      title: info.title ?? '',
-      vulnerable: info.vulnerable_versions ?? '',
-      patched: info.patched_versions ?? '',
-      url: info.url ?? '',
+  const advisories = [];
+
+  for (const [id, info] of Object.entries(report.advisories)) {
+    const advisory = normaliseAdvisory({
+      key: id,
+      info,
+      where: `advisories[${id}]`,
+      problems,
     });
+    if (advisory) advisories.push(advisory);
+  }
+
+  // Cross-check the summary against what was actually read. An advisory that
+  // failed validation above counts as unreadable, so a malformed high advisory
+  // can no longer hide behind an otherwise clean-looking report.
+  const summary = report.metadata?.vulnerabilities;
+  if (isPlainObject(summary)) {
+    const claimed =
+      readCount(summary.high, 'metadata.vulnerabilities.high', problems) +
+      readCount(summary.critical, 'metadata.vulnerabilities.critical', problems);
+    const readable = advisories.filter((advisory) => BLOCKING_SEVERITIES.has(advisory.severity))
+      .length;
+    if (claimed > readable) {
+      problems.push(
+        `audit report claims ${claimed} high/critical vulnerabilities but only ${readable} ` +
+          'blocking advisories could be read; refusing to trust a partial report',
+      );
+    }
   }
 
   return { advisories, problems };
