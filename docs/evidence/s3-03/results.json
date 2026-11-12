@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-12T13:26:14.671Z",
+  "generatedAt": "2026-11-12T16:49:47.794Z",
   "baseUrl": "http://127.0.0.1:4173",
   "dataSource": "FIXTURE: S3-02 is not merged into main (PR #25); every API response below is intercepted in the browser.",
   "widths": [
@@ -75,6 +75,46 @@
     },
     {
       "page": "pool-inspector-1280",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-320",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-320",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-375",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-375",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-768",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-768",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-1024",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-1024",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-1280",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-1280",
       "violations": []
     }
   ],

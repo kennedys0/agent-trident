@@ -346,8 +346,16 @@ async function main() {
         document.documentElement.dataset['theme'] = 'dark';
       });
       await page.getByTestId(`pool-row-${POOL}`).waitFor();
+      await axe(page, `discover-dark-${width}`, results.axe);
       await shot(page, `listing-dark-${width}`);
       results.screenshots.push(`listing-dark-${width}.png`);
+
+      await page.goto(`${BASE}/discover/pools/${POOL}`, { waitUntil: 'networkidle' });
+      await page.evaluate(() => {
+        document.documentElement.dataset['theme'] = 'dark';
+      });
+      await page.getByText('LOW CONFIDENCE').first().waitFor();
+      await axe(page, `pool-inspector-dark-${width}`, results.axe);
     });
   }
 

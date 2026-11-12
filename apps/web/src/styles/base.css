@@ -236,7 +236,7 @@ code,
 }
 
 .nav-link[aria-current='page'] {
-  color: var(--ink);
+  color: var(--status-ink);
   background: var(--wait);
   border-color: var(--ink);
   box-shadow: var(--shadow-sm);
@@ -316,7 +316,7 @@ code,
 }
 
 .bottom-nav__link[aria-current='page'] {
-  color: var(--ink);
+  color: var(--status-ink);
   background: var(--wait);
 }
 
