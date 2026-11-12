@@ -54,23 +54,17 @@ const RAD = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const USDC = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 function seedDiscoveredPools(db: ReturnType<typeof makeDb>) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS discovered_pools (
-      pool_address TEXT PRIMARY KEY,
-      factory TEXT NOT NULL,
-      token0 TEXT NOT NULL,
-      token1 TEXT NOT NULL,
-      token0_symbol TEXT NOT NULL,
-      token1_symbol TEXT NOT NULL,
-      token0_decimals INTEGER NOT NULL,
-      token1_decimals INTEGER NOT NULL,
-      fee INTEGER NOT NULL,
-      first_seen_block INTEGER NOT NULL
-    );
-  `);
+  // Migration 006 owns the real discovered_pools table; seed rows into it directly.
   db.prepare(
-    'INSERT INTO discovered_pools VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(DISCOVERED_POOL, VERIFIED_VENUE.factory, USDC, RAD, 'USDC', 'RAD', 6, 18, 10000, 112_000_000);
+    `INSERT INTO discovered_pools
+       (pool_address, factory, token0, token1, token0_symbol, token1_symbol,
+        token0_decimals, token1_decimals, fee, tick_spacing,
+        first_seen_block, first_seen_tx, log_index, discovered_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    DISCOVERED_POOL, VERIFIED_VENUE.factory, RAD, USDC, 'RAD', 'USDC',
+    18, 6, 10000, 200, 112_000_000, `0x${'cd'.repeat(32)}`, 0, new Date().toISOString(),
+  );
 }
 
 describe('price math', () => {
@@ -196,7 +190,7 @@ describe('HTTP API', () => {
     expect(pool).toBeDefined();
     expect(pool.confidence).toBe('LOW');
     expect(pool.metrics.volume24h.status).toBe('UNAVAILABLE');
-    expect(body.meta.registryStatus).toBe('ABSENT');
+    expect(body.meta.registryStatus).toBe('OK');
   });
 
   it('detail refresh reports real metrics and persists them', async () => {
@@ -232,7 +226,8 @@ describe('HTTP API', () => {
 
   it('fails closed to the verified pool when the registry is malformed', async () => {
     const db = makeDb();
-    db.exec('CREATE TABLE discovered_pools (only_pool TEXT PRIMARY KEY)');
+    // Make the registry schema unreadable: a column the adapter requires is gone.
+    db.exec('ALTER TABLE discovered_pools RENAME COLUMN token0_decimals TO renamed_decimals');
     const app = makeApp({ db });
     const response = await app.inject({ method: 'GET', url: '/api/v1/pools' });
     expect(response.statusCode).toBe(200);

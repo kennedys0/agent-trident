@@ -10,6 +10,7 @@ import { createMarketService } from './services/market.js';
 import { createQuotePort } from './services/ports.js';
 import { buildApp } from './app.js';
 import { startWorker } from './worker.js';
+import { makeDiscoveryPort, startDiscoveryWorker } from './services/discoveryWorker.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -51,10 +52,15 @@ async function main(): Promise<void> {
   });
 
   const worker = startWorker({ market, logger: app.log });
+  const discovery =
+    process.env['DISCOVERY_ENABLED'] === '0'
+      ? null
+      : startDiscoveryWorker({ db, chain: makeDiscoveryPort(chain), logger: app.log, correlationId: 'discovery' });
 
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, 'shutting down');
     worker.stop();
+    discovery?.stop();
     await app.close();
     releaseInstanceLock(db);
     db.close();
