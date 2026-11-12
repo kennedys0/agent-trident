@@ -193,6 +193,40 @@ test('a tolerated high advisory with fractional counters still fails', () => {
   assert.ok(problems.some((p) => /non-negative integer/.test(p)), problems.join('; '));
 });
 
+test('a JSON null report is not mistaken for no output', () => {
+  const { advisories, problems } = parseAuditReport(null);
+  assert.equal(advisories.length, 0);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /not a JSON object/);
+});
+
+test('non-blocking severities must also agree with the summary', () => {
+  const overcount = parseAuditReport(auditReport({}, { moderate: 5 }));
+  assert.ok(
+    overcount.problems.some((p) => /reports 5 moderate .* 0 moderate advisories/.test(p)),
+    overcount.problems.join('; '),
+  );
+
+  const listed = { ...zodAdvisory, github_advisory_id: 'GHSA-mod', severity: 'moderate' };
+  const undercount = parseAuditReport(auditReport({ 1: listed }, { moderate: 0 }));
+  assert.ok(
+    undercount.problems.some((p) => /reports 0 moderate .* 1 moderate advisories/.test(p)),
+    undercount.problems.join('; '),
+  );
+});
+
+test('an allowlist entry only tolerates the severity it declares', () => {
+  const advisory = parseAuditReport(
+    auditReport({ 1: { ...zodAdvisory, severity: 'critical' } }, { critical: 1 }),
+  ).advisories;
+  for (const declared of [{ severity: 'high' }, {}]) {
+    const entries = parseAllowlist(allowlistText([entry(declared)])).entries;
+    const { blocking, tolerated } = evaluateGate({ advisories: advisory, entries, today: pinnedToday });
+    assert.equal(tolerated.length, 0);
+    assert.equal(blocking.length, 1, `a critical advisory must not be tolerated by ${JSON.stringify(declared)}`);
+  }
+});
+
 test('a malformed high advisory cannot hide a matching summary count', () => {
   const { severity, module_name, ...malformed } = zodAdvisory;
   const { problems } = parseAuditReport(auditReport({ 1: malformed }, { high: 1 }));
@@ -266,8 +300,13 @@ test('date validation accepts leap days and rejects shifted ones', () => {
 // --- gate decision ----------------------------------------------------------
 
 function parsed(advisories = [zodAdvisory]) {
+  const counts = advisories.reduce((acc, advisory) => {
+    acc[advisory.severity] = (acc[advisory.severity] ?? 0) + 1;
+    return acc;
+  }, {});
   const report = auditReport(
     Object.fromEntries(advisories.map((a, i) => [String(i + 1), a])),
+    counts,
   );
   return parseAuditReport(report).advisories;
 }
@@ -449,6 +488,23 @@ test('CLI: reports that cannot prove the summary counts exit 1', () => {
     const result = runGate({ report, allowlist });
     assert.equal(result.status, 1, `expected exit 1 for ${label}`);
   }
+});
+
+test('CLI: a JSON null audit report exits 1', () => {
+  for (const report of ['null', 'null\n']) {
+    const result = runGate({ report, allowlist: allowlistText([]) });
+    assert.equal(result.status, 1, `expected exit 1 for ${JSON.stringify(report)}`);
+    assert.match(result.stderr, /not a JSON object/);
+  }
+});
+
+test('CLI: a summary that disagrees on a non-blocking severity exits 1', () => {
+  const result = runGate({
+    report: auditReport({}, { moderate: 5 }),
+    allowlist: allowlistText([]),
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /reports 5 moderate/);
 });
 
 test('CLI: a tracked, unexpired entry exits 0 and prints TOLERATED', () => {

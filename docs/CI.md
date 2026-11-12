@@ -42,12 +42,14 @@ The gate validates its own input before deciding anything:
   the fixed npm set (`info`, `low`, `moderate`, `high`, `critical`). A missing
   or unrecognised severity fails the gate instead of becoming "unknown" and
   being skipped;
-- `metadata.vulnerabilities` is required, and `high` plus `critical` must be
-  non-negative integers — absent, null, fractional, or non-numeric counters
-  fail the gate rather than being read as zero;
-- the summary count must equal the blocking advisories actually read, so both
-  an overcount (an unreadable high advisory) and an undercount (a summary that
-  under-reports a listed high) fail the gate;
+- `metadata.vulnerabilities` is required, and all five counters (`info`, `low`,
+  `moderate`, `high`, `critical`) must be non-negative integers — absent, null,
+  fractional, or non-numeric counters fail the gate rather than being read as
+  zero;
+- every counter must equal the advisories actually read at that severity, so an
+  overcount (an unreadable advisory) and an undercount both fail the gate;
+- output that parses to JSON `null` is a report of the wrong shape, not "no
+  output", and fails the gate;
 - unreadable or unparsable audit output fails the gate.
 
 An advisory is tolerated only when `.github/audit-allowlist.json` names its
@@ -56,10 +58,12 @@ Every entry is schema-validated: `advisory`, `package`, `tracking` (an http(s)
 URL), and `expires` (a real `YYYY-MM-DD` date) are required. A missing or
 impossible date therefore fails the gate rather than becoming a permanent
 exception. An allowlist file that is not valid JSON, or whose `entries` is not
-an array, also fails the gate.
+an array, also fails the gate. When an entry declares `severity`, it only
+tolerates that severity, so a `high` exception cannot absorb a `critical`
+advisory for the same id.
 
 `node --test scripts/audit-gate.test.mjs` (`pnpm audit:gate:test`) proves these
-paths with pinned fixtures and asserts the real CLI exit codes (42 cases). The
+paths with pinned fixtures and asserts the real CLI exit codes (47 cases). The
 `Dependency security` job runs those tests before the live audit, so a
 regression in the gate itself turns the job red.
 

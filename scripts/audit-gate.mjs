@@ -33,7 +33,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const BLOCKING_SEVERITIES = new Set(['high', 'critical']);
-const KNOWN_SEVERITIES = new Set(['info', 'low', 'moderate', 'high', 'critical']);
+const NON_BLOCKING_SEVERITIES = ['info', 'low', 'moderate'];
+const KNOWN_SEVERITIES = new Set([...NON_BLOCKING_SEVERITIES, ...BLOCKING_SEVERITIES]);
 const REQUIRED_ENTRY_FIELDS = ['advisory', 'package', 'tracking', 'expires'];
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -273,6 +274,23 @@ export function parseAuditReport(report) {
         );
       }
     }
+
+    // The same accounting applies below the blocking threshold: a report that
+    // disagrees with itself has not been read reliably, whatever the severity.
+    for (const severity of NON_BLOCKING_SEVERITIES) {
+      const count = readCount(
+        metadata.vulnerabilities[severity],
+        `metadata.vulnerabilities.${severity}`,
+        problems,
+      );
+      const listed = advisories.filter((advisory) => advisory.severity === severity).length;
+      if (count !== null && count !== listed) {
+        problems.push(
+          `audit summary reports ${count} ${severity} vulnerabilities but ${listed} ` +
+            `${severity} advisories were read; refusing to trust an inconsistent report`,
+        );
+      }
+    }
   }
 
   return { advisories, problems };
@@ -290,7 +308,13 @@ function matchingEntry(entries, advisory) {
     const idMatches =
       entry.advisory === advisory.advisory || entry.advisory === advisory.id;
     const packageMatches = entry.package === advisory.package;
-    return idMatches && packageMatches;
+    if (!idMatches || !packageMatches) return false;
+    // An entry that declares a severity may only tolerate that severity, so a
+    // "high" exception cannot silently absorb a critical advisory.
+    if (entry.severity !== undefined && entry.severity !== null) {
+      return String(entry.severity).toLowerCase() === advisory.severity;
+    }
+    return true;
   });
 }
 
@@ -381,32 +405,37 @@ export function main() {
   const trimmed = (stdout ?? '').trim();
 
   let report;
+  let parsedOutput = false;
   if (!trimmed) {
     problems.push(`pnpm audit produced no JSON output (stderr: ${stderr.trim() || '(empty)'})`);
-    report = null;
   } else {
     try {
       report = JSON.parse(trimmed);
+      parsedOutput = true;
     } catch {
       // Tolerate a non-JSON banner before the document.
       const start = trimmed.indexOf('{');
       if (start === -1) {
         problems.push(`pnpm audit output is not valid JSON (stderr: ${stderr.trim() || '(empty)'})`);
-        report = null;
       } else {
         try {
           report = JSON.parse(trimmed.slice(start));
+          parsedOutput = true;
         } catch {
           problems.push(
             `pnpm audit output is not valid JSON (stderr: ${stderr.trim() || '(empty)'})`,
           );
-          report = null;
         }
       }
     }
   }
 
-  const parsedReport = report === null ? { advisories: [], problems: [] } : parseAuditReport(report);
+  // Track parsing success explicitly. JSON `null` is valid JSON but not a
+  // report, and it must reach parseAuditReport() so the unknown shape fails
+  // instead of being mistaken for "no output" and skipped.
+  const parsedReport = parsedOutput
+    ? parseAuditReport(report)
+    : { advisories: [], problems: [] };
   problems.push(...parsedReport.problems);
 
   const { blocking, tolerated, stale } = evaluateGate({
