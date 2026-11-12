@@ -1,3 +1,4 @@
+import './zod-openapi.js';
 import { z } from 'zod';
 import {
   baseUnitAmountSchema,
@@ -286,7 +287,7 @@ export const auditEventSchema = z.object({
   id: idSchema,
   type: z.string().min(1).max(128),
   aggregateId: idSchema,
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
   createdAt: isoDateTimeSchema,
 }).strict();
 
