@@ -33,9 +33,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const BLOCKING_SEVERITIES = new Set(['high', 'critical']);
-const NON_BLOCKING_SEVERITIES = ['info', 'low', 'moderate'];
-const KNOWN_SEVERITIES = new Set([...NON_BLOCKING_SEVERITIES, ...BLOCKING_SEVERITIES]);
-const REQUIRED_ENTRY_FIELDS = ['advisory', 'package', 'tracking', 'expires'];
+const SEVERITY_ORDER = ['info', 'low', 'moderate', 'high', 'critical'];
+const KNOWN_SEVERITIES = new Set(SEVERITY_ORDER);
+const REQUIRED_ENTRY_FIELDS = ['advisory', 'package', 'severity', 'tracking', 'expires'];
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '..');
@@ -106,7 +106,7 @@ export function parseAllowlist(text) {
 
     if (entry.severity !== undefined && entry.severity !== null) {
       if (!BLOCKING_SEVERITIES.has(String(entry.severity).toLowerCase())) {
-        problems.push(`${where}.severity, when present, must be "high" or "critical"`);
+        problems.push(`${where}.severity must be "high" or "critical"`);
       }
     }
 
@@ -239,9 +239,9 @@ export function parseAuditReport(report) {
 
   // Cross-check the summary against what was actually read. The summary is
   // mandatory: pnpm always emits metadata.vulnerabilities, so a report without
-  // counters cannot prove it listed every blocking advisory. The counts must
-  // also agree exactly (pnpm derives them from the same advisory map), so an
-  // undercount is as untrustworthy as an overcount.
+  // counters cannot prove it listed every advisory. Counts are compared per
+  // severity (pnpm derives them from the same advisory map), so a split such as
+  // high:2 on one high plus one critical advisory is caught, as are undercounts.
   const metadata = report.metadata;
   if (!isPlainObject(metadata)) {
     problems.push(
@@ -252,39 +252,16 @@ export function parseAuditReport(report) {
       'audit report has no "metadata.vulnerabilities" object; cannot confirm the vulnerability counts',
     );
   } else {
-    const high = readCount(
-      metadata.vulnerabilities.high,
-      'metadata.vulnerabilities.high',
-      problems,
-    );
-    const critical = readCount(
-      metadata.vulnerabilities.critical,
-      'metadata.vulnerabilities.critical',
-      problems,
-    );
-    const readable = advisories.filter((advisory) => BLOCKING_SEVERITIES.has(advisory.severity))
-      .length;
-
-    if (high !== null && critical !== null) {
-      const claimed = high + critical;
-      if (claimed !== readable) {
-        problems.push(
-          `audit summary reports ${claimed} high/critical vulnerabilities but ${readable} ` +
-            'blocking advisories were read; refusing to trust an inconsistent report',
-        );
-      }
-    }
-
-    // The same accounting applies below the blocking threshold: a report that
-    // disagrees with itself has not been read reliably, whatever the severity.
-    for (const severity of NON_BLOCKING_SEVERITIES) {
+    for (const severity of SEVERITY_ORDER) {
       const count = readCount(
         metadata.vulnerabilities[severity],
         `metadata.vulnerabilities.${severity}`,
         problems,
       );
+      if (count === null) continue;
+
       const listed = advisories.filter((advisory) => advisory.severity === severity).length;
-      if (count !== null && count !== listed) {
+      if (count !== listed) {
         problems.push(
           `audit summary reports ${count} ${severity} vulnerabilities but ${listed} ` +
             `${severity} advisories were read; refusing to trust an inconsistent report`,

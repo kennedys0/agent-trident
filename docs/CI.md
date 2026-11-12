@@ -53,17 +53,17 @@ The gate validates its own input before deciding anything:
 - unreadable or unparsable audit output fails the gate.
 
 An advisory is tolerated only when `.github/audit-allowlist.json` names its
-advisory id, the affected package, the tracking issue, and an expiry date.
-Every entry is schema-validated: `advisory`, `package`, `tracking` (an http(s)
-URL), and `expires` (a real `YYYY-MM-DD` date) are required. A missing or
-impossible date therefore fails the gate rather than becoming a permanent
-exception. An allowlist file that is not valid JSON, or whose `entries` is not
-an array, also fails the gate. When an entry declares `severity`, it only
-tolerates that severity, so a `high` exception cannot absorb a `critical`
-advisory for the same id.
+advisory id, the affected package, the severity, the tracking issue, and an
+expiry date. Every entry is schema-validated: `advisory`, `package`,
+`severity` (`high` or `critical`), `tracking` (an http(s) URL), and `expires`
+(a real `YYYY-MM-DD` date) are required. A missing or impossible date therefore
+fails the gate rather than becoming a permanent exception. An allowlist file
+that is not valid JSON, or whose `entries` is not an array, also fails the gate.
+An entry only tolerates the severity it declares, so a `high` exception cannot
+absorb a `critical` advisory for the same id.
 
 `node --test scripts/audit-gate.test.mjs` (`pnpm audit:gate:test`) proves these
-paths with pinned fixtures and asserts the real CLI exit codes (47 cases). The
+paths with pinned fixtures and asserts the real CLI exit codes (49 cases). The
 `Dependency security` job runs those tests before the live audit, so a
 regression in the gate itself turns the job red.
 

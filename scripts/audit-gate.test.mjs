@@ -103,7 +103,7 @@ test('a genuinely clean report is accepted with zero advisories', () => {
 test('a summary claiming high vulnerabilities without advisory objects fails', () => {
   const { problems } = parseAuditReport(auditReport({}, { high: 2 }));
   assert.equal(problems.length, 1);
-  assert.match(problems[0], /reports 2 high\/critical/);
+  assert.match(problems[0], /reports 2 high vulnerabilities but 0 high advisories/);
 });
 
 test('a bare array report is rejected as an unknown shape', () => {
@@ -141,7 +141,7 @@ test('an advisory without a package name is a problem', () => {
 test('a summary claiming more high advisories than the report lists fails', () => {
   const { problems } = parseAuditReport(auditReport({ 1: zodAdvisory }, { high: 2 }));
   assert.ok(
-    problems.some((p) => /reports 2 high\/critical .* 1 blocking advisories were read/.test(p)),
+    problems.some((p) => /reports 2 high .* 1 high advisories were read/.test(p)),
     problems.join('; '),
   );
 });
@@ -149,7 +149,7 @@ test('a summary claiming more high advisories than the report lists fails', () =
 test('a summary undercounting a listed high advisory fails', () => {
   const { problems } = parseAuditReport(auditReport({ 1: zodAdvisory }, { high: 0 }));
   assert.ok(
-    problems.some((p) => /reports 0 high\/critical .* 1 blocking advisories were read/.test(p)),
+    problems.some((p) => /reports 0 high .* 1 high advisories were read/.test(p)),
     problems.join('; '),
   );
 });
@@ -184,6 +184,28 @@ test('null, fractional, and missing blocking counters fail', () => {
     });
     assert.ok(problems.length > 0, `expected a problem for ${JSON.stringify(summary)}`);
   }
+});
+
+test('a split high/critical summary is caught per severity', () => {
+  const high = { ...zodAdvisory, github_advisory_id: 'GHSA-high' };
+  const critical = { ...zodAdvisory, github_advisory_id: 'GHSA-critical', severity: 'critical' };
+  const { problems } = parseAuditReport(
+    auditReport({ 1: high, 2: critical }, { high: 2, critical: 0 }),
+  );
+  assert.ok(
+    problems.some((p) => /reports 2 high .* 1 high advisories were read/.test(p)),
+    problems.join('; '),
+  );
+  assert.ok(
+    problems.some((p) => /reports 0 critical .* 1 critical advisories were read/.test(p)),
+    problems.join('; '),
+  );
+});
+
+test('an allowlist entry without a severity fails', () => {
+  const { severity, ...withoutSeverity } = validEntry;
+  const { problems } = parseAllowlist(allowlistText([withoutSeverity]));
+  assert.ok(problems.some((p) => /entries\[0\]\.severity is required/.test(p)), problems.join('; '));
 });
 
 test('a tolerated high advisory with fractional counters still fails', () => {
@@ -231,7 +253,7 @@ test('a malformed high advisory cannot hide a matching summary count', () => {
   const { severity, module_name, ...malformed } = zodAdvisory;
   const { problems } = parseAuditReport(auditReport({ 1: malformed }, { high: 1 }));
   assert.ok(problems.length >= 2, problems.join('; '));
-  assert.ok(problems.some((p) => /0 blocking advisories were read/.test(p)), problems.join('; '));
+  assert.ok(problems.some((p) => /reports 1 high .* 0 high advisories were read/.test(p)), problems.join('; '));
 });
 
 test('a non-numeric summary counter is a problem', () => {
