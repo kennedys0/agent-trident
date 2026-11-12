@@ -342,3 +342,128 @@ export type PaperFill = z.infer<typeof paperFillSchema>;
 export type IntentExecution = z.infer<typeof intentExecutionSchema>;
 export type Portfolio = z.infer<typeof portfolioSchema>;
 export type AuditEvent = z.infer<typeof auditEventSchema>;
+
+// ---- S3-02: read-only Discover market intelligence ----
+
+export const tokenRefSchema = z.object({
+  address: evmAddressSchema,
+  symbol: z.string().min(1).max(64),
+  decimals: z.number().int().min(0).max(255),
+}).strict();
+
+const metricObservationSchema = z.object({
+  blockNumber: positiveBaseUnitStringSchema,
+  sourceTime: isoDateTimeSchema,
+  observedAt: isoDateTimeSchema,
+  provenance: z.string().min(1).max(256),
+});
+
+const unavailableMetricSchema = z.object({
+  status: z.literal('UNAVAILABLE'),
+  reason: z.string().min(1).max(512),
+}).strict();
+
+export const priceMetricSchema = z.discriminatedUnion('status', [
+  metricObservationSchema.extend({
+    status: z.literal('AVAILABLE'),
+    token1PerToken0: scaledIntegerSchema,
+    token0PerToken1: scaledIntegerSchema,
+  }).strict(),
+  metricObservationSchema.extend({
+    status: z.literal('STALE'),
+    token1PerToken0: scaledIntegerSchema,
+    token0PerToken1: scaledIntegerSchema,
+  }).strict(),
+  unavailableMetricSchema,
+]);
+
+export const liquidityMetricSchema = z.discriminatedUnion('status', [
+  metricObservationSchema.extend({
+    status: z.literal('AVAILABLE'),
+    liquidity: z.string().regex(/^(0|[1-9][0-9]*)$/).max(256),
+    reserve0: baseUnitStringSchema,
+    reserve1: baseUnitStringSchema,
+    reserve0Decimals: z.number().int().min(0).max(255),
+    reserve1Decimals: z.number().int().min(0).max(255),
+  }).strict(),
+  metricObservationSchema.extend({
+    status: z.literal('STALE'),
+    liquidity: z.string().regex(/^(0|[1-9][0-9]*)$/).max(256),
+    reserve0: baseUnitStringSchema,
+    reserve1: baseUnitStringSchema,
+    reserve0Decimals: z.number().int().min(0).max(255),
+    reserve1Decimals: z.number().int().min(0).max(255),
+  }).strict(),
+  unavailableMetricSchema,
+]);
+
+export const volumeMetricSchema = z.discriminatedUnion('status', [
+  metricObservationSchema.extend({
+    status: z.literal('AVAILABLE'),
+    volumeQuote24h: baseUnitAmountSchema,
+  }).strict(),
+  metricObservationSchema.extend({
+    status: z.literal('STALE'),
+    volumeQuote24h: baseUnitAmountSchema,
+  }).strict(),
+  unavailableMetricSchema,
+]);
+
+export const poolSummarySchema = z.object({
+  chainId: chainIdSchema,
+  pool: evmAddressSchema,
+  factory: evmAddressSchema,
+  fee: z.number().int().positive().max(1_000_000),
+  token0: tokenRefSchema,
+  token1: tokenRefSchema,
+  venue: z.enum(['verified-allowlist', 's3-01-registry']),
+  firstSeenBlock: positiveBaseUnitStringSchema.nullable(),
+  status: z.enum(['AVAILABLE', 'STALE', 'UNAVAILABLE']),
+  reason: z.string().min(1).max(512).optional(),
+  metrics: z.object({
+    price: priceMetricSchema,
+    liquidity: liquidityMetricSchema,
+    volume24h: volumeMetricSchema,
+  }).strict(),
+  confidence: z.literal('LOW'),
+  confidenceReason: z.string().min(1).max(256),
+  watched: z.boolean(),
+}).strict();
+
+export const poolListSchema = z.object({
+  pools: z.array(poolSummarySchema),
+  total: z.number().int().nonnegative(),
+  offset: z.number().int().nonnegative(),
+  limit: z.number().int().min(1).max(50),
+}).strict();
+
+export const watchlistEntrySchema = z.object({
+  address: evmAddressSchema,
+  addedAt: isoDateTimeSchema,
+  known: z.boolean(),
+  symbol: z.string().min(1).max(64).optional(),
+}).strict();
+
+export const watchlistSchema = z.object({
+  entries: z.array(watchlistEntrySchema),
+}).strict();
+
+export const createWatchlistEntrySchema = z.object({
+  address: evmAddressSchema,
+}).strict();
+
+export const watchlistMutationSchema = z.object({
+  address: evmAddressSchema,
+  result: z.enum(['ADDED', 'EXISTING', 'REMOVED', 'ABSENT']),
+}).strict();
+
+export type TokenRef = z.infer<typeof tokenRefSchema>;
+export type PriceMetric = z.infer<typeof priceMetricSchema>;
+export type LiquidityMetric = z.infer<typeof liquidityMetricSchema>;
+export type VolumeMetric = z.infer<typeof volumeMetricSchema>;
+export type PoolSummary = z.infer<typeof poolSummarySchema>;
+export type PoolList = z.infer<typeof poolListSchema>;
+export type WatchlistEntry = z.infer<typeof watchlistEntrySchema>;
+export type Watchlist = z.infer<typeof watchlistSchema>;
+export type CreateWatchlistEntry = z.infer<typeof createWatchlistEntrySchema>;
+export type WatchlistMutation = z.infer<typeof watchlistMutationSchema>;
