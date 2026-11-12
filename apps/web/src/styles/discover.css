@@ -200,6 +200,13 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.discover-identity dd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
 .discover-contract-note {
   font-size: var(--text-meta);
 }

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
+import type { PoolSummary } from '@trident/api-contract';
 import { Badge, type Tone } from '../../../components/Badge.js';
-import type { PoolStatus } from '../discoverContract.js';
+
+type PoolStatus = PoolSummary['status'];
 
 /**
  * Pixel's tone mapping for S3-03: AVAILABLE→success, STALE→wait,

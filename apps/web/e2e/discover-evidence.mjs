@@ -108,7 +108,7 @@ async function withPage(browser, options, fn) {
   await context.close();
 }
 
-function routePools(page, { mode = 'default', delayMs = 0, pools: override = null } = {}) {
+function routePools(page, { mode = 'default', delayMs = 0, pools: override = null, detailMeta = {} } = {}) {
   return page.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === '/health') {
@@ -134,7 +134,7 @@ function routePools(page, { mode = 'default', delayMs = 0, pools: override = nul
       const address = url.pathname.slice('/api/v1/pools/'.length).toLowerCase();
       const pools = override ?? [pool(), STALE_POOL, UNAVAILABLE_POOL];
       const match = pools.find((candidate) => candidate.pool.toLowerCase() === address) ?? pools[0];
-      return fulfil(route, { data: match, meta: {} });
+      return fulfil(route, { data: match, meta: detailMeta });
     }
     return route.continue();
   });
@@ -209,10 +209,84 @@ async function main() {
           };
         }, width),
       );
+      await axe(page, `discover-${width}`, results.axe);
       await shot(page, `listing-${width}`);
       results.screenshots.push(`listing-${width}.png`);
     });
   }
+
+  await withPage(browser, { viewport: { width: 375, height: 900 } }, async (page) => {
+    await routePools(page, { pools: [pool()], detailMeta: { refreshError: 'RPC read failed at pinned block' } });
+    await page.goto(`${BASE}/discover/pools/${POOL}`, { waitUntil: 'networkidle' });
+    await page.getByTestId('pool-refresh-error').waitFor();
+    await shot(page, 'pool-refresh-error-375');
+    results.screenshots.push('pool-refresh-error-375.png');
+    results.states.poolRefreshError = await page.getByTestId('pool-refresh-error').innerText();
+  });
+
+  await withPage(browser, { viewport: { width: 375, height: 900 } }, async (page) => {
+    await page.route('**/*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/health') {
+        return fulfil(route, HEALTH);
+      }
+      if (url.pathname === '/api/v1/watchlist') {
+        return fulfil(route, { data: { entries: [] }, meta: {} });
+      }
+      if (url.pathname.startsWith('/api/v1/pools/')) {
+        return fulfil(route, { error: { code: 'NOT_FOUND', message: 'Pool is not tracked' } }, 404);
+      }
+      return route.continue();
+    });
+    await page.goto(`${BASE}/discover/pools/${POOL}`, { waitUntil: 'networkidle' });
+    await page.getByTestId('pool-unknown').waitFor();
+    await shot(page, 'pool-unknown-375');
+    results.screenshots.push('pool-unknown-375.png');
+    results.states.poolUnknown = await page.getByTestId('pool-unknown').innerText();
+  });
+
+  await withPage(browser, { viewport: { width: 375, height: 900 } }, async (page, _context, calls) => {
+    let releaseMutation = () => {};
+    let markMutationStarted = () => {};
+    const mutationGate = new Promise((resolve) => {
+      releaseMutation = resolve;
+    });
+    const mutationStarted = new Promise((resolve) => {
+      markMutationStarted = resolve;
+    });
+    await page.route('**/*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/health') {
+        return fulfil(route, HEALTH);
+      }
+      if (url.pathname === '/api/v1/watchlist' && route.request().method() === 'POST') {
+        markMutationStarted();
+        await mutationGate;
+        return fulfil(route, { data: { address: WETH, result: 'ADDED' }, meta: {} });
+      }
+      if (url.pathname === '/api/v1/watchlist') {
+        return fulfil(route, { data: { entries: [] }, meta: {} });
+      }
+      if (url.pathname.startsWith('/api/v1/pools/')) {
+        return fulfil(route, { data: pool(), meta: {} });
+      }
+      return route.continue();
+    });
+    await page.goto(`${BASE}/discover/pools/${POOL}`, { waitUntil: 'networkidle' });
+    const button = page.getByTestId(`watch-${WETH}`);
+    await button.waitFor();
+    await button.click();
+    await mutationStarted;
+    const pendingPressed = await button.getAttribute('aria-pressed');
+    const pendingBusy = await button.getAttribute('aria-busy');
+    await shot(page, 'watch-pending-375');
+    releaseMutation();
+    await page.getByTestId('pool-watchlist-message').waitFor();
+    const persistedPressed = await button.getAttribute('aria-pressed');
+    await shot(page, 'watch-success-375');
+    results.screenshots.push('watch-pending-375.png', 'watch-success-375.png');
+    results.states.watchlist = { pendingPressed, pendingBusy, persistedPressed, calls };
+  });
 
   const states = [
     { key: 'loading', mode: 'loading' },
@@ -256,42 +330,26 @@ async function main() {
   for (const width of results.widths) {
     await withPage(browser, { viewport: { width, height: 1000 } }, async (page) => {
       await routePools(page, { pools: [pool()] });
-      await page.goto(`${BASE}/discover/tokens/${WETH}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE}/discover/pools/${POOL}`, { waitUntil: 'networkidle' });
       await page.getByText('LOW CONFIDENCE').first().waitFor();
-      await shot(page, `token-inspector-${width}`);
-      results.screenshots.push(`token-inspector-${width}.png`);
+      await axe(page, `pool-inspector-${width}`, results.axe);
+      await shot(page, `pool-inspector-${width}`);
+      results.screenshots.push(`pool-inspector-${width}.png`);
     });
   }
 
-  await withPage(browser, { viewport: { width: 1280, height: 1000 } }, async (page) => {
-    await routePools(page);
-    await page.goto(`${BASE}/discover`, { waitUntil: 'networkidle' });
-    await page.getByTestId('theme-toggle').click();
-    await page.getByTestId(`pool-row-${POOL}`).waitFor();
-    await shot(page, 'listing-dark-1280');
-    results.screenshots.push('listing-dark-1280.png');
-  });
-
-  await withPage(browser, { viewport: { width: 1280, height: 1000 } }, async (page) => {
-    await routePools(page);
-    await page.goto(`${BASE}/discover`, { waitUntil: 'networkidle' });
-    await page.getByTestId(`pool-row-${POOL}`).waitFor();
-    await axe(page, 'discover-1280', results.axe);
-  });
-
-  await withPage(browser, { viewport: { width: 375, height: 900 } }, async (page) => {
-    await routePools(page);
-    await page.goto(`${BASE}/discover`, { waitUntil: 'networkidle' });
-    await page.getByTestId(`pool-row-${POOL}`).waitFor();
-    await axe(page, 'discover-375', results.axe);
-  });
-
-  await withPage(browser, { viewport: { width: 1280, height: 1000 } }, async (page) => {
-    await routePools(page, { pools: [pool()] });
-    await page.goto(`${BASE}/discover/tokens/${WETH}`, { waitUntil: 'networkidle' });
-    await page.getByText('LOW CONFIDENCE').first().waitFor();
-    await axe(page, 'token-inspector-1280', results.axe);
-  });
+  for (const width of results.widths) {
+    await withPage(browser, { viewport: { width, height: 1000 } }, async (page) => {
+      await routePools(page);
+      await page.goto(`${BASE}/discover`, { waitUntil: 'networkidle' });
+      await page.evaluate(() => {
+        document.documentElement.dataset['theme'] = 'dark';
+      });
+      await page.getByTestId(`pool-row-${POOL}`).waitFor();
+      await shot(page, `listing-dark-${width}`);
+      results.screenshots.push(`listing-dark-${width}.png`);
+    });
+  }
 
   await withPage(browser, { viewport: { width: 1280, height: 900 } }, async (page) => {
     await routePools(page);

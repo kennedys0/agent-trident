@@ -8,7 +8,7 @@ import { SubjectHeader } from '../../components/SubjectHeader.js';
 import { ApiError } from '../../lib/api/client.js';
 import { useResource } from '../../lib/api/hooks.js';
 import { poolsEndpoint } from './discoverApi.js';
-import { DISCOVER_CONTRACT_REVISION, type PoolSummary } from './discoverContract.js';
+import type { PoolSummary } from '@trident/api-contract';
 import { PoolTable, orderPools, qualitySummary } from './components/PoolTable.js';
 import { useWatchlist } from './useWatchlist.js';
 
@@ -328,8 +328,8 @@ export function DiscoverPage(): ReactNode {
       </Panel>
 
       <p className="meta discover-contract-note">
-        Frontend binding <span className="mono">{DISCOVER_CONTRACT_REVISION}</span>. Fields come from the S3-02 contract;
-        a payload that does not match is reported as a contract mismatch instead of being displayed partially.
+        Frontend fields are parsed by <span className="mono">@trident/api-contract</span>. A payload that does not match
+        the S3-02 contract is reported as a contract mismatch instead of being displayed partially.
       </p>
     </>
   );

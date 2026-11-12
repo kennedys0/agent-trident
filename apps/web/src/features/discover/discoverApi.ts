@@ -8,7 +8,7 @@ import {
   type PoolSummary,
   type Watchlist,
   type WatchlistMutation,
-} from './discoverContract.js';
+} from '@trident/api-contract';
 import type { Endpoint } from '../../lib/api/endpoints.js';
 
 const BASE = '/api/v1';

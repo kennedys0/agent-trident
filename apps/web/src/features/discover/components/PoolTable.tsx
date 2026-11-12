@@ -5,11 +5,10 @@ import { Badge } from '../../../components/Badge.js';
 import { ageSeconds, formatAge, formatDecimalString, formatMoney } from '../../../lib/format.js';
 import type {
   LiquidityMetric,
-  PoolStatus,
   PoolSummary,
   PriceMetric,
   TokenRef,
-} from '../discoverContract.js';
+} from '@trident/api-contract';
 import { QualityBadge } from './QualityBadge.js';
 
 export type WatchLookup = {
@@ -59,17 +58,12 @@ export function feeLabel(fee: number): string {
 
 const LIQUIDITY_RANK: Record<PoolStatus, number> = { AVAILABLE: 0, STALE: 1, UNAVAILABLE: 2 };
 
-function pairKey(pool: PoolSummary): string {
-  return `${pool.token0.address.toLowerCase()}/${pool.token1.address.toLowerCase()}/${pool.fee}`;
-}
+type PoolStatus = PoolSummary['status'];
 
 /**
  * Fixed order from the design contract: verified allowlist first, then
- * liquidity AVAILABLE → STALE → UNAVAILABLE, tie by pool address.
- *
- * Raw `L` is unitless and reserves are denominated in different tokens, so a
- * cross-pair liquidity ranking would claim a comparison the data does not
- * support. Magnitude is only used inside one pair, where it is comparable.
+ * liquidity AVAILABLE descending → STALE descending → UNAVAILABLE, then pool
+ * address ascending. Volume never participates.
  */
 export function orderPools(pools: readonly PoolSummary[]): PoolSummary[] {
   return [...pools].sort((left, right) => {
@@ -81,12 +75,10 @@ export function orderPools(pools: readonly PoolSummary[]): PoolSummary[] {
     if (liquidity !== 0) {
       return liquidity;
     }
-    if (pairKey(left) === pairKey(right)) {
-      const a = left.metrics.liquidity;
-      const b = right.metrics.liquidity;
-      if (a.status !== 'UNAVAILABLE' && b.status !== 'UNAVAILABLE' && a.liquidity !== b.liquidity) {
-        return BigInt(a.liquidity) > BigInt(b.liquidity) ? -1 : 1;
-      }
+    const a = left.metrics.liquidity;
+    const b = right.metrics.liquidity;
+    if (a.status !== 'UNAVAILABLE' && b.status !== 'UNAVAILABLE' && a.liquidity !== b.liquidity) {
+      return BigInt(a.liquidity) > BigInt(b.liquidity) ? -1 : 1;
     }
     return left.pool.toLowerCase().localeCompare(right.pool.toLowerCase());
   });
@@ -149,11 +141,11 @@ function LiquidityCell({ pool, now, testId }: { readonly pool: PoolSummary; read
   );
 }
 
-function TokenLink({ token }: { readonly token: TokenRef }): ReactNode {
+function PoolLink({ pool, token }: { readonly pool: string; readonly token: TokenRef }): ReactNode {
   return (
-    <Link className="token-link" to={`/discover/tokens/${token.address}`}>
+    <Link className="token-link" to={`/discover/pools/${pool}`}>
       {token.symbol}
-      <span className="sr-only"> token inspector, contract {token.address}</span>
+      <span className="sr-only"> in pool inspector, pool contract {pool}</span>
     </Link>
   );
 }
@@ -161,15 +153,15 @@ function TokenLink({ token }: { readonly token: TokenRef }): ReactNode {
 /**
  * Watchlist is per token in S3-02, so a pool row cannot honestly own one
  * toggle: a row has two tokens and the backend `watched` flag is true when
- * either is watched. The row reports that state; the toggle lives in the Token
- * Inspector, where the address is unambiguous.
+ * either is watched. The row reports that state; the pool Inspector exposes
+ * one control per token, where each address is unambiguous.
  */
 function WatchCell({ pool, watch }: { readonly pool: PoolSummary; readonly watch: WatchLookup }): ReactNode {
   const watched = pool.watched || watch.isWatching(pool.token0.address) || watch.isWatching(pool.token1.address);
   return watched ? <Badge tone="wait">Watched</Badge> : <span className="meta">Not watched</span>;
 }
 
-/** Listing shared by Discover and the Token Inspector so the two cannot drift. */
+/** Contract-bound pool listing used by Discover. */
 export function PoolTable({ pools, now, watch, caption }: PoolTableProps): ReactNode {
   return (
     <div className="table-wrap">
@@ -204,9 +196,9 @@ export function PoolTable({ pools, now, watch, caption }: PoolTableProps): React
             <tr key={pool.pool} data-testid={`pool-row-${pool.pool}`}>
               <td data-label="Pair">
                 <span className="pair">
-                  <TokenLink token={pool.token0} />
+                  <PoolLink pool={pool.pool} token={pool.token0} />
                   <span aria-hidden="true"> / </span>
-                  <TokenLink token={pool.token1} />
+                  <PoolLink pool={pool.pool} token={pool.token1} />
                 </span>
                 <AddressChip address={pool.pool} label="pool" />
               </td>

@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { StatusProvider } from '../src/app/StatusProvider.js';
 import { DiscoverPage } from '../src/features/discover/DiscoverPage.js';
-import { TokenInspectorPage } from '../src/features/discover/TokenInspectorPage.js';
+import { PoolInspectorPage } from '../src/features/discover/PoolInspectorPage.js';
+import { orderPools } from '../src/features/discover/components/PoolTable.js';
 import {
   poolSummarySchema,
   watchlistMutationSchema,
   watchlistSchema,
-} from '../src/features/discover/discoverContract.js';
+} from '@trident/api-contract';
 import { setTransport } from '../src/lib/api/client.js';
 
 /**
@@ -105,7 +106,7 @@ function renderAt(entry: string): void {
       <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route path="/discover" element={<DiscoverPage />} />
-          <Route path="/discover/tokens/:address" element={<TokenInspectorPage />} />
+          <Route path="/discover/pools/:address" element={<PoolInspectorPage />} />
         </Routes>
       </MemoryRouter>
     </StatusProvider>,
@@ -144,6 +145,26 @@ describe('S3-02 wire contract', () => {
 });
 
 describe('DiscoverPage', () => {
+  it('uses the fixed venue, liquidity-status, liquidity-descending and address ordering', () => {
+    const low = poolSummarySchema.parse({
+      ...basePool,
+      pool: '0x0000000000000000000000000000000000000002',
+      metrics: { ...basePool.metrics, liquidity: { ...basePool.metrics.liquidity, liquidity: '10' } },
+    });
+    const high = poolSummarySchema.parse({
+      ...basePool,
+      pool: '0x0000000000000000000000000000000000000003',
+      metrics: { ...basePool.metrics, liquidity: { ...basePool.metrics.liquidity, liquidity: '20' } },
+    });
+    const registry = poolSummarySchema.parse({
+      ...basePool,
+      pool: '0x0000000000000000000000000000000000000001',
+      venue: 's3-01-registry',
+      metrics: { ...basePool.metrics, liquidity: { ...basePool.metrics.liquidity, liquidity: '999' } },
+    });
+    expect(orderPools([registry, low, high]).map((pool) => pool.pool)).toEqual([high.pool, low.pool, registry.pool]);
+  });
+
   it('renders backend values, provenance and the status summary', async () => {
     useTransport((method) =>
       method === 'GET' ? { body: poolsBody([basePool]) } : { body: { data: { entries: [] }, meta: {} } },
@@ -288,19 +309,16 @@ describe('DiscoverPage', () => {
   });
 });
 
-describe('TokenInspectorPage', () => {
+describe('PoolInspectorPage', () => {
   const watchEntries = (addresses: string[]): unknown => ({
     data: { entries: addresses.map((address) => ({ address, addedAt: '2026-11-12T05:00:00Z', known: true })) },
     meta: {},
   });
 
-  function tokenTransport(options: { watched?: boolean; mutation?: (method: string) => string } = {}): { calls: string[] } {
+  function poolTransport(options: { watched?: boolean; mutation?: (method: string) => string } = {}): { calls: string[] } {
     return useTransport((method, path) => {
       if (method === 'GET' && path.startsWith('/api/v1/watchlist')) {
         return { body: watchEntries(options.watched === true ? [WETH] : []) };
-      }
-      if (method === 'GET' && path.startsWith('/api/v1/pools?')) {
-        return { body: poolsBody([basePool]) };
       }
       if (method === 'GET' && path === `/api/v1/pools/${POOL}`) {
         return { body: { data: basePool, meta: {} } };
@@ -312,14 +330,12 @@ describe('TokenInspectorPage', () => {
     });
   }
 
-  it('derives the token from the pools the backend returns', async () => {
-    const { calls } = tokenTransport();
-    renderAt(`/discover/tokens/${WETH}`);
+  it('loads the pinned-block pool detail from the per-pool endpoint', async () => {
+    const { calls } = poolTransport();
+    renderAt(`/discover/pools/${POOL}`);
 
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('WETH');
-    expect(screen.getByTestId('token-match-count')).toHaveTextContent('1 indexed pool include this token');
+    expect(await screen.findByText('LOW CONFIDENCE')).toBeInTheDocument();
     expect(screen.getAllByText(/source: slot0 at block 123456/).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('LOW CONFIDENCE')).toBeInTheDocument();
     expect(screen.getByText(/single Uniswap v3 pool/)).toBeInTheDocument();
     expect(calls).toContain(`GET /api/v1/pools/${POOL}`);
   });
@@ -329,9 +345,6 @@ describe('TokenInspectorPage', () => {
       if (method === 'GET' && path.startsWith('/api/v1/watchlist')) {
         return { body: watchEntries([]) };
       }
-      if (method === 'GET' && path.startsWith('/api/v1/pools?')) {
-        return { body: poolsBody([basePool]) };
-      }
       if (method === 'GET' && path === `/api/v1/pools/${POOL}`) {
         return {
           body: { data: basePool, meta: { refreshError: 'RPC read failed at pinned block' } },
@@ -339,9 +352,9 @@ describe('TokenInspectorPage', () => {
       }
       return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'Unknown' } } };
     });
-    renderAt(`/discover/tokens/${WETH}`);
+    renderAt(`/discover/pools/${POOL}`);
 
-    const banner = await screen.findByTestId(`pool-refresh-error-${POOL}`);
+    const banner = await screen.findByTestId('pool-refresh-error');
     expect(banner).toHaveTextContent('RPC read failed at pinned block');
     expect(banner).toHaveTextContent('stale status');
     expect(screen.getAllByText('Stale').length).toBeGreaterThanOrEqual(3);
@@ -349,16 +362,42 @@ describe('TokenInspectorPage', () => {
   });
 
   it('shows volume as unavailable with its reason and no number', async () => {
-    tokenTransport();
-    renderAt(`/discover/tokens/${WETH}`);
+    poolTransport();
+    renderAt(`/discover/pools/${POOL}`);
     const volume = await screen.findByRole('region', { name: 'Volume' });
     expect(volume).toHaveTextContent('Unavailable');
     expect(volume).toHaveTextContent('no verifiable volume source');
   });
 
+  it('never renders a volume number when a payload violates the slice rule', async () => {
+    const invalidVolumePool = {
+      ...basePool,
+      metrics: {
+        ...basePool.metrics,
+        volume24h: {
+          status: 'AVAILABLE',
+          ...observed,
+          volumeQuote24h: { value: '999999', decimals: 6 },
+        },
+      },
+    };
+    useTransport((method, path) => {
+      if (method === 'GET' && path.startsWith('/api/v1/watchlist')) {
+        return { body: watchEntries([]) };
+      }
+      return { body: { data: invalidVolumePool, meta: {} } };
+    });
+    renderAt(`/discover/pools/${POOL}`);
+
+    const volume = await screen.findByRole('region', { name: 'Volume' });
+    expect(volume).toHaveTextContent('Unavailable');
+    expect(volume).toHaveTextContent('Contract mismatch');
+    expect(volume).not.toHaveTextContent('999999');
+  });
+
   it('toggles the watchlist through the server and only then changes state', async () => {
-    const { calls } = tokenTransport();
-    renderAt(`/discover/tokens/${WETH}`);
+    const { calls } = poolTransport();
+    renderAt(`/discover/pools/${POOL}`);
 
     const button = await screen.findByTestId(`watch-${WETH}`);
     await waitFor(() => expect(button).toBeEnabled());
@@ -367,7 +406,7 @@ describe('TokenInspectorPage', () => {
     await userEvent.click(button);
     await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
     expect(calls).toContain('POST /api/v1/watchlist');
-    expect(screen.getByTestId('token-watchlist-message')).toHaveTextContent('WETH added to watchlist');
+    expect(screen.getByTestId('pool-watchlist-message')).toHaveTextContent('WETH added to watchlist');
 
     await userEvent.click(button);
     await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'false'));
@@ -375,8 +414,8 @@ describe('TokenInspectorPage', () => {
   });
 
   it('starts watched from the persisted watchlist', async () => {
-    tokenTransport({ watched: true });
-    renderAt(`/discover/tokens/${WETH}`);
+    poolTransport({ watched: true });
+    renderAt(`/discover/pools/${POOL}`);
     const button = await screen.findByTestId(`watch-${WETH}`);
     await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
   });
@@ -389,42 +428,47 @@ describe('TokenInspectorPage', () => {
       if (method === 'POST') {
         return { status: 500, body: { error: { code: 'DB_WRITE_FAILED', message: 'Watchlist write failed' } } };
       }
-      return { body: poolsBody([basePool]) };
+      if (method === 'GET' && path === `/api/v1/pools/${POOL}`) {
+        return { body: { data: basePool, meta: {} } };
+      }
+      return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'Unknown' } } };
     });
-    renderAt(`/discover/tokens/${WETH}`);
+    renderAt(`/discover/pools/${POOL}`);
 
     const button = await screen.findByTestId(`watch-${WETH}`);
     await waitFor(() => expect(button).toBeEnabled());
     await userEvent.click(button);
 
-    expect(await screen.findByTestId('token-watchlist-error')).toHaveTextContent('Watchlist write failed');
+    expect(await screen.findByTestId('pool-watchlist-error')).toHaveTextContent('Watchlist write failed');
     expect(button).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('reports a missing explorer URL instead of linking to a guessed host', async () => {
-    tokenTransport();
-    renderAt(`/discover/tokens/${WETH}`);
+    poolTransport();
+    renderAt(`/discover/pools/${POOL}`);
     const notes = await screen.findAllByTestId('explorer-unavailable');
     expect(notes.length).toBeGreaterThan(0);
     expect(notes[0]).toHaveTextContent('no chain-4663 explorer URL');
     expect(screen.queryByTestId('explorer-link')).toBeNull();
   });
 
-  it('shows a truthful not-indexed state when no pool includes the token', async () => {
+  it('shows the exact unknown-pool state for a backend 404', async () => {
     useTransport((method, path) => {
       if (method === 'GET' && path.startsWith('/api/v1/watchlist')) {
         return { body: watchEntries([]) };
       }
-      return { body: poolsBody([]) };
+      return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'Pool is not tracked' } } };
     });
-    renderAt(`/discover/tokens/${WETH}`);
-    expect(await screen.findByTestId('token-not-indexed')).toHaveTextContent('This token is not indexed');
+    renderAt(`/discover/pools/${POOL}`);
+    const state = await screen.findByTestId('pool-unknown');
+    expect(state).toHaveTextContent('Unknown pool');
+    expect(state).toHaveTextContent(POOL);
   });
 
-  it('rejects a malformed address without calling the pools API', async () => {
-    const { calls } = tokenTransport();
-    renderAt('/discover/tokens/not-an-address');
-    expect(await screen.findByTestId('token-invalid')).toBeInTheDocument();
-    expect(calls.some((call) => call.includes('/api/v1/pools?'))).toBe(false);
+  it('rejects a malformed address without calling the pool API', async () => {
+    const { calls } = poolTransport();
+    renderAt('/discover/pools/not-an-address');
+    expect(await screen.findByTestId('pool-invalid')).toHaveTextContent('Unknown pool');
+    expect(calls.some((call) => call.includes('/api/v1/pools/'))).toBe(false);
   });
 });

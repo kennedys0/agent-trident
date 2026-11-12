@@ -5,10 +5,12 @@ import { Badge } from '../../../components/Badge.js';
 import { Panel } from '../../../components/Panel.js';
 import { Provenance } from '../../../components/Provenance.js';
 import { formatMoney } from '../../../lib/format.js';
-import type { LiquidityMetric, PoolSummary, PriceMetric, VolumeMetric } from '../discoverContract.js';
+import type { LiquidityMetric, PoolSummary, PriceMetric, VolumeMetric } from '@trident/api-contract';
 import { ExplorerLink } from './ExplorerLink.js';
 import { QualityBadge } from './QualityBadge.js';
 import { feeLabel, formatPrice, trimFraction } from './PoolTable.js';
+import { WatchButton } from './WatchButton.js';
+import type { WatchlistControls } from '../useWatchlist.js';
 
 function venueLabel(venue: PoolSummary['venue']): string {
   return venue === 'verified-allowlist' ? 'Verified allowlist' : 'S3-01 registry';
@@ -111,33 +113,19 @@ function LiquiditySection({
   );
 }
 
-function VolumeSection({ metric, now }: { readonly metric: VolumeMetric; readonly now: number }): ReactNode {
-  if (metric.status === 'UNAVAILABLE') {
-    return (
-      <section className="metric metric--absent" aria-label="Volume">
-        <div className="inline">
-          <span className="stat__label">Volume (24h)</span>
-          <QualityBadge status="UNAVAILABLE" />
-        </div>
-        <span className="stat__value">Unavailable</span>
-        <span className="meta">{metric.reason}</span>
-      </section>
-    );
-  }
+function VolumeSection({ metric }: { readonly metric: VolumeMetric }): ReactNode {
+  const reason =
+    metric.status === 'UNAVAILABLE'
+      ? metric.reason
+      : 'Contract mismatch: S3-02 does not provide a verified 24h volume metric.';
   return (
-    <section className="metric" aria-label="Volume">
+    <section className="metric metric--absent" aria-label="Volume">
       <div className="inline">
         <span className="stat__label">Volume (24h)</span>
-        <QualityBadge status={metric.status} />
+        <QualityBadge status="UNAVAILABLE" />
       </div>
-      <span className="stat__value mono">{trimFraction(formatMoney(metric.volumeQuote24h, { maxFrac: 2 }))}</span>
-      <Provenance
-        source={metric.provenance}
-        blockNumber={metric.blockNumber}
-        sourceTime={metric.sourceTime}
-        observedAt={metric.observedAt}
-        now={now}
-      />
+      <span className="stat__value">Unavailable</span>
+      <span className="meta">{reason}</span>
     </section>
   );
 }
@@ -153,12 +141,14 @@ export function PoolInspector({
   forcedStale = false,
   onRefresh,
   isRefreshing = false,
+  watch,
 }: {
   readonly pool: PoolSummary;
   readonly now: number;
   readonly forcedStale?: boolean;
   readonly onRefresh?: (() => void) | undefined;
   readonly isRefreshing?: boolean;
+  readonly watch?: WatchlistControls | undefined;
 }): ReactNode {
   return (
     <Panel
@@ -179,7 +169,7 @@ export function PoolInspector({
       <p className="meta">{pool.confidenceReason}</p>
       {pool.reason === undefined ? null : <p className="metric__reason">Pool status: {pool.reason}</p>}
 
-      <dl className="facts facts--two">
+      <dl className="facts facts--two discover-identity">
         <div className="fact">
           <dt>Token 0</dt>
           <dd>
@@ -187,6 +177,16 @@ export function PoolInspector({
             <span className="meta">
               {pool.token0.symbol} · {pool.token0.decimals} decimals
             </span>
+            {watch === undefined ? null : (
+              <WatchButton
+                address={pool.token0.address}
+                name={pool.token0.symbol}
+                watched={watch.isWatching(pool.token0.address)}
+                pending={watch.isPending(pool.token0.address)}
+                disabled={watch.isLoading}
+                onToggle={() => watch.toggle(pool.token0.address, pool.token0.symbol)}
+              />
+            )}
           </dd>
         </div>
         <div className="fact">
@@ -196,6 +196,16 @@ export function PoolInspector({
             <span className="meta">
               {pool.token1.symbol} · {pool.token1.decimals} decimals
             </span>
+            {watch === undefined ? null : (
+              <WatchButton
+                address={pool.token1.address}
+                name={pool.token1.symbol}
+                watched={watch.isWatching(pool.token1.address)}
+                pending={watch.isPending(pool.token1.address)}
+                disabled={watch.isLoading}
+                onToggle={() => watch.toggle(pool.token1.address, pool.token1.symbol)}
+              />
+            )}
           </dd>
         </div>
         <div className="fact">
@@ -231,7 +241,7 @@ export function PoolInspector({
       <div className="discover-metrics">
         <PriceSection metric={pool.metrics.price} pool={pool} now={now} forcedStale={forcedStale} />
         <LiquiditySection metric={pool.metrics.liquidity} pool={pool} now={now} forcedStale={forcedStale} />
-        <VolumeSection metric={pool.metrics.volume24h} now={now} />
+        <VolumeSection metric={pool.metrics.volume24h} />
       </div>
 
       <div className="stack stack--tight">
