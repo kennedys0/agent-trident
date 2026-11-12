@@ -49,13 +49,29 @@ function errorFromBody(body: unknown, status: number): ApiError {
   return new ApiError(message, { code, requestId, status });
 }
 
-export async function apiGet<T>(path: string, schema: ParseSchema<T>, signal?: AbortSignal): Promise<Envelope<T>> {
+type RequestOptions<T> = {
+  readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  readonly path: string;
+  readonly schema: ParseSchema<T>;
+  readonly payload?: unknown;
+  readonly signal?: AbortSignal | undefined;
+};
+
+async function request<T>(options: RequestOptions<T>): Promise<Envelope<T>> {
+  const { method, path, schema, payload, signal } = options;
+  const hasBody = payload !== undefined;
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (hasBody) {
+    headers['content-type'] = 'application/json';
+  }
+
   let response: Response;
   try {
     response = await transport(path, {
-      method: 'GET',
-      headers: { accept: 'application/json' },
+      method,
+      headers,
       credentials: 'same-origin',
+      ...(hasBody ? { body: JSON.stringify(payload) } : {}),
       ...(signal === undefined ? {} : { signal }),
     });
   } catch (cause) {
@@ -101,59 +117,30 @@ export async function apiGet<T>(path: string, schema: ParseSchema<T>, signal?: A
   return { data, meta };
 }
 
+export async function apiGet<T>(path: string, schema: ParseSchema<T>, signal?: AbortSignal): Promise<Envelope<T>> {
+  return request<T>({ method: 'GET', path, schema, signal });
+}
+
 export async function apiPost<T>(
   path: string,
   payload: unknown,
   schema: ParseSchema<T>,
   signal?: AbortSignal,
 ): Promise<Envelope<T>> {
-  let response: Response;
-  try {
-    response = await transport(path, {
-      method: 'POST',
-      headers: { accept: 'application/json', 'content-type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify(payload),
-      ...(signal === undefined ? {} : { signal }),
-    });
-  } catch (cause) {
-    if (cause instanceof DOMException && cause.name === 'AbortError') {
-      throw cause;
-    }
-    throw new ApiError('The API could not be reached', { code: 'NETWORK_ERROR', status: 0 });
-  }
+  return request<T>({ method: 'POST', path, schema, payload, signal });
+}
 
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    throw new ApiError('The API returned a response that is not JSON', {
-      code: 'BAD_RESPONSE',
-      status: response.status,
-    });
-  }
+/** DELETE for idempotent removals; no body, response still validated. */
+export async function apiDelete<T>(path: string, schema: ParseSchema<T>, signal?: AbortSignal): Promise<Envelope<T>> {
+  return request<T>({ method: 'DELETE', path, schema, signal });
+}
 
-  if (!response.ok) {
-    throw errorFromBody(body, response.status);
-  }
-
-  const record = asRecord(body);
-  if (record === null || !('data' in record)) {
-    throw new ApiError('The API response is missing its data envelope', {
-      code: 'BAD_RESPONSE',
-      status: response.status,
-    });
-  }
-
-  let data: T;
-  try {
-    data = schema.parse(record['data']);
-  } catch (cause) {
-    throw new ApiError(
-      `The API payload does not match the shared contract: ${cause instanceof Error ? cause.message : 'schema mismatch'}`,
-      { code: 'CONTRACT_MISMATCH', status: response.status },
-    );
-  }
-
-  return { data, meta: asRecord(record['meta']) ?? {} };
+/** PUT for idempotent upserts (watchlist add). */
+export async function apiPut<T>(
+  path: string,
+  payload: unknown,
+  schema: ParseSchema<T>,
+  signal?: AbortSignal,
+): Promise<Envelope<T>> {
+  return request<T>({ method: 'PUT', path, schema, payload, signal });
 }

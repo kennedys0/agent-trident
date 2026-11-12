@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, ListFilter, Menu, ShieldAlert, Wallet } from 'lucide-react';
+import { Activity, Compass, LayoutDashboard, ListFilter, Menu, ShieldAlert, Wallet } from 'lucide-react';
 import { useStatus } from '../app/StatusProvider.js';
 import { readFlag, readNumber } from '../lib/api/system.js';
 import { formatAge, formatUtc } from '../lib/format.js';
@@ -11,6 +11,7 @@ import { ThemeToggle } from './ThemeToggle.js';
 
 const NAV = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
+  { to: '/discover', label: 'Discover', icon: Compass },
   { to: '/candidates', label: 'Candidates', icon: ListFilter },
   { to: '/risk', label: 'Risk', icon: ShieldAlert },
   { to: '/portfolio', label: 'Portfolio', icon: Wallet },

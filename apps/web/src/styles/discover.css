@@ -1,0 +1,332 @@
+/* Discover: listing, filters, metric provenance and watchlist controls.
+   Only tokens from styles/tokens.css are used; no new colours or sizes. */
+
+.discover-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.discover-toolbar__title,
+.discover-section-title {
+  font-size: var(--text-meta);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.discover-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.discover-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.discover-field__label {
+  font-size: var(--text-meta);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.discover-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: var(--border-width) solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+}
+
+.discover-input::placeholder {
+  color: var(--muted);
+}
+
+.discover-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.discover-filters__label {
+  font-size: var(--text-meta);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-meta);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--motion);
+}
+
+.filter-chip[aria-pressed='true'] {
+  background: var(--wait);
+  color: var(--status-ink);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Listing ---------- */
+
+.discover-table {
+  table-layout: fixed;
+}
+
+.discover-col--pair {
+  width: 24%;
+}
+
+.discover-col--fee {
+  width: 7%;
+}
+
+.discover-col--price {
+  width: 20%;
+}
+
+.discover-col--liquidity {
+  width: 22%;
+}
+
+.discover-col--quality {
+  width: 15%;
+}
+
+.discover-col--watch {
+  width: 12%;
+}
+
+.discover-table th:last-child,
+.discover-table td:last-child {
+  white-space: nowrap;
+}
+
+.discover-table .addr {
+  flex-wrap: wrap;
+}
+
+.discover-table .addr code,
+.discover-table .metric__value,
+.discover-table .metric__prov {
+  overflow-wrap: anywhere;
+}
+
+.pair {
+  display: block;
+  font-weight: 700;
+}
+
+.token-link {
+  text-decoration-thickness: 2px;
+}
+
+.token-link:hover {
+  background: var(--wait);
+  color: var(--status-ink);
+}
+
+.discover-metrics .inline {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.metric__value {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.metric--absent .metric__value {
+  color: var(--ink);
+}
+
+.metric__prov {
+  font-size: var(--text-meta);
+  color: var(--muted);
+}
+
+.metric__reason {
+  font-size: var(--text-meta);
+  color: var(--muted);
+  max-width: 48ch;
+}
+
+.discover-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.discover-metrics {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.discover-contract-note {
+  font-size: var(--text-meta);
+}
+
+/* In-flight watchlist icon; the only new animation, and it is opt-out. */
+.watch-spin {
+  animation: watch-spin 900ms linear infinite;
+}
+
+@keyframes watch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watch-spin {
+    animation: none;
+  }
+
+  .filter-chip {
+    transition: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .discover-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .discover-col--pair {
+    width: 17%;
+  }
+
+  .discover-col--fee {
+    width: 9%;
+  }
+
+  .discover-col--price {
+    width: 19%;
+  }
+
+  .discover-col--liquidity {
+    width: 22%;
+  }
+
+  .discover-col--quality {
+    width: 19%;
+  }
+
+  .discover-col--watch {
+    width: 14%;
+  }
+
+  .discover-table th,
+  .discover-table td {
+    padding-inline: calc(var(--space-1) / 2);
+  }
+
+  .discover-table .badge,
+  .discover-table .meta {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 767px) {
+  .discover-toolbar {
+    padding: var(--space-2);
+  }
+
+  .discover-table,
+  .discover-table tbody,
+  .discover-table tr,
+  .discover-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .discover-table {
+    table-layout: auto;
+  }
+
+  .discover-search .btn {
+    flex: 1 1 auto;
+  }
+
+  .discover-table td {
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: 6px 12px;
+  }
+
+  .discover-table td::before {
+    flex: 0 0 86px;
+  }
+
+  .discover-table td > * {
+    min-width: 0;
+  }
+
+  .discover-table .metric {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .discover-table .metric__reason {
+    max-width: 32ch;
+  }
+}
+
+@media (max-width: 374px) {
+  .discover-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-chip {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+@media (pointer: coarse) {
+  .discover-input,
+  .filter-chip {
+    min-height: var(--tap);
+  }
+}

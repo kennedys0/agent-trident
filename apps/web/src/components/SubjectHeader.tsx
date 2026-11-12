@@ -7,7 +7,7 @@ export function SubjectHeader({
 }: {
   readonly title: string;
   readonly description: string;
-  readonly meta?: string;
+  readonly meta?: string | undefined;
 }): ReactNode {
   return (
     <header className="stack stack--tight">

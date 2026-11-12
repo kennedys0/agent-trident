@@ -2,11 +2,11 @@ import type { ReactNode } from 'react';
 
 type PanelProps = {
   readonly title: string;
-  readonly actions?: ReactNode;
+  readonly actions?: ReactNode | undefined;
   readonly children: ReactNode;
-  readonly foot?: ReactNode;
+  readonly foot?: ReactNode | undefined;
   readonly flush?: boolean;
-  readonly labelledBy?: string;
+  readonly labelledBy?: string | undefined;
 };
 
 export function Panel({ title, actions, children, foot, flush = false, labelledBy }: PanelProps): ReactNode {
