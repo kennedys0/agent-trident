@@ -26,8 +26,8 @@ const VENUE_LABEL: Record<VenueFilter, string> = {
   's3-01-registry': 'S3-01 registry',
 };
 
-function firstOf<T extends string>(values: readonly T[], raw: string | null): T {
-  return values.find((value) => value === raw) ?? values[0]!;
+function firstOf<T extends string>(values: readonly [T, ...T[]], raw: string | null): T {
+  return values.find((value) => value === raw) ?? values[0];
 }
 
 function errorTitle(error: Error): string {
