@@ -10,7 +10,9 @@
     "build": "pnpm -r build",
     "dev": "pnpm --parallel --filter './apps/*' dev",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "audit:gate": "node scripts/audit-gate.mjs",
+    "audit:gate:test": "node --test scripts/audit-gate.test.mjs"
   }
 }
 

@@ -172,7 +172,7 @@ Do not expose this application to a network you do not control.
 - No authentication, CSRF protection, rate limiting, request body limit, or TLS. The API binds loopback only.
 - No host allowlist for RPC endpoints; any HTTPS URL is accepted if it reports chain ID `4663`.
 - `zod@3` is in use and needs an upgrade to clear a known advisory before any deployment review.
-- No Dockerfile, Compose file, or CI pipeline is committed, so container hardening, backup and restore drills, and deployment checks are unproven.
+- No Dockerfile or Compose file is committed, so container hardening and backup and restore drills are unproven. CI covers deterministic gates only; see [docs/CI.md](docs/CI.md).
 - One venue and one pool, no independent price oracle. A second RPC provider for finality and failover is future work.
 - The kill switch is not released automatically after a reorg or missing chain evidence. An operator must clear it.
 - The public RPC has no `eth_subscribe`, so latency and freshness depend on the 10-second poll.

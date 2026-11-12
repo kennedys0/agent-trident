@@ -1,0 +1,4 @@
+{
+  "description": "Known production advisories that are tracked and time-boxed. Anything high or critical that is not listed here fails the dependency-audit job. An expired entry fails the job, so it cannot silently outlive its fix.",
+  "entries": []
+}
