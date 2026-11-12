@@ -319,4 +319,43 @@ CREATE TABLE pool_market_snapshots (
 CREATE INDEX idx_pool_market_snapshots_pool ON pool_market_snapshots (pool, block_number DESC);
 `,
   },
+  {
+    version: '006_pool_discovery',
+    // S3-01: additive only. The factory CHECK pins every row to the verified
+    // Uniswap v3 factory, so a changed bytecode can stop ingestion but can never
+    // introduce a row from another factory. UNIQUE(tx, log_index) makes event
+    // replay idempotent even when two events claim the same pool identity.
+    sql: `
+CREATE TABLE discovered_pools (
+  pool_address     TEXT PRIMARY KEY CHECK (length(pool_address) = 42 AND lower(substr(pool_address, 1, 2)) = '0x'),
+  factory          TEXT NOT NULL CHECK (lower(factory) = '0x1f7d7550b1b028f7571e69a784071f0205fd2efa'),
+  token0           TEXT NOT NULL CHECK (length(token0) = 42 AND lower(substr(token0, 1, 2)) = '0x'),
+  token1           TEXT NOT NULL CHECK (length(token1) = 42 AND lower(substr(token1, 1, 2)) = '0x'),
+  token0_symbol    TEXT NOT NULL CHECK (length(token0_symbol) BETWEEN 1 AND 64 AND token0_symbol = trim(token0_symbol) AND instr(token0_symbol, x'00') = 0),
+  token1_symbol    TEXT NOT NULL CHECK (length(token1_symbol) BETWEEN 1 AND 64 AND token1_symbol = trim(token1_symbol) AND instr(token1_symbol, x'00') = 0),
+  token0_decimals  INTEGER NOT NULL CHECK (token0_decimals BETWEEN 0 AND 255),
+  token1_decimals  INTEGER NOT NULL CHECK (token1_decimals BETWEEN 0 AND 255),
+  fee              INTEGER NOT NULL CHECK (fee IN (100, 500, 3000, 10000)),
+  tick_spacing     INTEGER NOT NULL CHECK (tick_spacing > 0),
+  first_seen_block INTEGER NOT NULL CHECK (first_seen_block >= 0),
+  first_seen_tx    TEXT NOT NULL CHECK (length(first_seen_tx) = 66 AND lower(substr(first_seen_tx, 1, 2)) = '0x'),
+  log_index        INTEGER NOT NULL CHECK (log_index >= 0),
+  discovered_at    TEXT NOT NULL,
+  CHECK (lower(token0) < lower(token1)),
+  UNIQUE (factory, token0, token1, fee),
+  UNIQUE (first_seen_tx, log_index)
+);
+
+CREATE TABLE discovery_checkpoints (
+  id          INTEGER PRIMARY KEY CHECK (id = 1),
+  chain_id    INTEGER NOT NULL CHECK (chain_id = 4663),
+  from_block  INTEGER NOT NULL CHECK (from_block >= 0),
+  to_block    INTEGER NOT NULL CHECK (to_block >= from_block),
+  block_hash  TEXT,
+  updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX idx_discovered_pools_seen ON discovered_pools (first_seen_block DESC);
+`,
+  },
 ];
