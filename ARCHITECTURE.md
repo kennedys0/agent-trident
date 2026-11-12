@@ -27,5 +27,5 @@ TRIDENT is a single-instance TypeScript modular monolith: Node.js 24, Fastify, v
 
 ## Recovery
 
-SQLite migrations run before workers. A database lock prevents a second active worker. Checkpoints include block number and hash. The transactional outbox resumes committed work after restart, expires obsolete intents, and relies on unique business keys to prevent duplicate effects.
+SQLite migrations run before workers. A database lock prevents a second active worker. Checkpoints include block number and hash; a restart re-proves the latest checkpoint before ingesting and freezes state on unverifiable evidence. There is no transactional outbox: every transaction commits synchronously inside the single writer, so there is no background fan-out to resume. Obsolete `PENDING` intents expire on their next execution attempt (`INTENT_EXPIRED`); there is no sweeper. Unique business keys (`order_intents.evaluation_id`, `order_intents.idempotency_key`, `orders.intent_id`, `fills.order_id`, `ledger_entries.business_key`) make replays read-only.
 

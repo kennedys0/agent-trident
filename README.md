@@ -126,7 +126,7 @@ pnpm test
 pnpm build
 ```
 
-Expected results: typecheck and build finish clean; tests report contract 17, API 84 with 4 skipped real-RPC tests, and web 42.
+Expected results: typecheck and build finish clean; tests report contract 17, API 87 with 4 skipped real-RPC tests, and web 42.
 
 To include the four tests that call the live RPC:
 
@@ -160,7 +160,7 @@ The API builds `@trident/api-contract` before it type-checks or tests, so the AP
 - Public RPC: `https://rpc.mainnet.chain.robinhood.com`
 - Uniswap v3 factory: `0x1f7d7550b1b028f7571e69a784071f0205fd2efa`
 - QuoterV2: `0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7`
-- WETH/USDG pool at the `0.01%` fee tier: `0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca`
+- WETH/USDG pool at Uniswap v3 **fee tier 100** (100/1,000,000 = 0.01%, tick spacing 1): `0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca`. "Fee tier 100" is the protocol term; "0.01%" is the same thing in plain percent. It is not "100 bps" (that would be 1%). The other on-chain tiers are `500` (0.05%, spacing 10), `3000` (0.3%, spacing 60), and `10000` (1%, spacing 200). Verified against the mainnet contract on 2026-11-12: `getPool(WETH, USDG, 100)` → `0x52e6…71Ca`, `pool.fee()` → `100`, `tickSpacing()` → `1`
 - The public RPC is polling-only and non-archive. Historical state reaches roughly 5,000 blocks back, so the risk gate rejects snapshots beyond that window.
 
 The testnet, chain ID `46630`, has no Uniswap v3 deployment and no USDG. It is unusable for this system.
@@ -170,9 +170,10 @@ The testnet, chain ID `46630`, has no Uniswap v3 deployment and no USDG. It is u
 Do not expose this application to a network you do not control.
 
 - No authentication, CSRF protection, rate limiting, request body limit, or TLS. The API binds loopback only.
-- No host allowlist for RPC endpoints; any HTTPS URL is accepted if it reports chain ID `4663`.
-- `zod@3` is in use and needs an upgrade to clear a known advisory before any deployment review.
-- No Dockerfile, Compose file, or CI pipeline is committed, so container hardening, backup and restore drills, and deployment checks are unproven.
+- No host allowlist for RPC endpoints; any HTTPS URL is accepted if it reports chain ID `4663`. Tracked as Sprint 2 S2-03 (PR under review).
+- `zod@3` is in use and needs an upgrade to clear a known advisory before any deployment review. Tracked as Sprint 2 S2-01 (upgrade PR open).
+- No Dockerfile or Compose file is committed, so container hardening, backup and restore drills, and deployment checks are unproven. A deterministic CI pipeline is an open PR (Sprint 2 S2-02), not yet in `main`.
+- Completed Phase 1 issues are reconciled, with close recommendations, in [docs/phase-1-reconciliation.md](docs/phase-1-reconciliation.md). They remain open until the coordinator closes them.
 - One venue and one pool, no independent price oracle. A second RPC provider for finality and failover is future work.
 - The kill switch is not released automatically after a reorg or missing chain evidence. An operator must clear it.
 - The public RPC has no `eth_subscribe`, so latency and freshness depend on the 10-second poll.
