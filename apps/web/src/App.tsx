@@ -10,6 +10,8 @@ import { RiskPage } from './features/risk/RiskPage.js';
 import { PortfolioPage } from './features/portfolio/PortfolioPage.js';
 import { JournalPage } from './features/journal/JournalPage.js';
 import { MorePage } from './features/more/MorePage.js';
+import { DiscoverPage } from './features/discover/DiscoverPage.js';
+import { PoolInspectorPage } from './features/discover/PoolInspectorPage.js';
 
 function NotFound(): ReactNode {
   return (
@@ -29,6 +31,8 @@ export function App(): ReactNode {
         <Routes>
           <Route element={<Shell />}>
             <Route index element={<OverviewPage />} />
+            <Route path="discover" element={<DiscoverPage />} />
+            <Route path="discover/pools/:address" element={<PoolInspectorPage />} />
             <Route path="candidates" element={<CandidatesPage />} />
             <Route path="candidates/:id" element={<CandidateDetailPage />} />
             <Route path="risk" element={<RiskPage />} />

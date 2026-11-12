@@ -1,0 +1,188 @@
+{
+  "generatedAt": "2026-11-12T16:49:47.794Z",
+  "baseUrl": "http://127.0.0.1:4173",
+  "dataSource": "FIXTURE: S3-02 is not merged into main (PR #25); every API response below is intercepted in the browser.",
+  "widths": [
+    320,
+    375,
+    768,
+    1024,
+    1280
+  ],
+  "screenshots": [
+    "listing-320.png",
+    "listing-375.png",
+    "listing-768.png",
+    "listing-1024.png",
+    "listing-1280.png",
+    "pool-refresh-error-375.png",
+    "pool-unknown-375.png",
+    "watch-pending-375.png",
+    "watch-success-375.png",
+    "state-loading-375.png",
+    "state-empty-375.png",
+    "state-unavailable-375.png",
+    "state-error-375.png",
+    "state-rejected-375.png",
+    "state-offline-375.png",
+    "pool-inspector-320.png",
+    "pool-inspector-375.png",
+    "pool-inspector-768.png",
+    "pool-inspector-1024.png",
+    "pool-inspector-1280.png",
+    "listing-dark-320.png",
+    "listing-dark-375.png",
+    "listing-dark-768.png",
+    "listing-dark-1024.png",
+    "listing-dark-1280.png"
+  ],
+  "axe": [
+    {
+      "page": "discover-320",
+      "violations": []
+    },
+    {
+      "page": "discover-375",
+      "violations": []
+    },
+    {
+      "page": "discover-768",
+      "violations": []
+    },
+    {
+      "page": "discover-1024",
+      "violations": []
+    },
+    {
+      "page": "discover-1280",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-320",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-375",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-768",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-1024",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-1280",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-320",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-320",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-375",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-375",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-768",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-768",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-1024",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-1024",
+      "violations": []
+    },
+    {
+      "page": "discover-dark-1280",
+      "violations": []
+    },
+    {
+      "page": "pool-inspector-dark-1280",
+      "violations": []
+    }
+  ],
+  "keyboard": [
+    "a",
+    "nav-overview",
+    "nav-discover",
+    "nav-candidates",
+    "nav-risk",
+    "nav-portfolio",
+    "nav-more",
+    "a",
+    "theme-toggle",
+    "discover-search-input",
+    "discover-search-submit",
+    "filter-quality-ANY"
+  ],
+  "layout": [
+    {
+      "width": 320,
+      "viewportScrollWidth": 320,
+      "bodyScrollWidth": 320,
+      "overflowingCells": []
+    },
+    {
+      "width": 375,
+      "viewportScrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "overflowingCells": []
+    },
+    {
+      "width": 768,
+      "viewportScrollWidth": 768,
+      "bodyScrollWidth": 768,
+      "overflowingCells": []
+    },
+    {
+      "width": 1024,
+      "viewportScrollWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "overflowingCells": []
+    },
+    {
+      "width": 1280,
+      "viewportScrollWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "overflowingCells": []
+    }
+  ],
+  "states": {
+    "poolRefreshError": "Pool refresh failed: RPC read failed at pinned block. Showing the last successful response with stale status.\nRetry",
+    "poolUnknown": "Unknown pool\n\n0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca\n\nRetry",
+    "watchlist": {
+      "pendingPressed": "false",
+      "pendingBusy": "true",
+      "persistedPressed": "true",
+      "calls": [
+        "GET /api/v1/pools/0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+        "GET /api/v1/watchlist",
+        "POST /api/v1/watchlist",
+        "GET /api/v1/watchlist"
+      ]
+    },
+    "loading": "Loading pools…",
+    "empty": "No pools discovered yet\n\nDiscovery has not published any pools yet.\n\nRetry",
+    "unavailable": "Showing 1–1 of 1 indexed pools · 1 visible after on-page filters · 0 available · 0 stale · 1 unavailable",
+    "error": "Backend error\n\nThe backend could not complete this request.\n\nRetry",
+    "rejected": "Request rejected\n\nInvalid query parameters for pool discovery\n\nRetry",
+    "offline": "You are offline\n\nPools cannot be loaded until the browser reconnects.\n\nRetry"
+  }
+}
