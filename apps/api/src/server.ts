@@ -42,6 +42,7 @@ async function main(): Promise<void> {
     strategyConfig: DEFAULT_STRATEGY_CONFIG,
     market,
     quote: createQuotePort(chain, verified.venue),
+    chain,
     probe: async () => {
       const started = Date.now();
       const head = await chain.getHead();

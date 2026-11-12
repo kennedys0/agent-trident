@@ -287,4 +287,36 @@ CREATE INDEX idx_strategy_evaluations_canonical ON strategy_evaluations (created
 CREATE INDEX idx_chain_reorgs_pool ON chain_reorgs (pool_id, detected_at DESC);
 `,
   },
+  {
+    version: '005_market_intelligence',
+    // S3-02: additive read-only Discover state. No table is altered or dropped.
+    sql: `
+CREATE TABLE watchlist_entries (
+  address TEXT PRIMARY KEY CHECK (length(address) = 42 AND lower(substr(address, 1, 2)) = '0x'),
+  added_at TEXT NOT NULL
+);
+
+CREATE TABLE pool_market_snapshots (
+  id TEXT PRIMARY KEY,
+  pool TEXT NOT NULL,
+  block_number INTEGER NOT NULL,
+  sqrt_price_x96 TEXT NOT NULL,
+  tick INTEGER NOT NULL,
+  liquidity TEXT NOT NULL,
+  reserve0 TEXT NOT NULL,
+  reserve1 TEXT NOT NULL,
+  price_token1_per_token0 TEXT NOT NULL,
+  price_token0_per_token1 TEXT NOT NULL,
+  confidence TEXT NOT NULL CHECK (confidence = 'LOW'),
+  status TEXT NOT NULL CHECK (status IN ('AVAILABLE','STALE','UNAVAILABLE')),
+  source TEXT NOT NULL,
+  source_time TEXT NOT NULL,
+  observed_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (pool, block_number)
+);
+
+CREATE INDEX idx_pool_market_snapshots_pool ON pool_market_snapshots (pool, block_number DESC);
+`,
+  },
 ];
