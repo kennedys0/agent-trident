@@ -45,9 +45,9 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-The defaults target Robinhood Chain mainnet and write the database to `./data/trident.sqlite`. `RPC_URL` is the only value without a fallback, so the API refuses to boot if it is missing or not HTTPS.
+The defaults target Robinhood Chain mainnet and write the database to `./data/trident.sqlite`. `RPC_URL` is the only value without a fallback, so the API refuses to boot if it is missing, is not HTTPS, embeds credentials, or names a host outside `RPC_ALLOWED_HOSTS`.
 
-Edit `.env` only if you need a different port, database path, or RPC endpoint. Keep `EXPECTED_CHAIN_ID=4663`; any other value aborts boot.
+Edit `.env` only if you need a different port, database path, or RPC endpoint. Keep `EXPECTED_CHAIN_ID=4663`; any other value aborts boot. To use another provider, add its bare hostname to `RPC_ALLOWED_HOSTS` (comma separated). Loopback, private, link-local and IP-literal hosts are rejected even if listed.
 
 ### 3. Build the workspace
 
@@ -103,7 +103,8 @@ The preview server listens on http://127.0.0.1:4173 and uses the same API proxy.
 | Variable | Default | Meaning |
 |---|---|---|
 | `EXECUTION_MODE` | `PAPER` | `OBSERVE` or `PAPER`; any other value aborts boot |
-| `RPC_URL` | none | HTTPS JSON-RPC endpoint, required |
+| `RPC_URL` | none | HTTPS JSON-RPC endpoint, required; must match `RPC_ALLOWED_HOSTS` |
+| `RPC_ALLOWED_HOSTS` | `rpc.mainnet.chain.robinhood.com` | Comma-separated bare hostnames approved for RPC traffic |
 | `EXPECTED_CHAIN_ID` | `4663` | Must equal `4663` |
 | `DATABASE_PATH` | `./data/trident.sqlite` | SQLite file, relative to the working directory |
 | `PORT` | `8080` | API port |
@@ -126,7 +127,7 @@ pnpm test
 pnpm build
 ```
 
-Expected results: typecheck and build finish clean; tests report contract 17, API 87 with 4 skipped real-RPC tests, and web 42.
+Expected results: typecheck and build finish clean; tests report contract 19, API 156 with 4 skipped real-RPC tests, and web 42.
 
 To include the four tests that call the live RPC:
 
@@ -170,9 +171,8 @@ The testnet, chain ID `46630`, has no Uniswap v3 deployment and no USDG. It is u
 Do not expose this application to a network you do not control.
 
 - No authentication, CSRF protection, rate limiting, request body limit, or TLS. The API binds loopback only.
-- No host allowlist for RPC endpoints; any HTTPS URL is accepted if it reports chain ID `4663`. Tracked as Sprint 2 S2-03 (PR under review).
-- `zod@3` is in use and needs an upgrade to clear a known advisory before any deployment review. Tracked as Sprint 2 S2-01 (upgrade PR open).
-- No Dockerfile or Compose file is committed, so container hardening, backup and restore drills, and deployment checks are unproven. A deterministic CI pipeline is an open PR (Sprint 2 S2-02), not yet in `main`.
+- RPC endpoints require HTTPS, an exact `RPC_ALLOWED_HOSTS` match, public DNS resolution, and chain ID `4663`; redirects are rejected. DNS-rebinding between boot validation and later requests is not fully eliminated.
+- No Dockerfile or Compose file is committed, so container hardening and backup and restore drills are unproven. CI covers deterministic gates only; see [docs/CI.md](docs/CI.md).
 - Completed Phase 1 issues are reconciled, with close recommendations, in [docs/phase-1-reconciliation.md](docs/phase-1-reconciliation.md). They remain open until the coordinator closes them.
 - One venue and one pool, no independent price oracle. A second RPC provider for finality and failover is future work.
 - The kill switch is not released automatically after a reorg or missing chain evidence. An operator must clear it.

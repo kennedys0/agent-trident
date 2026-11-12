@@ -1,0 +1,61 @@
+name: Real RPC (non-deterministic, isolated)
+
+# These checks talk to the public Robinhood Chain RPC and can fail for reasons
+# unrelated to the code (network, upstream rate limits). They are deliberately
+# kept out of the pull_request path so they can never turn a deterministic PR
+# result red or green on their own.
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily, 06:00 UTC.
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-rpc-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '9.12.3'
+  RUN_RPC_TESTS: '1'
+  RPC_URL: 'https://rpc.mainnet.chain.robinhood.com'
+
+jobs:
+  real-rpc:
+    name: Real RPC checks (Robinhood Chain 4663, live network)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (no persisted credentials)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Record toolchain versions
+        run: |
+          node --version
+          pnpm --version
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm --filter @trident/api-contract build
+
+      - name: Real-network chain checks (read-only, no signing)
+        run: pnpm --filter @trident/api exec vitest run test/chain-rpc.test.ts

@@ -7,8 +7,8 @@ offer to deploy.
 
 - Node.js 24, pnpm 9.12.3 (pinned in `package.json`), Git.
 - No Docker/Podman is available to validate a container manifest, and no Compose
-  file or CI deployment is committed. A deterministic CI pipeline is an open PR
-  (Sprint 2, S2-02); it is not a deployment and it is not merged yet.
+  file or deployment workflow is committed. Deterministic CI is committed; it
+  does not deploy the application.
 - The application binds `127.0.0.1` by default. Do not expose it to any network
   you do not control.
 

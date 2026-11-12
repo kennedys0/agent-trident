@@ -47,7 +47,8 @@ in this slice at all.
 | Variable | Default | Meaning |
 |---|---|---|
 | `EXECUTION_MODE` | `PAPER` | `OBSERVE` or `PAPER`; anything else aborts boot |
-| `RPC_URL` | — | HTTPS JSON-RPC endpoint (server-side only) |
+| `RPC_URL` | — | HTTPS JSON-RPC endpoint (server-side only); host must be allowlisted |
+| `RPC_ALLOWED_HOSTS` | `rpc.mainnet.chain.robinhood.com` | Bare hostnames approved for RPC traffic, comma separated |
 | `EXPECTED_CHAIN_ID` | `4663` | Must equal `4663`; a different value aborts boot |
 | `DATABASE_PATH` | `./data/trident.sqlite` | SQLite file (WAL) |
 | `PORT` / `HOST` | `8080` / `127.0.0.1` | Bind address; loopback by default |
@@ -191,7 +192,7 @@ carry `quantity` and `cost_basis` in base units; unrealized PnL is
 ## Tests
 
 ```bash
-pnpm --filter @trident/api test           # 87 offline tests, 4 skipped
+pnpm --filter @trident/api test           # 156 offline tests, 4 skipped
 RUN_RPC_TESTS=1 pnpm --filter @trident/api test   # adds 4 real-RPC tests
 ```
 

@@ -10,13 +10,13 @@ approval that has never been given.
 2. Vertical slice: verified WETH/USDG snapshot, deterministic WAIT/BUY evaluation, fail-closed risk gate, paper order, ledger, UI. — contracts (#7), backend (#8), UI (#9) merged.
 3. Reliability: checkpoints, restart recovery, replay/idempotency, stale/RPC fault injection, atomic audit. — merged via #8; independent re-review on `f4e1f6a` closed the reorg-recovery and risk-transaction defects.
 
-## Phase 2 — Stability and security (current, PAPER only)
+## Phase 2 — Stability and security (PAPER only)
 
-4. Sprint 2 workstreams, each on its own branch with its own PR to `main`:
-   - S2-01 dependency security: `zod` GHSA-mrhx-c7xc-m3w5, patched upgrade, lockfile. (issue #12, open PR #15)
-   - S2-02 GitHub CI: deterministic gates, real-RPC isolated. (issue #11, open PR #16)
-   - S2-03 RPC security: hostname allowlist, HTTPS, chain ID 4663, no redirects, SSRF defenses. (issue #13)
-   - S2-04 technical debt: documentation accuracy, schema debt, halt visibility, fee-tier terminology, issue reconciliation. (issue #14, this change)
+4. Sprint 2 workstreams:
+   - S2-01 dependency security: `zod` GHSA-mrhx-c7xc-m3w5, patched upgrade, lockfile. (issue #12, PR #15)
+   - S2-02 GitHub CI: deterministic gates, real-RPC isolated. (issue #11, PR #16)
+   - S2-03 RPC security: hostname allowlist, HTTPS, chain ID 4663, no redirects, SSRF defenses. (issue #13, PR #18)
+   - S2-04 technical debt: documentation accuracy, schema debt, halt visibility, fee-tier terminology, issue reconciliation. (issue #14, PR #17)
 5. Documentation matches the implementation. Remaining debt is documented, not hidden:
    no transactional outbox (single synchronous writer), `portfolio_snapshots` /
    `strategy_configs` retained but unused, halt reason exposed at `/health` meta.

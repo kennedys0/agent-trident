@@ -1,8 +1,8 @@
-import { extendZodWithOpenApi, OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
+import './zod-openapi.js';
+import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
 import type { OpenAPIObject } from 'openapi3-ts/oas31';
 import { z } from 'zod';
 
-extendZodWithOpenApi(z);
 import {
   auditEventSchema,
   candidateSchema,
