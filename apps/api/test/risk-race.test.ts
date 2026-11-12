@@ -19,6 +19,7 @@ import { createFakeChain, createFakeQuotePort, fakeBlock, makeDb, makeSnapshot, 
 const config: Config = {
   mode: 'PAPER',
   rpcUrl: 'https://rpc.mainnet.chain.robinhood.com',
+  rpcAllowedHosts: ['rpc.mainnet.chain.robinhood.com'],
   expectedChainId: 4663,
   databasePath: ':memory:',
   port: 0,

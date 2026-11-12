@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ChainClient } from '../src/chain/client.js';
+import { DEFAULT_RPC_ALLOWED_HOSTS } from '../src/chain/rpc-guard.js';
 import { EXPECTED_POOL, verifyVenue } from '../src/chain/venue.js';
 import { openDatabase } from '../src/db/index.js';
 import { seedReferenceData, insertSnapshot } from '../src/db/repositories.js';
@@ -24,7 +25,13 @@ describe.skipIf(!RUN)('real Robinhood Chain RPC', () => {
   }, 60_000);
 
   it('rejects a mismatched chain id', async () => {
-    const chain = new ChainClient({ rpcUrl: 'https://rpc.testnet.chain.robinhood.com', minIntervalMs: 100 });
+    const chain = new ChainClient({
+      rpcUrl: 'https://rpc.testnet.chain.robinhood.com',
+      // The testnet host is intentionally outside the default allowlist; opt in
+      // here only so the chain-id mismatch path is what fails.
+      allowedRpcHosts: [...DEFAULT_RPC_ALLOWED_HOSTS, 'rpc.testnet.chain.robinhood.com'],
+      minIntervalMs: 100,
+    });
     await expect(chain.assertChain()).rejects.toThrow(/does not match/);
   }, 60_000);
 

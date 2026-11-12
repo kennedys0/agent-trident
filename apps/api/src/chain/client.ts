@@ -1,5 +1,11 @@
 import { createPublicClient, defineChain, http, type PublicClient } from 'viem';
 import { ROBINHOOD_CHAIN_ID } from '../config.js';
+import {
+  DEFAULT_RPC_ALLOWED_HOSTS,
+  assertSafeRpcUrl,
+  createGuardedRpcFetch,
+  type RpcFetch,
+} from './rpc-guard.js';
 import { erc20Abi, quoterV2Abi, uniswapV3FactoryAbi, uniswapV3PoolAbi } from './abi.js';
 
 export const robinhoodChain = defineChain({
@@ -58,6 +64,10 @@ export type RpcTransport = {
 
 export type ChainClientOptions = {
   readonly rpcUrl: string;
+  /** Hosts approved for RPC traffic; defaults to the verified Robinhood host. */
+  readonly allowedRpcHosts?: readonly string[];
+  /** Test seam for the HTTP layer; the default is the guarded fetch below. */
+  readonly fetchFn?: RpcFetch;
   readonly minIntervalMs?: number;
   readonly timeoutMs?: number;
   readonly maxRetries?: number;
@@ -79,9 +89,17 @@ export class ChainClient implements ChainReadPort {
   private lastCallAt = 0;
 
   constructor(options: ChainClientOptions) {
+    const allowedRpcHosts = options.allowedRpcHosts ?? DEFAULT_RPC_ALLOWED_HOSTS;
+    // Fail closed before any traffic: an unsafe or unapproved endpoint never
+    // becomes a public client, so market/risk reads cannot be redirected.
+    const rpcUrl = assertSafeRpcUrl(options.rpcUrl, allowedRpcHosts).toString();
+    const fetchFn = createGuardedRpcFetch({
+      allowedHosts: allowedRpcHosts,
+      ...(options.fetchFn === undefined ? {} : { baseFetch: options.fetchFn }),
+    });
     this.client = createPublicClient({
       chain: robinhoodChain,
-      transport: http(options.rpcUrl, { timeout: options.timeoutMs ?? 15_000, retryCount: 0 }),
+      transport: http(rpcUrl, { timeout: options.timeoutMs ?? 15_000, retryCount: 0, fetchFn }),
     });
     this.minIntervalMs = options.minIntervalMs ?? 250;
     this.maxRetries = options.maxRetries ?? 3;

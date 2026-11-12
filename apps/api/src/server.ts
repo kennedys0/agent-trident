@@ -3,6 +3,7 @@ import { openDatabase } from './db/index.js';
 import { acquireInstanceLock, releaseInstanceLock } from './db/lock.js';
 import { seedOpeningCash, seedReferenceData, seedStrategyConfig } from './db/repositories.js';
 import { ChainClient } from './chain/client.js';
+import { assertRpcHostResolvesPublic } from './chain/rpc-guard.js';
 import { USDG, VERIFIED_VENUE, WETH, verifyVenue } from './chain/venue.js';
 import { DEFAULT_STRATEGY_CONFIG } from './domain/strategy.js';
 import { createMarketService } from './services/market.js';
@@ -12,10 +13,13 @@ import { startWorker } from './worker.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  // SSRF preflight: refuse to start if the approved host resolves to loopback,
+  // a private range or cloud metadata. Runs before the database is opened.
+  await assertRpcHostResolvesPublic(new URL(config.rpcUrl).hostname);
   const db = openDatabase(config.databasePath);
   acquireInstanceLock(db);
 
-  const chain = new ChainClient({ rpcUrl: config.rpcUrl });
+  const chain = new ChainClient({ rpcUrl: config.rpcUrl, allowedRpcHosts: config.rpcAllowedHosts });
   const chainId = await chain.assertChain();
   const verified = await verifyVenue(chain);
 
