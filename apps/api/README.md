@@ -38,7 +38,8 @@ in this slice at all.
 | Variable | Default | Meaning |
 |---|---|---|
 | `EXECUTION_MODE` | `PAPER` | `OBSERVE` or `PAPER`; anything else aborts boot |
-| `RPC_URL` | — | HTTPS JSON-RPC endpoint (server-side only) |
+| `RPC_URL` | — | HTTPS JSON-RPC endpoint (server-side only); host must be allowlisted |
+| `RPC_ALLOWED_HOSTS` | `rpc.mainnet.chain.robinhood.com` | Bare hostnames approved for RPC traffic, comma separated |
 | `EXPECTED_CHAIN_ID` | `4663` | Must equal `4663`; a different value aborts boot |
 | `DATABASE_PATH` | `./data/trident.sqlite` | SQLite file (WAL) |
 | `PORT` / `HOST` | `8080` / `127.0.0.1` | Bind address; loopback by default |

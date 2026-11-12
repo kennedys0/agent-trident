@@ -45,9 +45,9 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-The defaults target Robinhood Chain mainnet and write the database to `./data/trident.sqlite`. `RPC_URL` is the only value without a fallback, so the API refuses to boot if it is missing or not HTTPS.
+The defaults target Robinhood Chain mainnet and write the database to `./data/trident.sqlite`. `RPC_URL` is the only value without a fallback, so the API refuses to boot if it is missing, is not HTTPS, embeds credentials, or names a host outside `RPC_ALLOWED_HOSTS`.
 
-Edit `.env` only if you need a different port, database path, or RPC endpoint. Keep `EXPECTED_CHAIN_ID=4663`; any other value aborts boot.
+Edit `.env` only if you need a different port, database path, or RPC endpoint. Keep `EXPECTED_CHAIN_ID=4663`; any other value aborts boot. To use another provider, add its bare hostname to `RPC_ALLOWED_HOSTS` (comma separated). Loopback, private, link-local and IP-literal hosts are rejected even if listed.
 
 ### 3. Build the workspace
 
@@ -103,7 +103,8 @@ The preview server listens on http://127.0.0.1:4173 and uses the same API proxy.
 | Variable | Default | Meaning |
 |---|---|---|
 | `EXECUTION_MODE` | `PAPER` | `OBSERVE` or `PAPER`; any other value aborts boot |
-| `RPC_URL` | none | HTTPS JSON-RPC endpoint, required |
+| `RPC_URL` | none | HTTPS JSON-RPC endpoint, required; must match `RPC_ALLOWED_HOSTS` |
+| `RPC_ALLOWED_HOSTS` | `rpc.mainnet.chain.robinhood.com` | Comma-separated bare hostnames approved for RPC traffic |
 | `EXPECTED_CHAIN_ID` | `4663` | Must equal `4663` |
 | `DATABASE_PATH` | `./data/trident.sqlite` | SQLite file, relative to the working directory |
 | `PORT` | `8080` | API port |
