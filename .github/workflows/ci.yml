@@ -96,5 +96,8 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
+      - name: Test the dependency gate itself (fail-closed paths)
+        run: node --test scripts/audit-gate.test.mjs
+
       - name: Audit production dependencies
         run: node scripts/audit-gate.mjs

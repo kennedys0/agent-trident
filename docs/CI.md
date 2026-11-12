@@ -32,13 +32,28 @@ Notes:
 `scripts/audit-gate.mjs` runs `pnpm audit --prod --json` and fails on any
 high or critical advisory affecting production dependencies.
 
+The gate validates its own input before deciding anything:
+
+- a report carrying a top-level `error` (for example a missing lockfile or an
+  unreachable registry) fails the gate instead of counting as zero advisories;
+- a report with an unrecognised shape — no `advisories` object and not an
+  array — fails the gate;
+- a summary that claims high/critical vulnerabilities while listing no
+  advisory objects fails the gate;
+- unreadable or unparsable audit output fails the gate.
+
 An advisory is tolerated only when `.github/audit-allowlist.json` names its
 advisory id, the affected package, the tracking issue, and an expiry date.
-The gate fails closed in every other direction:
+Every entry is schema-validated: `advisory`, `package`, `tracking` (an http(s)
+URL), and `expires` (a real `YYYY-MM-DD` date) are required. A missing or
+impossible date therefore fails the gate rather than becoming a permanent
+exception. An allowlist file that is not valid JSON, or whose `entries` is not
+an array, also fails the gate.
 
-- unknown high/critical advisory → fail;
-- expired allowlist entry that still matches → fail;
-- unreadable or unparsable audit output → fail.
+`node --test scripts/audit-gate.test.mjs` (`pnpm audit:gate:test`) proves these
+paths with pinned fixtures and asserts the real CLI exit codes. The
+`Dependency security` job runs those tests before the live audit, so a
+regression in the gate itself turns the job red.
 
 An allowlist entry that no longer matches anything is reported as stale so it
 can be deleted. The file is meant to shrink to nothing; it is not a permanent
@@ -74,6 +89,7 @@ And the dependency gate:
 
 ```bash
 pnpm install --frozen-lockfile
+node --test scripts/audit-gate.test.mjs
 node scripts/audit-gate.mjs
 ```
 
