@@ -1,0 +1,13 @@
+{
+  "description": "Known production advisories that are tracked and time-boxed. Anything high or critical that is not listed here fails the dependency-audit job. An expired entry fails the job, so it cannot silently outlive its fix.",
+  "entries": [
+    {
+      "advisory": "GHSA-mrhx-c7xc-m3w5",
+      "package": "zod",
+      "severity": "high",
+      "reason": "Uncontrolled memory consumption while validating oversized arrays. Patched in zod >= 4.6.6; the upgrade needs the paired zod-to-openapi bump and is in progress on the S2-01 branch.",
+      "tracking": "https://github.com/kennedys0/agent-trident/issues/12",
+      "expires": "2026-12-12"
+    }
+  ]
+}

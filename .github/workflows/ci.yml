@@ -1,0 +1,100 @@
+name: CI
+
+# Deterministic gates only. Nothing in this workflow may reach a live chain:
+# real-RPC checks live in .github/workflows/real-rpc.yml and never run here.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '9.12.3'
+  # Belt and braces: the unit suite skips real-network describes unless this is
+  # exactly "1". The isolation guard below fails the job if it ever becomes "1".
+  RUN_RPC_TESTS: '0'
+
+jobs:
+  deterministic:
+    name: Deterministic gates (typecheck, tests, build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout (no persisted credentials)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Record toolchain versions
+        run: |
+          node --version
+          pnpm --version
+          node -e "require('node:sqlite'); console.log('node:sqlite available')"
+
+      - name: Assert deterministic isolation (real-RPC must stay off)
+        run: |
+          if [ "${RUN_RPC_TESTS}" != "0" ]; then
+            echo "::error::RUN_RPC_TESTS=${RUN_RPC_TESTS}; deterministic CI must not run real-RPC tests."
+            exit 1
+          fi
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests (deterministic; real-RPC describes skipped)
+        run: pnpm test
+
+      - name: Build (production bundles)
+        run: pnpm build
+
+  dependency-audit:
+    name: Dependency security (high and critical)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (no persisted credentials)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: node scripts/audit-gate.mjs
