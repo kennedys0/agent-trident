@@ -77,7 +77,7 @@
   gap: 6px;
   min-height: 44px;
   padding: 6px 12px;
-  border: 2px solid var(--ink);
+  border: var(--border-width) solid var(--ink);
   border-radius: var(--radius);
   background: var(--canvas);
   color: var(--ink);
@@ -281,8 +281,7 @@
 
   .discover-table,
   .discover-table tbody,
-  .discover-table tr,
-  .discover-table td {
+  .discover-table tr {
     display: block;
     width: 100%;
   }
