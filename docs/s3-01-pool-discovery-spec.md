@@ -83,8 +83,13 @@ CREATE INDEX idx_discovered_pools_seen ON discovered_pools (first_seen_block DES
   25); if still capped at 25 blocks, mark the range `UNAVAILABLE`, log + audit,
   skip it, continue from `to_block + 1`. Never loop unbounded; never scan the
   same block twice after a crash.
-- `topic0` = `0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118`
-  for `PoolCreated(address,address,uint24,int24,address)`.
+- Verified event layout (corrected against a real log at block 112297142):
+  `topic0` = `0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118`
+  for `PoolCreated(address,address,uint24,int24,address)`; `token0`, `token1`
+  and `fee` are INDEXED topics (`fee` in `topics[3]`); `data` = `tickSpacing`
+  (int24, 32 bytes) followed by `pool` (address, 32 bytes, left-padded).
+  For fee tier 10000 the real log shows tickSpacing `0x00c8` = 200 — the
+  standard Uniswap fee↔tickSpacing pairing.
 - Verify the factory before any `getLogs`: `getCodeSize(factory) > 0` and compare
   `keccak256(factoryCode)` against the constant recorded at implementation time
   (probe measured `0xec72b1abd1f2faee020cfea9c646bd8994f9fb389054f6e574f103a895091739`;
