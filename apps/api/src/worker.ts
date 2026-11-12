@@ -6,6 +6,8 @@ import type { MarketService } from './services/market.js';
 import { ChainEvidenceUnavailableError, ReorgDetectedError } from './services/market.js';
 
 export const SNAPSHOT_INTERVAL_MS = 10_000;
+/** Identical hold/reorg lines repeat at most this often; the first is always logged. */
+export const HOLD_REPEAT_LOG_MS = 30 * 60 * 1000;
 
 export type Worker = {
   readonly tick: () => Promise<void>;
@@ -26,6 +28,25 @@ export function startWorker(input: {
 }): Worker {
   let running = false;
   let timer: NodeJS.Timeout | null = null;
+  /**
+   * HOLD conditions persist until an operator acts, so a 10 s poll would emit
+   * 8,640 identical lines a day. Log the first occurrence, then one line every
+   * HOLD_REPEAT_LOG_MS with the count of suppressed repeats; reset on recovery.
+   */
+  let holdLog: { key: string | null; loggedAt: number; suppressed: number } = { key: null, loggedAt: 0, suppressed: 0 };
+  const logHold = (fields: Record<string, unknown>, message: string) => {
+    const key = `${fields['kind']}:${fields['checkpointBlock'] ?? fields['divergenceBlock'] ?? ''}:${String(fields['detail'] ?? '')}`;
+    const now = Date.now();
+    if (key === holdLog.key && now - holdLog.loggedAt < HOLD_REPEAT_LOG_MS) {
+      holdLog.suppressed += 1;
+      return;
+    }
+    input.logger.error({ ...fields, suppressedSinceLast: holdLog.suppressed }, message);
+    holdLog = { key, loggedAt: now, suppressed: 0 };
+  };
+  const resetHoldLog = () => {
+    holdLog = { key: null, loggedAt: 0, suppressed: 0 };
+  };
 
   const tick = async (): Promise<void> => {
     if (running) return;
@@ -39,6 +60,7 @@ export function startWorker(input: {
         return;
       }
       const evaluation = input.market.evaluate(snapshot);
+      resetHoldLog();
       input.logger.info(
         { blockNumber: snapshot.blockNumber, snapshotStatus: snapshot.status, action: evaluation.action, evaluationId: evaluation.id },
         'market tick',
@@ -47,7 +69,7 @@ export function startWorker(input: {
       if (error instanceof ChainEvidenceUnavailableError) {
         // No divergence is proven: state and checkpoint stay untouched, and a
         // later tick retries once the provider can answer for the checkpoint.
-        input.logger.error(
+        logHold(
           {
             kind: error.kind,
             reason: error.hold.reason,
@@ -61,7 +83,7 @@ export function startWorker(input: {
       if (error instanceof ReorgDetectedError) {
         // The service already rewound the projections and engaged the kill
         // switch; log the audit trail link and wait for a canonical re-anchor.
-        input.logger.error(
+        logHold(
           { kind: error.kind, reorgId: error.recovery.reorgId, divergenceBlock: error.recovery.divergenceBlock },
           'chain reorg detected; new entries halted pending canonical data',
         );

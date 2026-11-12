@@ -409,6 +409,20 @@ describe('HTTP API', () => {
     expect(health.json().meta.killSwitchEngaged).toBe(true);
   });
 
+  it('exposes the halt reason in /health and /api/v1/system/halt meta', async () => {
+    const server = makeApp();
+    const before = await server.inject({ method: 'GET', url: '/health' });
+    expect(before.json().meta.haltReason).toBeNull();
+    const halt = await server.inject({ method: 'POST', url: '/api/v1/system/halt', payload: { engaged: true } });
+    expect(halt.json().data.haltReason).toBe('OPERATOR');
+    const engaged = await server.inject({ method: 'GET', url: '/health' });
+    expect(engaged.json().meta.haltReason).toBe('OPERATOR');
+    const release = await server.inject({ method: 'POST', url: '/api/v1/system/halt', payload: { engaged: false } });
+    expect(release.json().data.haltReason).toBeNull();
+    const after = await server.inject({ method: 'GET', url: '/health' });
+    expect(after.json().meta.haltReason).toBeNull();
+  });
+
   it('returns a structured 404 envelope for unknown routes', async () => {
     const server = makeApp();
     const response = await server.inject({ method: 'GET', url: '/api/v1/nope' });

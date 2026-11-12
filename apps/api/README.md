@@ -7,6 +7,15 @@ and never calls `eth_send*`.
 
 ## Pipeline
 
+The venue is `WETH/USDG` at Uniswap v3 **fee tier 100** — 100/1,000,000 = 0.01%,
+tick spacing 1. "0.01%" is the correct term; "100 bps" would mean 1% and is wrong.
+On-chain verification (2026-11-12, mainnet 4663):
+`factory.getPool(WETH, USDG, 100)` = `0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca`,
+`pool.fee()` = `100`, `tickSpacing()` = `1`; the other active tiers are
+500 (0x69bf…8d9a, spacing 10), 3000 (0xa918…fB03, spacing 60) and
+10000 (0x5f00…680D, spacing 200). The 0.01% pool is allowlisted because it is the
+deepest; it is the only pool the service will touch.
+
 ```
 RPC (chain 4663) -> verifyVenue (factory.getPool) -> block-pinned snapshot
                 -> deterministic strategy -> fail-closed risk gate
@@ -53,7 +62,7 @@ Envelope: `{ "data": ..., "meta": { "requestId", "observedAt" } }` on success an
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/health` | mode, chain id, head block, RPC latency, kill switch. `503` when the chain id is wrong or the probe fails |
+| GET | `/health` | mode, chain id, head block, RPC latency, kill switch. `meta.haltReason` carries `CHAIN_REORG` / `CHAIN_EVIDENCE_UNAVAILABLE` / `OPERATOR` when entries are halted, `null` otherwise. `503` when the chain id is wrong or the probe fails |
 | GET | `/api/v1/venues` | allowlist: tokens, factory, quoter, router, factory-derived pool (`data` is an array) |
 | GET | `/api/v1/markets/weth-usdg/snapshot` | latest stored snapshot, freshness recomputed at read time; `404` before the first observation |
 | GET | `/api/v1/candidates?limit=` | latest strategy evaluations (`data` is an array) |
@@ -67,8 +76,9 @@ Every `data` payload is the type owned by `@trident/api-contract` and is produce
 through the mappers in `src/api/contract.ts`, which call the contract's zod
 schema. A contract change therefore fails the API build or its tests instead of
 drifting quietly. Facts the contract does not model (kill switch, RPC latency,
-`sqrtPriceX96`, pool liquidity) travel in `meta`; order, fill, and risk-decision
-ids live in `data`, so the intent route meta stays strict.
+`sqrtPriceX96`, pool liquidity, and the halt reason `haltReason`) travel in
+`meta`; order, fill, and risk-decision ids live in `data`, so the intent route
+meta stays strict.
 
 Error codes: `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`,
 `INTENT_NOT_ACTIONABLE`, `INTENT_EXPIRED`, `CHAIN_UNAVAILABLE`,
@@ -182,7 +192,7 @@ carry `quantity` and `cost_basis` in base units; unrealized PnL is
 ## Tests
 
 ```bash
-pnpm --filter @trident/api test           # 84 offline tests, 4 skipped
+pnpm --filter @trident/api test           # 156 offline tests, 4 skipped
 RUN_RPC_TESTS=1 pnpm --filter @trident/api test   # adds 4 real-RPC tests
 ```
 
@@ -348,13 +358,32 @@ Remaining follow-ups, recorded for the contract owner rather than worked around:
   exposure is tracked as a release blocker, not silently skipped.
 - **`GET /health` is at the root**, as specified in `ARCHITECTURE.md`; the rest
   of the surface is under `/api/v1`.
-- **Stacked on the contract branch.** This branch is based on
-  `feat/issue-6-domain-contracts` (`@trident/api-contract`), so it must not merge
-  before PR #7. `apps/api` builds the contract package before typecheck/test to
-  keep a clean checkout working.
+- **Merged stack.** This slice was built on the contract branch and has since
+  merged to `main` (PRs #7, #8). `apps/api` still builds the contract package
+  before typecheck/test to keep a clean checkout working.
 - **Contract conformance.** Health, venues, snapshot, candidates, intents,
   portfolio, and journal payloads are all produced through schema-validated
   mappers; the API tests parse each response with the contract schema.
+
+## Schema debt (kept, not dropped)
+
+- **`portfolio_snapshots`** was created in `001_init` and is never read or
+  written. It was reserved for a portfolio-projection table that does not exist
+  yet. It stays because dropping it would be a destructive migration for zero
+  benefit; nothing should be built on it until a reader exists, and the next
+  migration may drop it once that is true.
+- **`strategy_configs`** is written once at boot (`seedStrategyConfig`) and never
+  read back; `DEFAULT_STRATEGY_CONFIG` is the only source the strategy uses. Same
+  disposition: kept for audit value and migration compatibility, not removed.
+
+## HOLD logging
+
+The snapshot worker polls every 10 s. A `CHAIN_EVIDENCE_UNAVAILABLE` or
+reorg-HOLD condition persists until an operator releases the halt, so identical
+lines are now logged once at the change and then at most every
+`HOLD_REPEAT_LOG_MS` (30 minutes), with a `suppressedSinceLast` counter; the
+counter and the first line after every recovery keep the signal. Without this,
+a held system emits ~8,640 identical error lines per day.
 
 ## Known blockers
 

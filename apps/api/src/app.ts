@@ -17,6 +17,8 @@ import {
   getSnapshotById,
   isKillSwitchEngaged,
   isEvaluationQuarantined,
+  HALT_REASON_KEY,
+  getState,
   KILL_SWITCH_KEY,
   listEvaluations,
   listJournal,
@@ -110,6 +112,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     );
   });
 
+  const haltReason = (): string | null => getState(deps.db, HALT_REASON_KEY);
+
   app.get('/health', async (request, reply) => {
     const requestId = requestIdOf(request);
     try {
@@ -128,12 +132,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
           chainOk: chainIdOk,
           rpcLatencyMs: probe.latencyMs,
           killSwitchEngaged: isKillSwitchEngaged(deps.db),
+          haltReason: haltReason(),
         }),
       });
     } catch {
       return reply.status(503).send({
         data: toHealth({ mode: deps.config.mode, chainId: null, headBlock: null, lagSeconds: null }),
-        meta: meta(requestId, { expectedChainId: 4663, chainOk: false, rpcLatencyMs: null, killSwitchEngaged: isKillSwitchEngaged(deps.db) }),
+        meta: meta(requestId, { expectedChainId: 4663, chainOk: false, rpcLatencyMs: null, killSwitchEngaged: isKillSwitchEngaged(deps.db), haltReason: haltReason() }),
       });
     }
   });
@@ -310,7 +315,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         });
       }
     });
-    return reply.send({ data: { killSwitchEngaged: body.engaged }, meta: meta(requestId) });
+    return reply.send({
+      data: { killSwitchEngaged: body.engaged, haltReason: getState(deps.db, HALT_REASON_KEY) },
+      meta: meta(requestId),
+    });
   });
 
   return app;
