@@ -103,7 +103,7 @@ test('a genuinely clean report is accepted with zero advisories', () => {
 test('a summary claiming high vulnerabilities without advisory objects fails', () => {
   const { problems } = parseAuditReport(auditReport({}, { high: 2 }));
   assert.equal(problems.length, 1);
-  assert.match(problems[0], /claims 2 high\/critical/);
+  assert.match(problems[0], /reports 2 high\/critical/);
 });
 
 test('a bare array report is rejected as an unknown shape', () => {
@@ -141,16 +141,63 @@ test('an advisory without a package name is a problem', () => {
 test('a summary claiming more high advisories than the report lists fails', () => {
   const { problems } = parseAuditReport(auditReport({ 1: zodAdvisory }, { high: 2 }));
   assert.ok(
-    problems.some((p) => /claims 2 high\/critical .* only 1 blocking advisories/.test(p)),
+    problems.some((p) => /reports 2 high\/critical .* 1 blocking advisories were read/.test(p)),
     problems.join('; '),
   );
+});
+
+test('a summary undercounting a listed high advisory fails', () => {
+  const { problems } = parseAuditReport(auditReport({ 1: zodAdvisory }, { high: 0 }));
+  assert.ok(
+    problems.some((p) => /reports 0 high\/critical .* 1 blocking advisories were read/.test(p)),
+    problems.join('; '),
+  );
+});
+
+test('a report without metadata is refused', () => {
+  for (const report of [
+    { advisories: {} },
+    { advisories: {}, metadata: {} },
+    { advisories: {}, metadata: { vulnerabilities: {} } },
+    { advisories: {}, metadata: { vulnerabilities: 'unknown' } },
+  ]) {
+    const { problems } = parseAuditReport(report);
+    assert.ok(problems.length > 0, `expected a problem for ${JSON.stringify(report)}`);
+    assert.ok(
+      problems.some((p) => /metadata/.test(p)),
+      problems.join('; '),
+    );
+  }
+});
+
+test('null, fractional, and missing blocking counters fail', () => {
+  for (const summary of [
+    { high: null, critical: 0 },
+    { high: 0, critical: null },
+    { high: 0.5, critical: 0.5 },
+    { high: 0 },
+    {},
+  ]) {
+    const { problems } = parseAuditReport({
+      advisories: {},
+      metadata: { vulnerabilities: summary },
+    });
+    assert.ok(problems.length > 0, `expected a problem for ${JSON.stringify(summary)}`);
+  }
+});
+
+test('a tolerated high advisory with fractional counters still fails', () => {
+  const { problems } = parseAuditReport(
+    auditReport({ 1: zodAdvisory }, { high: 0.5, critical: 0.5 }),
+  );
+  assert.ok(problems.some((p) => /non-negative integer/.test(p)), problems.join('; '));
 });
 
 test('a malformed high advisory cannot hide a matching summary count', () => {
   const { severity, module_name, ...malformed } = zodAdvisory;
   const { problems } = parseAuditReport(auditReport({ 1: malformed }, { high: 1 }));
   assert.ok(problems.length >= 2, problems.join('; '));
-  assert.ok(problems.some((p) => /only 0 blocking advisories/.test(p)), problems.join('; '));
+  assert.ok(problems.some((p) => /0 blocking advisories were read/.test(p)), problems.join('; '));
 });
 
 test('a non-numeric summary counter is a problem', () => {
@@ -159,7 +206,7 @@ test('a non-numeric summary counter is a problem', () => {
     metadata: { vulnerabilities: { high: 'one', critical: 0 } },
   });
   assert.ok(
-    problems.some((p) => /metadata\.vulnerabilities\.high must be a non-negative number/.test(p)),
+    problems.some((p) => /metadata\.vulnerabilities\.high must be a non-negative integer/.test(p)),
     problems.join('; '),
   );
 });
@@ -361,6 +408,47 @@ test('CLI: a malformed high advisory is not tolerated by an allowlist entry', ()
     allowlist: allowlistText([validEntry]),
   });
   assert.equal(result.status, 1);
+});
+
+test('CLI: reports that cannot prove the summary counts exit 1', () => {
+  const cases = [
+    { label: 'missing metadata', report: { advisories: {} }, allowlist: allowlistText([]) },
+    {
+      label: 'empty metadata',
+      report: { advisories: {}, metadata: {} },
+      allowlist: allowlistText([]),
+    },
+    {
+      label: 'vulnerabilities not an object',
+      report: { advisories: {}, metadata: { vulnerabilities: 'unknown' } },
+      allowlist: allowlistText([]),
+    },
+    {
+      label: 'empty vulnerabilities',
+      report: { advisories: {}, metadata: { vulnerabilities: {} } },
+      allowlist: allowlistText([]),
+    },
+    {
+      label: 'null counters',
+      report: auditReport({}, { high: null, critical: null }),
+      allowlist: allowlistText([]),
+    },
+    {
+      label: 'fractional counters with a tolerated advisory',
+      report: auditReport({ 1: zodAdvisory }, { high: 0.5, critical: 0.5 }),
+      allowlist: allowlistText([validEntry]),
+    },
+    {
+      label: 'summary undercount with a tolerated advisory',
+      report: auditReport({ 1: zodAdvisory }, { high: 0 }),
+      allowlist: allowlistText([validEntry]),
+    },
+  ];
+
+  for (const { label, report, allowlist } of cases) {
+    const result = runGate({ report, allowlist });
+    assert.equal(result.status, 1, `expected exit 1 for ${label}`);
+  }
 });
 
 test('CLI: a tracked, unexpired entry exits 0 and prints TOLERATED', () => {

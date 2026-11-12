@@ -13,8 +13,9 @@
  * - Fail on unknown risk: only advisories listed by id are tolerated. Every
  *   advisory must carry a package name and a severity from a fixed set, so a
  *   partial or reformatted report cannot hide a high advisory as "unknown".
- * - Cross-check the summary against the advisories that were actually read, so
- *   a report that claims high/critical findings but lists fewer of them fails.
+ * - Cross-check the summary against the advisories that were actually read. The
+ *   summary is mandatory and the counts must match exactly, so an incomplete
+ *   report cannot claim there is nothing to report.
  * - Validate the allowlist: every entry needs advisory, package, tracking URL,
  *   and a real expiry date. A malformed entry fails the gate instead of
  *   silently becoming a permanent exception.
@@ -166,12 +167,17 @@ function normaliseAdvisory({ key, info, where, problems }) {
   };
 }
 
-/** Read a summary counter, failing closed on anything that is not a number. */
+/**
+ * Read a summary counter. Absent, null, fractional, negative, or non-numeric
+ * values are failures: mapping them to zero would let an incomplete report
+ * claim there is nothing to report.
+ */
 function readCount(value, where, problems) {
-  if (value === undefined || value === null) return 0;
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    problems.push(`${where} must be a non-negative number; received ${JSON.stringify(value)}`);
-    return 0;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    problems.push(
+      `${where} must be a non-negative integer; received ${JSON.stringify(value ?? null)}`,
+    );
+    return null;
   }
   return value;
 }
@@ -230,21 +236,42 @@ export function parseAuditReport(report) {
     if (advisory) advisories.push(advisory);
   }
 
-  // Cross-check the summary against what was actually read. An advisory that
-  // failed validation above counts as unreadable, so a malformed high advisory
-  // can no longer hide behind an otherwise clean-looking report.
-  const summary = report.metadata?.vulnerabilities;
-  if (isPlainObject(summary)) {
-    const claimed =
-      readCount(summary.high, 'metadata.vulnerabilities.high', problems) +
-      readCount(summary.critical, 'metadata.vulnerabilities.critical', problems);
+  // Cross-check the summary against what was actually read. The summary is
+  // mandatory: pnpm always emits metadata.vulnerabilities, so a report without
+  // counters cannot prove it listed every blocking advisory. The counts must
+  // also agree exactly (pnpm derives them from the same advisory map), so an
+  // undercount is as untrustworthy as an overcount.
+  const metadata = report.metadata;
+  if (!isPlainObject(metadata)) {
+    problems.push(
+      'audit report has no "metadata" object; cannot confirm the vulnerability counts',
+    );
+  } else if (!isPlainObject(metadata.vulnerabilities)) {
+    problems.push(
+      'audit report has no "metadata.vulnerabilities" object; cannot confirm the vulnerability counts',
+    );
+  } else {
+    const high = readCount(
+      metadata.vulnerabilities.high,
+      'metadata.vulnerabilities.high',
+      problems,
+    );
+    const critical = readCount(
+      metadata.vulnerabilities.critical,
+      'metadata.vulnerabilities.critical',
+      problems,
+    );
     const readable = advisories.filter((advisory) => BLOCKING_SEVERITIES.has(advisory.severity))
       .length;
-    if (claimed > readable) {
-      problems.push(
-        `audit report claims ${claimed} high/critical vulnerabilities but only ${readable} ` +
-          'blocking advisories could be read; refusing to trust a partial report',
-      );
+
+    if (high !== null && critical !== null) {
+      const claimed = high + critical;
+      if (claimed !== readable) {
+        problems.push(
+          `audit summary reports ${claimed} high/critical vulnerabilities but ${readable} ` +
+            'blocking advisories were read; refusing to trust an inconsistent report',
+        );
+      }
     }
   }
 
