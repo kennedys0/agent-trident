@@ -9,12 +9,23 @@ import { BrandMark } from './BrandMark.js';
 import { StopControl } from './StopControl.js';
 import { ThemeToggle } from './ThemeToggle.js';
 
+/* Every entry here is a real route — there are no placeholder pages. The
+   mobile bottom bar carries the five primary destinations (spec §6); the
+   sidebar additionally offers Candidates and the audit journal. */
 const NAV = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/discover', label: 'Discover', icon: Compass },
   { to: '/candidates', label: 'Candidates', icon: ListFilter },
   { to: '/risk', label: 'Risk', icon: ShieldAlert },
   { to: '/portfolio', label: 'Portfolio', icon: Wallet },
+  { to: '/more', label: 'More', icon: Menu },
+] as const;
+
+const BOTTOM_NAV = [
+  { to: '/', label: 'Overview', icon: LayoutDashboard },
+  { to: '/discover', label: 'Discover', icon: Compass },
+  { to: '/portfolio', label: 'Portfolio', icon: Wallet },
+  { to: '/risk', label: 'Risk', icon: ShieldAlert },
   { to: '/more', label: 'More', icon: Menu },
 ] as const;
 
@@ -97,7 +108,7 @@ export function Shell(): ReactNode {
             <BrandMark />
           </span>
           <div className="topbar__cluster">
-            <Badge tone="wait" icon={<span aria-hidden="true">●</span>}>
+            <Badge tone="testnet" icon={<span aria-hidden="true">●</span>}>
               PAPER — SIMULATED
             </Badge>
             <Badge tone={rpcTone(healthData?.rpcStatus ?? null)}>
@@ -106,9 +117,9 @@ export function Shell(): ReactNode {
             {healthData === null ? (
               <Badge tone="muted">chain unknown</Badge>
             ) : (
-              <Badge tone={healthData.chainId === 4663 ? 'info' : 'danger'}>chain {healthData.chainId}</Badge>
+              <Badge tone={healthData.chainId === 4663 ? 'muted' : 'danger'}>chain {healthData.chainId}</Badge>
             )}
-            {engaged === true ? <Badge tone="danger">Entries stopped</Badge> : null}
+            {engaged === true ? <Badge tone="halted">Entries stopped</Badge> : null}
           </div>
           <div className="topbar__spacer" />
           <div className="topbar__meta">
@@ -132,12 +143,15 @@ export function Shell(): ReactNode {
               This browser is offline. Displayed values are the last received and are not live.
             </p>
           )}
-          <Outlet />
+          {/* Keyed per route: the page transition runs once on route entry. */}
+          <div className="page" key={location.pathname}>
+            <Outlet />
+          </div>
         </main>
       </div>
 
       <nav className="bottom-nav" aria-label="Primary">
-        {NAV.map((item) => {
+        {BOTTOM_NAV.map((item) => {
           const Icon = item.icon;
           const current = isCurrent(location.pathname, item.to);
           return (
