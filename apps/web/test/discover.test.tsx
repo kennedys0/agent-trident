@@ -81,23 +81,27 @@ function poolsBody(pools: unknown[], total = pools.length, offset = 0): unknown 
 }
 
 type Reply = { status?: number; body: unknown };
-type Handler = (method: string, path: string) => Reply | Promise<Reply>;
+type Handler = (method: string, path: string, body: string | undefined) => Reply | Promise<Reply>;
+type RecordedRequest = { method: string; path: string; body: string | undefined };
 
-function useTransport(handler: Handler): { calls: string[] } {
+function useTransport(handler: Handler): { calls: string[]; requests: RecordedRequest[] } {
   const calls: string[] = [];
+  const requests: RecordedRequest[] = [];
   setTransport(async (path, init) => {
     const method = init.method ?? 'GET';
+    const body = typeof init.body === 'string' ? init.body : undefined;
     calls.push(`${method} ${path}`);
+    requests.push({ method, path, body });
     if (path === '/health') {
       return new Response(JSON.stringify(health), { status: 200, headers: { 'content-type': 'application/json' } });
     }
-    const reply = await handler(method, path);
+    const reply = await handler(method, path, body);
     return new Response(JSON.stringify(reply.body), {
       status: reply.status ?? 200,
       headers: { 'content-type': 'application/json' },
     });
   });
-  return { calls };
+  return { calls, requests };
 }
 
 function renderAt(entry: string): void {
@@ -283,6 +287,33 @@ describe('DiscoverPage', () => {
     await waitFor(() => expect(screen.queryByTestId(`pool-row-${POOL}`)).toBeNull());
     expect(screen.getByTestId(`pool-row-${POOL_B}`)).toBeInTheDocument();
     expect(calls.filter((call) => call.includes('/api/v1/pools?')).length).toBe(before);
+  });
+
+  it('narrows the loaded page to watched pools when the watchlist filter is clicked', async () => {
+    const { calls } = useTransport((method, path) => {
+      if (method === 'GET' && path.startsWith('/api/v1/watchlist')) {
+        return { body: { data: { entries: [] }, meta: {} } };
+      }
+      return { body: poolsBody([{ ...basePool, watched: true }, stalePool]) };
+    });
+    renderAt('/discover');
+    await screen.findByTestId(`pool-row-${POOL}`);
+    expect(screen.getByTestId(`pool-row-${POOL_B}`)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('filter-watched'));
+
+    expect(screen.getByTestId('filter-watched')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId(`pool-row-${POOL}`)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId(`pool-row-${POOL_B}`)).not.toBeInTheDocument());
+
+    await userEvent.click(screen.getByTestId('filter-watched'));
+
+    expect(screen.getByTestId('filter-watched')).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(screen.getByTestId(`pool-row-${POOL_B}`)).toBeInTheDocument());
+
+    // The listing's watch badge is read-only — the Discover-side click is the
+    // filter, and it must stay a read: no watchlist write ever hit the wire.
+    expect(calls.filter((call) => call.startsWith('POST') || call.startsWith('DELETE'))).toEqual([]);
   });
 
   it('pages with the backend offset and keeps totals honest', async () => {
@@ -489,5 +520,136 @@ describe('PoolInspectorPage', () => {
     renderAt('/discover/pools/not-an-address');
     expect(await screen.findByTestId('pool-invalid')).toHaveTextContent('Unknown pool');
     expect(calls.some((call) => call.includes('/api/v1/pools/'))).toBe(false);
+  });
+});
+
+describe('Watchlist click flow across pages', () => {
+  it('watches a token in the inspector and sees it on the listing, then unwatches it', async () => {
+    let entries: string[] = [];
+    const { calls } = useTransport((method, path) => {
+      if (method === 'GET' && path.startsWith('/api/v1/watchlist')) {
+        return {
+          body: {
+            data: { entries: entries.map((address) => ({ address, addedAt: '2026-11-13T05:00:00Z', known: true })) },
+            meta: {},
+          },
+        };
+      }
+      if (method === 'POST') {
+        entries = [WETH];
+        return { body: { data: { address: WETH, result: 'ADDED' }, meta: {} } };
+      }
+      if (method === 'DELETE') {
+        entries = [];
+        return { body: { data: { address: WETH, result: 'REMOVED' }, meta: {} } };
+      }
+      if (path === `/api/v1/pools/${POOL}`) {
+        return { body: { data: basePool, meta: {} } };
+      }
+      return { body: poolsBody([{ ...basePool, watched: false }]) };
+    });
+    renderAt('/discover');
+
+    // Listing → Inspector through the row link.
+    await userEvent.click(await screen.findByRole('link', { name: /WETH/ }));
+    const button = await screen.findByTestId(`watch-${WETH}`);
+    await waitFor(() => expect(button).toBeEnabled());
+
+    // The pressed state only moves after the server persisted the write.
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
+    expect(calls).toContain('POST /api/v1/watchlist');
+
+    // Back on the listing the row reports the watched token.
+    await userEvent.click(await screen.findByRole('link', { name: /Back to Discover/ }));
+    await screen.findByTestId(`pool-row-${POOL}`);
+    expect(await screen.findByText('Watched')).toBeInTheDocument();
+
+    // Unwatch from the inspector, again server-first.
+    await userEvent.click(await screen.findByRole('link', { name: /WETH/ }));
+    const unwatch = await screen.findByTestId(`watch-${WETH}`);
+    await waitFor(() => expect(unwatch).toHaveAttribute('aria-pressed', 'true'));
+    await userEvent.click(unwatch);
+    await waitFor(() => expect(unwatch).toHaveAttribute('aria-pressed', 'false'));
+    expect(calls).toContain(`DELETE /api/v1/watchlist/${WETH}`);
+
+    // The listing reports the removal too.
+    await userEvent.click(await screen.findByRole('link', { name: /Back to Discover/ }));
+    await screen.findByTestId(`pool-row-${POOL}`);
+    expect(await screen.findByText('Not watched')).toBeInTheDocument();
+  });
+
+  it('sends exactly the contract request for each watchlist toggle', async () => {
+    const { calls, requests } = useTransport((method, path) => {
+      if (method === 'GET' && path.startsWith('/api/v1/watchlist')) {
+        return { body: { data: { entries: [] }, meta: {} } };
+      }
+      if (method === 'POST') {
+        return { body: { data: { address: WETH, result: 'ADDED' }, meta: {} } };
+      }
+      if (method === 'DELETE') {
+        return { body: { data: { address: WETH, result: 'REMOVED' }, meta: {} } };
+      }
+      return { body: { data: basePool, meta: {} } };
+    });
+    renderAt(`/discover/pools/${POOL}`);
+
+    const button = await screen.findByTestId(`watch-${WETH}`);
+    await waitFor(() => expect(button).toBeEnabled());
+
+    // Add: one POST to the collection carrying the strict `{address}` body —
+    // the same shape `createWatchlistEntrySchema` accepts, nothing else.
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
+    const adds = requests.filter((request) => request.method === 'POST');
+    expect(adds).toHaveLength(1);
+    expect(adds[0]?.path).toBe('/api/v1/watchlist');
+    expect(JSON.parse(String(adds[0]?.body))).toEqual({ address: WETH });
+
+    // Remove: one DELETE on the item path and no request body at all.
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'false'));
+    const removes = requests.filter((request) => request.method === 'DELETE');
+    expect(removes).toHaveLength(1);
+    expect(removes[0]?.path).toBe(`/api/v1/watchlist/${WETH}`);
+    expect(removes[0]?.body).toBeUndefined();
+
+    // And those two are the only writes the whole session put on the wire.
+    expect(calls.filter((call) => call.startsWith('POST') || call.startsWith('DELETE'))).toEqual([
+      'POST /api/v1/watchlist',
+      `DELETE /api/v1/watchlist/${WETH}`,
+    ]);
+  });
+
+  it('keeps the pressed state unchanged while the add request is in flight', async () => {
+    let releaseAdd = (): void => {};
+    const addGate = new Promise<void>((resolve) => {
+      releaseAdd = resolve;
+    });
+    useTransport((method, path) => {
+      if (method === 'GET' && path.startsWith('/api/v1/watchlist')) {
+        return { body: { data: { entries: [] }, meta: {} } };
+      }
+      if (method === 'POST') {
+        return addGate.then(() => ({ body: { data: { address: WETH, result: 'ADDED' }, meta: {} } }));
+      }
+      return { body: { data: basePool, meta: {} } };
+    });
+    renderAt(`/discover/pools/${POOL}`);
+
+    const button = await screen.findByTestId(`watch-${WETH}`);
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+
+    // The write is on the wire and unanswered: the control must report busy and
+    // must not claim a pressed state the backend has not confirmed yet. An
+    // optimistic toggle fails here immediately.
+    await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).toBeDisabled();
+
+    releaseAdd();
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
+    expect(button).toHaveAttribute('aria-busy', 'false');
   });
 });
