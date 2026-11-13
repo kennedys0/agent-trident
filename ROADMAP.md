@@ -34,6 +34,12 @@ Every PR passed an independent security review and a QA gate before merge, and C
 - Watchlist click flow covered by automated tests (listing filter, inspector toggle, exact wire contract). (PR #34, merge `9aab25e9`)
 - Remaining debt (documented, not hidden): the `chain.raw` escape hatch and the message-based retry classifier inside `ChainClient` still need a separate hardening PR; the destructive reorg drill is synthetic only, and the default discovery lookback is 2,000 blocks. Still blocked: Phase 3 deployment (auth/TLS/CSRF/rate limiting/backup drill) and the product decisions listed in `PRD.md`.
 
+## Soft Bento design direction (merged)
+
+- The visual direction moved from Taste Engine `neo-brutalism` to `minimalism` with a Bento Grid layout ("TRIDENT Robinhood Soft Bento"), approved by the CEO. (issue #39, PR #40, merge `4dea6b13`)
+- Scope stayed presentation-only: token and motion specs, Overview Bento layout, dense Discover table, dark sidebar plus mobile bottom nav. No trading engine, strategy, risk gate, database, API contract, live execution, signing or deployment change.
+- The token and motion specs, the independent QA report, the operational-safety review and the screenshot and interaction evidence live under `docs/design/`. All security review items S-1..S-7 are closed.
+
 ## Phase 3 — Deployment readiness (blocked; requires CEO approval)
 
 6. Auth (single-admin), CSRF/Origin checks, rate limiting, body limits, TLS proxy, non-root read-only container, backup/restore drill with RPO/RTO, persistent volume, observability. None of this is implemented or approved yet.
