@@ -1,5 +1,17 @@
-import { createPublicClient, defineChain, http, type PublicClient } from 'viem';
+import { createPublicClient, defineChain, http, numberToHex, type PublicClient } from 'viem';
 import { ROBINHOOD_CHAIN_ID } from '../config.js';
+import { isTransientRpcError } from './errors.js';
+import { type RawLog } from './poolCodec.js';
+
+/** JSON-RPC log shape as returned by `eth_getLogs`; fields are hex strings. */
+type RawRpcLog = {
+  readonly address: string;
+  readonly topics: readonly string[];
+  readonly data: string;
+  readonly blockNumber: string;
+  readonly transactionHash?: string | undefined;
+  readonly logIndex?: string | undefined;
+};
 import {
   DEFAULT_RPC_ALLOWED_HOSTS,
   assertSafeRpcUrl,
@@ -131,8 +143,49 @@ export class ChainClient implements ChainReadPort {
     return task;
   }
 
-  get raw(): PublicClient {
-    return this.client;
+  /** Chain id pinned at construction; asserts the pin without any traffic. */
+  get configuredChainId(): number {
+    return this.client.chain?.id ?? 0;
+  }
+
+  /** Raw bytecode of a contract; part of the factory identity check. */
+  async getBytecode(address: `0x${string}`): Promise<`0x${string}` | undefined> {
+    return this.run(() => this.client.getBytecode({ address }));
+  }
+
+  /**
+   * Raw logs for one topic filter over a bounded range. Goes through
+   * `eth_getLogs` because viem's typed getLogs only filters by decoded event.
+   * Queued and throttled like every other call: discovery must not open an
+   * unthrottled path to the public RPC.
+   */
+  async getLogs(request: {
+    readonly address: `0x${string}`;
+    readonly fromBlock: number;
+    readonly toBlock: number;
+    readonly topics: readonly [string];
+  }): Promise<readonly RawLog[]> {
+    const logs = await this.run(() =>
+      this.client.request({
+        method: 'eth_getLogs',
+        params: [
+          {
+            address: request.address,
+            fromBlock: numberToHex(request.fromBlock),
+            toBlock: numberToHex(request.toBlock),
+            topics: [...request.topics],
+          },
+        ],
+      } as Parameters<PublicClient['request']>[0]),
+    );
+    return (logs as readonly RawRpcLog[]).map((log, index) => ({
+      address: log.address,
+      topics: [...log.topics],
+      data: log.data,
+      blockNumber: Number(log.blockNumber),
+      transactionHash: log.transactionHash ?? `0x${'0'.repeat(64)}`,
+      logIndex: log.logIndex === undefined ? index : Number(log.logIndex),
+    }));
   }
 
   async assertChain(): Promise<number> {
@@ -173,7 +226,9 @@ export class ChainClient implements ChainReadPort {
 
   async getCodeSize(address: `0x${string}`): Promise<number> {
     const code = await this.run(() => this.client.getCode({ address }));
-    return (code ?? '0x').length;
+    // Byte length, not hex-string length: the factory identity check compares
+    // against EXPECTED_FACTORY_BYTES.
+    return code === undefined ? 0 : (code.length - 2) / 2;
   }
 
   async getPool(factory: `0x${string}`, tokenA: `0x${string}`, tokenB: `0x${string}`, fee: number): Promise<`0x${string}`> {
@@ -256,14 +311,8 @@ export class ChainClient implements ChainReadPort {
 }
 
 function isTransient(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return (
-    message.includes('timeout') ||
-    message.includes('fetch failed') ||
-    message.includes('econnreset') ||
-    message.includes('socket') ||
-    message.includes('429') ||
-    message.includes('502') ||
-    message.includes('503')
-  );
+  // Numeric JSON-RPC codes and HTTP statuses decide; message matching is only
+  // the fallback for transport failures that carry no numeric code. The
+  // classifier lives in errors.ts and is shared with the discovery service.
+  return isTransientRpcError(error);
 }

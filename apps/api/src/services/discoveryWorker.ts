@@ -16,42 +16,17 @@ export function makeDiscoveryPort(chain: ChainClient): DiscoveryChainPort {
   return {
     getHead: () => chain.getHead(),
     getBlockByNumber: (blockNumber) => chain.getBlockByNumber(blockNumber),
-    async getCodeSize(address) {
-      const code = await chain.raw.getCode({ address: address as `0x${string}` });
-      return code === undefined ? 0 : (code.length - 2) / 2;
-    },
-    async getBytecode(address) {
-      const code = await chain.raw.getBytecode({ address: address as `0x${string}` });
-      return code as `0x${string}` | undefined;
-    },
+    getCodeSize: (address) => chain.getCodeSize(address as `0x${string}`),
+    getBytecode: (address) => chain.getBytecode(address as `0x${string}`),
     readSymbol: (address) => chain.readSymbol(address as `0x${string}`),
     readDecimals: (address) => chain.readDecimals(address as `0x${string}`),
-    async getLogs(request) {
-      const logs = await chain.raw.getLogs({
+    getLogs: (request) =>
+      chain.getLogs({
         address: request.address as `0x${string}`,
-        fromBlock: BigInt(request.fromBlock),
-        toBlock: BigInt(request.toBlock),
-        event: {
-          type: 'event',
-          name: 'PoolCreated',
-          inputs: [
-            { type: 'address', name: 'token0', indexed: true },
-            { type: 'address', name: 'token1', indexed: true },
-            { type: 'uint24', name: 'fee', indexed: false },
-            { type: 'int24', name: 'tickSpacing', indexed: false },
-            { type: 'address', name: 'pool', indexed: false },
-          ],
-        },
-      });
-      return logs.map((log, index) => ({
-        address: log.address,
-        topics: [...log.topics],
-        data: log.data,
-        blockNumber: Number(log.blockNumber),
-        transactionHash: log.transactionHash ?? `0x${'0'.repeat(64)}`,
-        logIndex: log.logIndex === undefined ? index : Number(log.logIndex),
-      }));
-    },
+        fromBlock: request.fromBlock,
+        toBlock: request.toBlock,
+        topics: request.topics,
+      }),
   };
 }
 

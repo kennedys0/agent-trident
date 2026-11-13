@@ -167,7 +167,7 @@ describe('loadConfig RPC hardening', () => {
 
 describe('ChainClient refuses unsafe endpoints before any traffic', () => {
   it('validates at construction time', () => {
-    expect(new ChainClient({ rpcUrl: MAINNET }).raw.chain?.id).toBe(4663);
+    expect(new ChainClient({ rpcUrl: MAINNET }).configuredChainId).toBe(4663);
     expectReject(() => new ChainClient({ rpcUrl: 'http://rpc.mainnet.chain.robinhood.com' }), 'RPC_URL_NOT_HTTPS');
     expectReject(() => new ChainClient({ rpcUrl: 'https://evil.tld' }), 'RPC_URL_HOST_NOT_ALLOWED');
     expectReject(() => new ChainClient({ rpcUrl: 'https://127.0.0.1' }), 'RPC_URL_UNSAFE_FORM');
