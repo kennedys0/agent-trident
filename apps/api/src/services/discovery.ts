@@ -1,12 +1,14 @@
 import { keccak256 } from 'viem';
 import {
-  deleteDiscoveredPoolsFrom,
+  deleteDiscoveredPoolsByAddress,
   getDiscoveryCheckpoint,
   insertDiscoveredPool,
+  listDiscoveredPools,
   saveDiscoveryCheckpoint,
 } from '../db/discoveryRepositories.js';
 import { appendAudit, clearState, getState, setState } from '../db/repositories.js';
 import { withTransaction, type Db } from '../db/index.js';
+import { isTransientRpcError, rpcErrorCode } from '../chain/errors.js';
 import {
   decodePoolCreated,
   EXPECTED_FACTORY_BYTES,
@@ -62,21 +64,18 @@ export class FactoryMismatchError extends Error {
 }
 
 function isCapError(error: unknown): boolean {
+  // The 10,000-log cap is provider copy, so the message carries the signature;
+  // the numeric code still has to be a server-side error family so random
+  // errors containing "10000" cannot force chunk halving.
   const message = error instanceof Error ? error.message : String(error);
-  return /10000|exceeds limit/i.test(message) && /32000/i.test(message);
+  if (!(/10000|exceeds limit/i.test(message) && /32000/i.test(message))) return false;
+  const code = rpcErrorCode(error);
+  return code === null || code === -32603 || (code <= -32000 && code >= -32099);
 }
 
 function isTransient(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return (
-    message.includes('timeout') ||
-    message.includes('fetch failed') ||
-    message.includes('econnreset') ||
-    message.includes('socket') ||
-    message.includes('429') ||
-    message.includes('502') ||
-    message.includes('503')
-  );
+  // Numeric codes and HTTP statuses decide; see chain/errors.ts.
+  return isTransientRpcError(error);
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -126,13 +125,42 @@ export async function verifyDiscoveryCheckpoint(input: {
       return 'frozen';
     }
     if (canonical.hash.toLowerCase() !== checkpoint.blockHash.toLowerCase()) {
+      // Proven same-height replacement: the rewrite may reach deeper than the
+      // tip, so every stored row is suspect. Replay the stored range against
+      // the canonical chain and delete only rows whose events no longer exist
+      // there — a re-scan then re-ingests whatever the new fork contains.
+      // Nothing is deleted without that replay proof.
+      const rows = listDiscoveredPools(db);
+      const sweepFrom = Math.min(checkpoint.fromBlock, ...rows.map((row) => row.firstSeenBlock));
+      let replay: { readonly logs: readonly RawLog[]; readonly unavailable: boolean };
+      try {
+        replay = await getLogsHalving({ chain, fromBlock: sweepFrom, toBlock: checkpoint.toBlock });
+      } catch {
+        replay = { logs: [], unavailable: true };
+      }
+      if (replay.unavailable) {
+        appendAudit(db, {
+          actor: 'system',
+          action: 'discovery.frozen',
+          entity: 'discovery',
+          entityId: 'discovery',
+          correlationId,
+          payload: { reason: 'canonical replay unavailable after proven reorg; rows kept', divergenceBlock: checkpoint.toBlock },
+        });
+        return 'frozen';
+      }
+      const canonicalEvents = new Set(replay.logs.map((log) => `${log.transactionHash.toLowerCase()}#${log.logIndex}`));
+      const orphans = rows.filter((row) => !canonicalEvents.has(`${row.firstSeenTx.toLowerCase()}#${row.logIndex}`));
       const deleted = withTransaction(db, () =>
-        deleteDiscoveredPoolsFrom(db, checkpoint.toBlock),
+        deleteDiscoveredPoolsByAddress(
+          db,
+          orphans.map((row) => row.poolAddress),
+        ),
       );
       withTransaction(db, () =>
         saveDiscoveryCheckpoint(db, {
           fromBlock: checkpoint.fromBlock,
-          toBlock: checkpoint.toBlock - 1,
+          toBlock: checkpoint.fromBlock,
           blockHash: null,
         }),
       );
@@ -142,7 +170,12 @@ export async function verifyDiscoveryCheckpoint(input: {
         entity: 'discovery',
         entityId: 'discovery',
         correlationId,
-        payload: { divergenceBlock: checkpoint.toBlock, deletedPools: deleted.map((r) => r.poolAddress) },
+        payload: {
+          divergenceBlock: checkpoint.toBlock,
+          deletedPools: deleted.map((r) => r.poolAddress),
+          keptPools: rows.length - orphans.length,
+          replayFrom: checkpoint.fromBlock,
+        },
       });
       return 'rewound';
     }
@@ -253,7 +286,10 @@ export async function runDiscoveryTick(input: {
   }
 
   const freshMarker = checkpoint.blockHash === null && checkpoint.toBlock === checkpoint.fromBlock;
-  const from = freshMarker ? checkpoint.fromBlock : checkpoint.toBlock + 1;
+  // A fresh marker is both "nothing scanned yet" and "replay pending after a
+  // reorg rewind"; in both cases the horizon is the configured lookback, so an
+  // old fromBlock can never stall the replay behind the sanity gap bound.
+  const from = freshMarker ? Math.max(checkpoint.fromBlock, head.number - discoveryLookbackBlocks()) : checkpoint.toBlock + 1;
   if (from > head.number) {
     return { accepted: 0, skippedEvents: 0, skippedRows: 0, status: 'OK', detail: 'nothing to scan' };
   }

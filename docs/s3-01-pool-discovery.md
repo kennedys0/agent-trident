@@ -37,7 +37,7 @@ Columns are contractual; a mismatch fails closed on the S3-02 side.
   discovery failure touch the execution path; on factory mismatch the discovery
   path goes dark for the process lifetime.
 - `db/discoveryRepositories.ts` — checkpoint + rows I/O; `ON CONFLICT DO NOTHING`
-  everywhere; rewind deletes rows at/above a proven divergence block.
+  everywhere; rewind deletes only rows proven absent from the canonical replay.
 
 ### Checkpoint and resume
 
@@ -53,8 +53,14 @@ aim: seed once, then cheap steady-state polls). On restart, the stored hash at
   head regresses below it — rows stay, ingest stops, one audit row per ongoing
   incident (`discovery.frozen`), no deletions.
 - **Rewind** only on proven replacement: same-height hash mismatch vs the
-  stored `block_hash`. Deletes rows with `first_seen_block >= divergenceBlock`,
-  re-anchors the checkpoint one block lower, audits addresses.
+  stored `block_hash`. The rewrite may reach deeper than the tip, so the whole
+  stored range is replayed against the canonical chain: rows whose event
+  `(first_seen_tx, log_index)` no longer exists there are deleted with that
+  replay as proof, the rest are kept, and the checkpoint re-anchors to a replay
+  marker (`to_block == from_block`, null hash) so the scan re-ingests whatever
+  the new fork contains. The replay scan horizon is the configured
+  `DISCOVERY_LOOKBACK_BLOCKS`; when the canonical replay cannot be read at all,
+  the state is freeze — nothing is deleted without proof.
 
 ### Bounds and fail-closed behavior
 

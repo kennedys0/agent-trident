@@ -38,6 +38,39 @@ export type DiscoveredPoolRow = {
   readonly poolAddress: string;
 };
 
+export type DiscoveredPoolEventRef = {
+  readonly poolAddress: string;
+  readonly firstSeenBlock: number;
+  readonly firstSeenTx: string;
+  readonly logIndex: number;
+};
+
+/** Every stored row with its event identity, for replay verification. */
+export function listDiscoveredPools(db: Db): DiscoveredPoolEventRef[] {
+  const rows = db
+    .prepare('SELECT pool_address, first_seen_block, first_seen_tx, log_index FROM discovered_pools')
+    .all() as Row[];
+  return rows.map((row) => ({
+    poolAddress: String(row['pool_address']),
+    firstSeenBlock: Number(row['first_seen_block']),
+    firstSeenTx: String(row['first_seen_tx']),
+    logIndex: Number(row['log_index']),
+  }));
+}
+
+/**
+ * Deletes rows proven absent from the canonical chain and returns them for the
+ * audit trail. Callers must have replay proof: an empty list deletes nothing.
+ */
+export function deleteDiscoveredPoolsByAddress(db: Db, poolAddresses: readonly string[]): DiscoveredPoolRow[] {
+  if (poolAddresses.length === 0) return [];
+  const placeholders = poolAddresses.map(() => '?').join(', ');
+  const rows = db
+    .prepare(`SELECT pool_address FROM discovered_pools WHERE pool_address IN (${placeholders})`)
+    .all(...poolAddresses) as Row[];
+  db.prepare(`DELETE FROM discovered_pools WHERE pool_address IN (${placeholders})`).run(...poolAddresses);
+  return rows.map((row) => ({ poolAddress: String(row['pool_address']) }));
+}
 /** Idempotent insert keyed by pool address; returns true when the row was new. */
 export function insertDiscoveredPool(
   db: Db,
@@ -83,15 +116,6 @@ export function insertDiscoveredPool(
       nowIso(),
     );
   return Number(result.changes) === 1;
-}
-
-/** Rows whose first_seen_block is at or above the divergence block are deleted by a proven rewind. */
-export function deleteDiscoveredPoolsFrom(db: Db, divergenceBlock: number): DiscoveredPoolRow[] {
-  const rows = db
-    .prepare('SELECT pool_address FROM discovered_pools WHERE first_seen_block >= ?')
-    .all(divergenceBlock) as Row[];
-  db.prepare('DELETE FROM discovered_pools WHERE first_seen_block >= ?').run(divergenceBlock);
-  return rows.map((row) => ({ poolAddress: String(row['pool_address']) }));
 }
 
 export function countDiscoveredPools(db: Db): number {

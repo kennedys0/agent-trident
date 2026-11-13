@@ -15,7 +15,6 @@ import {
   insertDiscoveredPool,
   countDiscoveredPools,
   saveDiscoveryCheckpoint,
-  deleteDiscoveredPoolsFrom,
 } from '../src/db/discoveryRepositories.js';
 import { makeDb } from './helpers.js';
 import { WETH, USDG, VERIFIED_VENUE } from '../src/chain/venue.js';
@@ -270,28 +269,82 @@ describe('getLogs halving', () => {
 });
 
 describe('reorg semantics', () => {
-  it('deletes rows at/above a proven same-height replacement block', async () => {
-    const db = makeDb();
+  const txFor = (block: number): string => `0x${String(block).padEnd(64, '0').slice(0, 64)}`;
+  const mkRow = (db: Db, pool: string, block: number, fee = 100): boolean => {
     const { token0, token1 } = tokenPair();
-    const mk = (pool: string, block: number, fee = 100) =>
-      insertDiscoveredPool(db, {
-        poolAddress: pool, factory: FACTORY_ADDRESS, token0, token1,
-        token0Symbol: 'A', token1Symbol: 'B', token0Decimals: 18, token1Decimals: 6,
-        fee, tickSpacing: fee === 100 ? 1 : 10, firstSeenBlock: block, firstSeenTx: `0x${String(block).padEnd(64, '0').slice(0, 64)}`, logIndex: 0,
-      });
-    mk(`0x${'d1'.repeat(20)}`, 100);
-    mk(`0x${'d2'.repeat(20)}`, 110, 500);
+    return insertDiscoveredPool(db, {
+      poolAddress: pool, factory: FACTORY_ADDRESS, token0, token1,
+      token0Symbol: 'A', token1Symbol: 'B', token0Decimals: 18, token1Decimals: 6,
+      fee, tickSpacing: fee === 100 ? 1 : 10, firstSeenBlock: block, firstSeenTx: txFor(block), logIndex: 0,
+    });
+  };
+  const poolAddresses = (db: Db): string[] =>
+    (db.prepare('SELECT pool_address FROM discovered_pools ORDER BY first_seen_block').all() as { pool_address: string }[]).map((r) => r.pool_address);
+  const divergentPort = (canonicalLogs: readonly RawLog[]) =>
+    makePort({
+      async getBlockByNumber(blockNumber: number) {
+        return { number: blockNumber, hash: `0x${'bb'.repeat(32)}` as `0x${string}`, parentHash: `0x${'cd'.repeat(32)}` as `0x${string}`, timestamp: Math.floor(Date.now() / 1000) };
+      },
+      async getLogs() {
+        return canonicalLogs;
+      },
+    });
+
+  it('keeps rows whose events survive a proven replacement and deletes the rest', async () => {
+    const db = makeDb();
+    mkRow(db, `0x${'d1'.repeat(20)}`, 100);
+    mkRow(db, `0x${'d2'.repeat(20)}`, 110, 500);
+    saveDiscoveryCheckpoint(db, { fromBlock: 100, toBlock: 110, blockHash: `0x${'aa'.repeat(32)}` });
+    // Canonical replay: d1's event is re-mined, d2's is gone.
+    const port = divergentPort([makeLog({ blockNumber: 100, transactionHash: txFor(100), logIndex: 0 })]);
+    const verdict = await verifyDiscoveryCheckpoint({ db, chain: port, correlationId: 't' });
+    expect(verdict).toBe('rewound');
+    expect(poolAddresses(db)).toEqual([`0x${'d1'.repeat(20)}`]);
+    // The checkpoint re-anchors to the replay marker, not one block lower.
+    const after = getDiscoveryCheckpoint(db)!;
+    expect(after.toBlock).toBe(after.fromBlock);
+    expect(after.blockHash).toBeNull();
+  });
+
+  it('drops orphans below the divergence block when the reorg is deeper than the tip', async () => {
+    const db = makeDb();
+    mkRow(db, `0x${'d1'.repeat(20)}`, 100);
+    mkRow(db, `0x${'d5'.repeat(20)}`, 105, 500);
+    mkRow(db, `0x${'d2'.repeat(20)}`, 110, 3000);
+    saveDiscoveryCheckpoint(db, { fromBlock: 100, toBlock: 110, blockHash: `0x${'aa'.repeat(32)}` });
+    // The rewrite reaches back to block 103: only the row from block 100 has a
+    // canonical event; 105 and 110 are orphans. The new fork also created a
+    // pool at block 108 that was never stored.
+    const forkLog = makeLog({ token0: `0x${'aa'.repeat(20)}`, token1: `0x${'bb'.repeat(20)}`, fee: 500, tickSpacing: 10, pool: `0x${'ee'.repeat(20)}`, blockNumber: 108, transactionHash: txFor(108), logIndex: 0 });
+    const port = divergentPort([makeLog({ blockNumber: 100, transactionHash: txFor(100), logIndex: 0 }), forkLog]);
+    const verdict = await verifyDiscoveryCheckpoint({ db, chain: port, correlationId: 't' });
+    expect(verdict).toBe('rewound');
+    expect(poolAddresses(db)).toEqual([`0x${'d1'.repeat(20)}`]);
+
+    // The replay scan re-ingests the new fork's event exactly once.
+    const replayPort = divergentPort([forkLog]);
+    const result = await runDiscoveryTick({ db, chain: replayPort, correlationId: 't' });
+    expect(result.status).toBe('OK');
+    expect(result.accepted).toBe(1);
+    expect(poolAddresses(db)).toEqual([`0x${'d1'.repeat(20)}`, `0x${'ee'.repeat(20)}`]);
+  });
+
+  it('freezes without deleting when the canonical replay cannot be read', async () => {
+    const db = makeDb();
+    mkRow(db, `0x${'d1'.repeat(20)}`, 100);
+    mkRow(db, `0x${'d2'.repeat(20)}`, 110, 500);
     saveDiscoveryCheckpoint(db, { fromBlock: 100, toBlock: 110, blockHash: `0x${'aa'.repeat(32)}` });
     const port = makePort({
-      async getBlockByNumber() {
-        return { number: 110, hash: `0x${'bb'.repeat(32)}` as `0x${string}`, parentHash: `0x${'cd'.repeat(32)}` as `0x${string}`, timestamp: Math.floor(Date.now() / 1000) };
+      async getBlockByNumber(blockNumber: number) {
+        return { number: blockNumber, hash: `0x${'bb'.repeat(32)}` as `0x${string}`, parentHash: `0x${'cd'.repeat(32)}` as `0x${string}`, timestamp: Math.floor(Date.now() / 1000) };
+      },
+      async getLogs() {
+        throw new Error('execution reverted: logs matched by query exceeds limit of 10000 (-32000)');
       },
     });
     const verdict = await verifyDiscoveryCheckpoint({ db, chain: port, correlationId: 't' });
-    expect(verdict).toBe('rewound');
-    const kept = (db.prepare('SELECT pool_address FROM discovered_pools ORDER BY first_seen_block').all() as { pool_address: string }[]).map((r) => r.pool_address);
-    expect(kept).toEqual([`0x${'d1'.repeat(20)}`]);
-    expect(getDiscoveryCheckpoint(db)!.toBlock).toBe(109);
+    expect(verdict).toBe('frozen');
+    expect(poolAddresses(db)).toEqual([`0x${'d1'.repeat(20)}`, `0x${'d2'.repeat(20)}`]);
   });
 
   it('freezes discovery instead of deleting when the checkpoint block is unresolvable', async () => {
