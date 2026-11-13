@@ -94,6 +94,29 @@ export function deleteDiscoveredPoolsFrom(db: Db, divergenceBlock: number): Disc
   return rows.map((row) => ({ poolAddress: String(row['pool_address']) }));
 }
 
+/**
+ * Proven-rewind delete: rows at/above the divergence block are always removed
+ * (their block was replaced); rows below it survive only when their
+ * (first_seen_tx, log_index) still exists in the canonical replay. Every
+ * deletion is per-row and parameterized.
+ */
+export function deleteDiscoveredPoolsNotCanonical(
+  db: Db,
+  divergenceBlock: number,
+  canonicalKeys: ReadonlySet<string>,
+): DiscoveredPoolRow[] {
+  const rows = db
+    .prepare('SELECT pool_address, first_seen_tx, log_index FROM discovered_pools')
+    .all() as Row[];
+  const doomed = rows.filter((row) => {
+    if (Number(row['first_seen_block']) >= divergenceBlock) return true;
+    return !canonicalKeys.has(`${String(row['first_seen_tx']).toLowerCase()}:${Number(row['log_index'])}`);
+  });
+  const byAddress = db.prepare('DELETE FROM discovered_pools WHERE pool_address = ?');
+  for (const row of doomed) byAddress.run(String(row['pool_address']));
+  return doomed.map((row) => ({ poolAddress: String(row['pool_address']) }));
+}
+
 export function countDiscoveredPools(db: Db): number {
   const row = db.prepare('SELECT COUNT(*) AS count FROM discovered_pools').get() as Row;
   return Number(row['count']);

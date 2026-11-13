@@ -1,6 +1,6 @@
 import { keccak256 } from 'viem';
 import {
-  deleteDiscoveredPoolsFrom,
+  deleteDiscoveredPoolsNotCanonical,
   getDiscoveryCheckpoint,
   insertDiscoveredPool,
   saveDiscoveryCheckpoint,
@@ -61,21 +61,81 @@ export class FactoryMismatchError extends Error {
   }
 }
 
+/**
+ * Error classification is numeric-code first. Provider message text is only a
+ * fallback when an error carries no JSON-RPC/HTTP code at all, so a provider
+ * rewording its errors cannot flip retry semantics.
+ */
+type RpcLikeError = { readonly code?: unknown; readonly statusCode?: unknown; readonly status?: unknown };
+
+function numericCode(error: unknown): number | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const code = (error as RpcLikeError).code;
+  return typeof code === 'number' ? code : null;
+}
+
+function httpStatus(error: unknown): number | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const candidate = (error as RpcLikeError).statusCode ?? (error as RpcLikeError).status;
+  return typeof candidate === 'number' ? candidate : null;
+}
+
+/** JSON-RPC codes providers use when a getLogs range matches too many logs. */
+const RPC_LOG_LIMIT_CODES: ReadonlySet<number> = new Set([-32005, -32062]);
+/** JSON-RPC codes that are retryable overload/server errors. */
+const RPC_TRANSIENT_CODES: ReadonlySet<number> = new Set([-32000, -32603]);
+
+export /**
+ * Re-read PoolCreated logs from the canonical chain over the stored scan range
+ * and return the (tx, logIndex) keys that survived. Returns null when the
+ * replay itself is unreadable (cap exceeded, transient exhausted): the caller
+ * must freeze rather than delete on partial evidence. Bounded by the stored
+ * range (≤25k blocks in ≤500-block chunks); event decode is not needed here —
+ * the topic filter in the getLogs request already narrows to PoolCreated.
+ */
+async function replayCanonicalLogs(input: {
+  readonly chain: DiscoveryChainPort;
+  readonly fromBlock: number;
+  readonly toBlock: number;
+}): Promise<ReadonlySet<string> | null> {
+  if (input.toBlock < input.fromBlock) return new Set<string>();
+  try {
+    const { logs, unavailable } = await getLogsHalving({
+      chain: input.chain,
+      fromBlock: input.fromBlock,
+      toBlock: input.toBlock,
+    });
+    if (unavailable) return null;
+    const keys = new Set<string>();
+    for (const log of logs) {
+      if (log.topics[0]?.toLowerCase() !== POOL_CREATED_TOPIC) continue;
+      keys.add(`${log.transactionHash.toLowerCase()}:${log.logIndex}`);
+    }
+    return keys;
+  } catch {
+    return null;
+  }
+}
+
 function isCapError(error: unknown): boolean {
+  const code = numericCode(error);
+  if (code !== null) return RPC_LOG_LIMIT_CODES.has(code);
+  // Legacy fallback for code-less errors (older providers, direct Error throws).
   const message = error instanceof Error ? error.message : String(error);
   return /10000|exceeds limit/i.test(message) && /32000/i.test(message);
 }
 
-function isTransient(error: unknown): boolean {
+export function isTransient(error: unknown): boolean {
+  const code = numericCode(error);
+  if (code !== null) return RPC_TRANSIENT_CODES.has(code);
+  const status = httpStatus(error);
+  if (status === 429 || status === 502 || status === 503) return true;
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   return (
     message.includes('timeout') ||
     message.includes('fetch failed') ||
     message.includes('econnreset') ||
-    message.includes('socket') ||
-    message.includes('429') ||
-    message.includes('502') ||
-    message.includes('503')
+    message.includes('socket')
   );
 }
 
@@ -126,13 +186,44 @@ export async function verifyDiscoveryCheckpoint(input: {
       return 'frozen';
     }
     if (canonical.hash.toLowerCase() !== checkpoint.blockHash.toLowerCase()) {
+      // Same-height replacement proves the checkpoint block itself diverged.
+      // Rows found at or above it are on the orphan branch; rows below it are
+      // only provably canonical if the re-scanned canonical log set still
+      // contains their (tx, log_index). Unreadable replay deletes nothing.
+      const replay = await replayCanonicalLogs({
+        chain,
+        fromBlock: checkpoint.fromBlock,
+        toBlock: checkpoint.toBlock - 1,
+      });
+      if (replay === null) {
+        appendAudit(db, {
+          actor: 'system',
+          action: 'discovery.frozen',
+          entity: 'discovery',
+          entityId: 'discovery',
+          correlationId,
+          payload: {
+            reason: 'canonical replay unreadable after divergence; deletion withheld',
+            checkpointBlock: checkpoint.toBlock,
+          },
+        });
+        return 'frozen';
+      }
       const deleted = withTransaction(db, () =>
-        deleteDiscoveredPoolsFrom(db, checkpoint.toBlock),
+        deleteDiscoveredPoolsNotCanonical(db, checkpoint.toBlock, replay),
       );
       withTransaction(db, () =>
         saveDiscoveryCheckpoint(db, {
+          // Re-anchor as a fresh marker at the START of the stored range, not
+          // just below the divergence: PoolCreated events on the replacement
+          // fork between the divergence block and toBlock-1 would otherwise
+          // never be re-scanned (silent ingest gap). A null-hash marker with
+          // toBlock == fromBlock makes the next tick scan [fromBlock..head],
+          // bounded by the stored range width, with idempotent inserts via
+          // UNIQUE (tx, log_index). (CHECK to_block >= from_block forbids a
+          // fromBlock-1 anchor; the fresh marker is its supported equivalent.)
           fromBlock: checkpoint.fromBlock,
-          toBlock: checkpoint.toBlock - 1,
+          toBlock: checkpoint.fromBlock,
           blockHash: null,
         }),
       );

@@ -5,6 +5,34 @@ import { runDiscoveryTick, verifyFactory, FactoryMismatchError, type DiscoveryCh
 
 export const DISCOVERY_INTERVAL_MS = 30_000;
 
+/** Default minimum spacing between discovery RPC calls (mirrors ChainClient's own interval). */
+export const DISCOVERY_MIN_CALL_INTERVAL_MS = 250;
+
+/**
+ * Worker-side pacer: discovery RPC calls are serialized with a minimum spacing
+ * so the discovery port cannot burst the public RPC even though it reaches the
+ * transport directly (the internal ChainClient queue is not reusable here
+ * without touching the control file `chain/client.ts`).
+ *
+ * Trade-off: a 25k-block initial scan needs up to 50 getLogs chunks, so worst
+ * case adds ~12.5s of pacing — acceptable next to the 30s poll interval, and
+ * bounded because the tick is single-in-flight.
+ */
+export function createPacer(minIntervalMs: number): <T>(work: () => Promise<T>) => Promise<T> {
+  let lastCallAt = 0;
+  let queue: Promise<unknown> = Promise.resolve();
+  return <T>(work: () => Promise<T>): Promise<T> => {
+    const run = queue.then(async () => {
+      const wait = minIntervalMs - (Date.now() - lastCallAt);
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      lastCallAt = Date.now();
+      return work();
+    });
+    queue = run.catch(() => undefined);
+    return run as Promise<T>;
+  };
+}
+
 export type DiscoveryWorker = { readonly tick: () => Promise<void>; readonly stop: () => void };
 
 /**
@@ -12,37 +40,42 @@ export type DiscoveryWorker = { readonly tick: () => Promise<void>; readonly sto
  * narrow so tests can inject a deterministic chain without touching the
  * guarded RPC transport.
  */
-export function makeDiscoveryPort(chain: ChainClient): DiscoveryChainPort {
+export function makeDiscoveryPort(chain: ChainClient, minIntervalMs = DISCOVERY_MIN_CALL_INTERVAL_MS): DiscoveryChainPort {
+  const paced = createPacer(minIntervalMs);
   return {
-    getHead: () => chain.getHead(),
-    getBlockByNumber: (blockNumber) => chain.getBlockByNumber(blockNumber),
+    getHead: () => paced(() => chain.getHead()),
+    getBlockByNumber: (blockNumber) => paced(() => chain.getBlockByNumber(blockNumber)),
     async getCodeSize(address) {
-      const code = await chain.raw.getCode({ address: address as `0x${string}` });
-      return code === undefined ? 0 : (code.length - 2) / 2;
+      return paced(async () => {
+        const code = await chain.raw.getCode({ address: address as `0x${string}` });
+        return code === undefined ? 0 : (code.length - 2) / 2;
+      });
     },
     async getBytecode(address) {
-      const code = await chain.raw.getBytecode({ address: address as `0x${string}` });
+      const code = await paced(() => chain.raw.getBytecode({ address: address as `0x${string}` }));
       return code as `0x${string}` | undefined;
     },
-    readSymbol: (address) => chain.readSymbol(address as `0x${string}`),
-    readDecimals: (address) => chain.readDecimals(address as `0x${string}`),
+    readSymbol: (address) => paced(() => chain.readSymbol(address as `0x${string}`)),
+    readDecimals: (address) => paced(() => chain.readDecimals(address as `0x${string}`)),
     async getLogs(request) {
-      const logs = await chain.raw.getLogs({
-        address: request.address as `0x${string}`,
-        fromBlock: BigInt(request.fromBlock),
-        toBlock: BigInt(request.toBlock),
-        event: {
-          type: 'event',
-          name: 'PoolCreated',
-          inputs: [
-            { type: 'address', name: 'token0', indexed: true },
-            { type: 'address', name: 'token1', indexed: true },
-            { type: 'uint24', name: 'fee', indexed: false },
-            { type: 'int24', name: 'tickSpacing', indexed: false },
-            { type: 'address', name: 'pool', indexed: false },
-          ],
-        },
-      });
+      const logs = await paced(() =>
+        chain.raw.getLogs({
+          address: request.address as `0x${string}`,
+          fromBlock: BigInt(request.fromBlock),
+          toBlock: BigInt(request.toBlock),
+          event: {
+            type: 'event',
+            name: 'PoolCreated',
+            inputs: [
+              { type: 'address', name: 'token0', indexed: true },
+              { type: 'address', name: 'token1', indexed: true },
+              { type: 'uint24', name: 'fee', indexed: false },
+              { type: 'int24', name: 'tickSpacing', indexed: false },
+              { type: 'address', name: 'pool', indexed: false },
+            ],
+          },
+        }),
+      );
       return logs.map((log, index) => ({
         address: log.address,
         topics: [...log.topics],
