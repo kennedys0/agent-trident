@@ -352,6 +352,15 @@ code,
   color: var(--muted);
 }
 
+@media (max-width: 767px) {
+  /* R-4 (QA rev2): every wrapped topbar row costs 16px of first paint on
+     mobile — tighten the row gap so page controls clear the fixed bottom
+     nav band sooner. */
+  .topbar {
+    gap: var(--space-1);
+  }
+}
+
 /* ---------- Bottom navigation (mobile <768px) ---------- */
 
 .bottom-nav {
@@ -610,6 +619,28 @@ code,
 /* Meta text inside the charcoal panel reads in the feature muted pair. */
 .bento-tile--portfolio .meta {
   color: var(--feature-muted);
+}
+
+/* R-1 (QA rev2): every muted-text and quiet-control class inside the charcoal
+   panel reads in the feature pair — --muted is calibrated to the light canvas
+   and fails on #222123 (2.07:1), while --feature-muted holds AA in both
+   themes (6.3:1 light / 5.8:1 dark). Enumerated explicitly so each rule
+   outranks its single-class definition later in the file. */
+.bento-tile--portfolio .state__text,
+.bento-tile--portfolio .btn--quiet,
+.bento-tile--portfolio .muted,
+.bento-tile--portfolio .row__label,
+.bento-tile--portfolio .fact dt,
+.bento-tile--portfolio .metric__prov,
+.bento-tile--portfolio .provenance,
+.bento-tile--portfolio .bento-module__title,
+.bento-tile--portfolio .bento-module__foot,
+.bento-tile--portfolio .status-strip__label {
+  color: var(--feature-muted);
+}
+
+.bento-tile--portfolio .btn--quiet {
+  border-color: var(--feature-line);
 }
 
 /* Balance the tall module: the figure group breathes between the title and
@@ -876,7 +907,8 @@ code,
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
+  /* R-2 (QA rev2): 48px minimum for every button target, in pointer modes. */
+  min-height: var(--tap);
   padding: 8px 16px;
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-sm);
@@ -956,6 +988,20 @@ code,
   .nav-link {
     min-height: var(--tap);
   }
+}
+
+/* R-2 (QA rev2): the inline title links ("All candidates", "Open risk",
+   "Open Discover", "Open journal") are interactive targets hidden inside
+   small text rows. Give each link the 48px tap minimum with padding plus a
+   compensating negative margin, so the row's visual rhythm stays dense. */
+.bento-tile__title a,
+.bento-module__title a,
+.bento-tile__foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--space-05);
+  margin: -14px calc(var(--space-05) * -1);
 }
 
 /* ---------- Status rows ---------- */

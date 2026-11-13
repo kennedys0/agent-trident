@@ -100,7 +100,7 @@ export function PortfolioView({
       </div>
 
       <section className="stack stack--tight" aria-label="Open paper positions">
-        <h3 className="panel__title">Open positions</h3>
+        <h2 className="panel__title">Open positions</h2>
         {portfolio.positions.length === 0 ? (
           <p className="meta">No open paper positions.</p>
         ) : (
@@ -156,7 +156,7 @@ export function PortfolioView({
       {compact ? null : (
         <>
       <section className="stack stack--tight" aria-label="Paper balances">
-        <h3 className="panel__title">Balances</h3>
+        <h2 className="panel__title">Balances</h2>
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -190,7 +190,7 @@ export function PortfolioView({
       </section>
 
       <section className="stack stack--tight" aria-label="Execution assumptions">
-        <h3 className="panel__title">Assumptions</h3>
+        <h2 className="panel__title">Assumptions</h2>
         <dl className="facts facts--two">
           <div className="fact">
             <dt>Pool fee tier</dt>

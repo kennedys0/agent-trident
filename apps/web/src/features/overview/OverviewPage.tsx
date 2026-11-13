@@ -275,10 +275,12 @@ export function OverviewPage(): ReactNode {
             </>
           )}
           <div className="bento-module" data-testid="overview-strategy">
-            <h3 className="bento-module__title">
+            {/* R-3 (QA rev2): module titles are h2 — the bento tiles are not
+                heading elements, so an h3 here would skip a level under h1. */}
+            <h2 className="bento-module__title">
               <span>Last strategy decision</span>
               <Link to="/candidates">All candidates</Link>
-            </h3>
+            </h2>
             {candidates.isLoading ? (
               <StateView kind="loading" title="Loading the latest evaluation…" testId="candidates-loading" />
             ) : candidates.error !== null ? (

@@ -303,7 +303,10 @@
   }
 
   .discover-toolbar {
-    padding: var(--space-2);
+    /* R-4 (QA rev2): tighter vertical padding on mobile so the toolbar's
+       input, Search button and first chip row clear the fixed bottom-nav
+       band at first paint (375/320); horizontal rhythm stays 16px. */
+    padding: var(--space-1) var(--space-2);
   }
 
   .discover-table,
@@ -349,6 +352,14 @@
   .discover-search {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  /* R-4 (QA rev2): flex-basis 220px is a width hint in the row layout, but the
+     stacked column form applies it to height — the field would stretch to
+     220px tall and push the Search button ~150px into the bottom-nav band at
+     first paint on 320. Reset the basis so the button follows the input. */
+  .discover-field {
+    flex: 0 0 auto;
   }
 
   .filter-chip {

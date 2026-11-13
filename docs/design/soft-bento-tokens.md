@@ -240,9 +240,16 @@ Tablet (6 kolom): strip 6, portfolio 6, market 6, risk 3, discovery 3, activity 
 
 ### Peta Discover
 
-- Toolbar (search + filter) = tile span 12, **bukan kartu KPI raksasa**.
+- Toolbar (search + filter) = tile span 12, **bukan kartu KPI raksasa**. Intro halaman (deskripsi + catatan read-only) berada **di bawah toolbar** (R-4: first paint 375/320 tidak lagi menutup input, tombol Search, dan baris chip pertama di belakang bottom-nav; teks tidak berubah, hanya urutan).
 - `INDEXED POOLS` = satu tile span 12 berisi tabel padat yang tetap seperti sekarang: header eksplisit, row 36–40px, `tabular-nums`, angka rata kanan, hover row `--surface-hover`, badge status pakai semantic token §4. Provenance/freshness/confidence/watch tetap. Bento TIDAK mengubah tabel jadi kartu.
 - Inspector: satu tile, struktur sama, judul h1.
+
+### Catatan QA Revision 2 (temuan Probe, diperbaiki Pixel)
+
+- **R-1 (kontras):** semua teks/kontrol muted di dalam panel charcoal (`state__text`, `btn--quiet`, `meta`, dst.) memakai pasangan `--feature-muted`/`--feature-line` — `--muted` dikalibrasi ke canvas terang (2,07:1 di atas `#222123`). Lulus AA di light (6,3:1) dan dark (5,8:1).
+- **R-2 (tap target):** semua `.btn` memakai `min-height: var(--tap)` (48px); tautan teks di judul/foot bento dapat hit-area 48px (padding + margin kompensasi, ritme baris tidak berubah).
+- **R-3 (heading):** judul modul bento dan judul panel portfolio = `h2` (urutan h1→h2 valid; h3 hanya sebagai sub-judul di bawah h2).
+- **R-4 (first paint mobile):** gap baris topbar mobile 8px; padding vertikal toolbar Discover 8px; pada ≤374px `flex-basis` field search di-reset (`flex: 0 0 auto`) agar tombol Search tidak terdorong ~150px oleh basis 220px yang berubah makna jadi tinggi di form kolom. Baris chip lebih dalam tetap dicapai lewat scroll dengan clearance F-1 (`scroll-margin-bottom`).
 
 ### Navigasi mobile (<768px)
 
