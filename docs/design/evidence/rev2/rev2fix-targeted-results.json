@@ -1,0 +1,564 @@
+{
+ "r1": {
+  "light": [
+   {
+    "text": "Simulated equity",
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "cls": "",
+    "ratio": 6.26
+   },
+   {
+    "text": "SIMULATED",
+    "fg": "rgb(23, 23, 23)",
+    "bg": "rgb(185,174,244)",
+    "cls": "badge badge--testnet",
+    "ratio": 8.9
+   },
+   {
+    "text": "Portfolio could not be loaded",
+    "fg": "rgb(250, 250, 250)",
+    "bg": "rgb(34,33,35)",
+    "cls": "state__title",
+    "ratio": 15.36
+   },
+   {
+    "text": "The API could not be reached",
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "cls": "state__text",
+    "ratio": 6.26
+   },
+   {
+    "text": "Retry",
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "cls": "btn btn--quiet",
+    "ratio": 6.26
+   }
+  ],
+  "light_key": {
+   "stateText": {
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "ratio": 6.26
+   },
+   "retry": {
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "ratio": 6.26
+   }
+  },
+  "dark": [
+   {
+    "text": "Simulated equity",
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "cls": "",
+    "ratio": 6.26
+   },
+   {
+    "text": "SIMULATED",
+    "fg": "rgb(23, 23, 23)",
+    "bg": "rgb(185,174,244)",
+    "cls": "badge badge--testnet",
+    "ratio": 8.9
+   },
+   {
+    "text": "Portfolio could not be loaded",
+    "fg": "rgb(250, 250, 250)",
+    "bg": "rgb(34,33,35)",
+    "cls": "state__title",
+    "ratio": 15.36
+   },
+   {
+    "text": "The API could not be reached",
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "cls": "state__text",
+    "ratio": 6.26
+   },
+   {
+    "text": "Retry",
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "cls": "btn btn--quiet",
+    "ratio": 6.26
+   }
+  ],
+  "dark_key": {
+   "stateText": {
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "ratio": 6.26
+   },
+   "retry": {
+    "fg": "rgb(161, 161, 170)",
+    "bg": "rgb(34,33,35)",
+    "ratio": 6.26
+   }
+  }
+ },
+ "r4": {
+  "320": {
+   "bandTop": 507.8125,
+   "input": {
+    "top": 352,
+    "bottom": 396,
+    "freeOfNav": true
+   },
+   "searchBtn": {
+    "top": 404,
+    "bottom": 452,
+    "freeOfNav": true
+   },
+   "chips": [
+    {
+     "text": "All",
+     "top": 489,
+     "bottom": 533,
+     "freeOfNav": false
+    },
+    {
+     "text": "Available",
+     "top": 541,
+     "bottom": 585,
+     "freeOfNav": false
+    }
+   ]
+  },
+  "375": {
+   "bandTop": 606.8125,
+   "input": {
+    "top": 352,
+    "bottom": 396,
+    "freeOfNav": true
+   },
+   "searchBtn": {
+    "top": 404,
+    "bottom": 452,
+    "freeOfNav": true
+   },
+   "chips": [
+    {
+     "text": "All",
+     "top": 460,
+     "bottom": 504,
+     "freeOfNav": true
+    },
+    {
+     "text": "Available",
+     "top": 460,
+     "bottom": 504,
+     "freeOfNav": true
+    }
+   ]
+  }
+ },
+ "r2": {
+  "all": [
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "",
+    "text": "Skip to content",
+    "w": 148,
+    "h": 42
+   },
+   {
+    "route": "/",
+    "tag": "BUTTON",
+    "testid": "stop-new-entries",
+    "text": "STOP NEW ENTRIES",
+    "w": 224,
+    "h": 48
+   },
+   {
+    "route": "/",
+    "tag": "BUTTON",
+    "testid": "",
+    "text": "Refresh",
+    "w": 89,
+    "h": 48
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "",
+    "text": "All candidates",
+    "w": 114,
+    "h": 48
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "open-candidate",
+    "text": "Open candidate",
+    "w": 309,
+    "h": 48
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "",
+    "text": "Open risk",
+    "w": 70,
+    "h": 48
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "",
+    "text": "Open Discover",
+    "w": 116,
+    "h": 48
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "",
+    "text": "Open journal",
+    "w": 104,
+    "h": 48
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "bottom-nav-overview",
+    "text": "Overview",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "bottom-nav-discover",
+    "text": "Discover",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "bottom-nav-portfolio",
+    "text": "Portfolio",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "bottom-nav-risk",
+    "text": "Risk",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "bottom-nav-more",
+    "text": "More",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "",
+    "text": "Skip to content",
+    "w": 148,
+    "h": 42
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "stop-new-entries",
+    "text": "STOP NEW ENTRIES",
+    "w": 224,
+    "h": 48
+   },
+   {
+    "route": "/discover",
+    "tag": "INPUT",
+    "testid": "discover-search-input",
+    "text": "",
+    "w": 309,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "discover-search-submit",
+    "text": "Search",
+    "w": 309,
+    "h": 48
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-quality-ANY",
+    "text": "All",
+    "w": 49,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-quality-AVAILABLE",
+    "text": "Available",
+    "w": 97,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-quality-STALE",
+    "text": "Stale",
+    "w": 68,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-quality-UNAVAILABLE",
+    "text": "Unavailable",
+    "w": 116,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-venue-ANY",
+    "text": "All venues",
+    "w": 106,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-venue-verified-allowlist",
+    "text": "Verified allowlist",
+    "w": 153,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-venue-s3-01-registry",
+    "text": "S3-01 registry",
+    "w": 134,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-watched",
+    "text": "Watched only · on this page",
+    "w": 235,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "discover-refresh",
+    "text": "Refresh",
+    "w": 123,
+    "h": 48
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "",
+    "text": "WETH in pool inspector, pool c",
+    "w": 43,
+    "h": 15
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "",
+    "text": "USDG in pool inspector, pool c",
+    "w": 41,
+    "h": 15
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "",
+    "text": "",
+    "w": 26,
+    "h": 24
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "discover-prev",
+    "text": "Prev",
+    "w": 91,
+    "h": 48
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "discover-next",
+    "text": "Next",
+    "w": 92,
+    "h": 48
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "bottom-nav-overview",
+    "text": "Overview",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "bottom-nav-discover",
+    "text": "Discover",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "bottom-nav-portfolio",
+    "text": "Portfolio",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "bottom-nav-risk",
+    "text": "Risk",
+    "w": 75,
+    "h": 59
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "bottom-nav-more",
+    "text": "More",
+    "w": 75,
+    "h": 59
+   }
+  ],
+  "below48": [
+   {
+    "route": "/",
+    "tag": "A",
+    "testid": "",
+    "text": "Skip to content",
+    "w": 148,
+    "h": 42
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "",
+    "text": "Skip to content",
+    "w": 148,
+    "h": 42
+   },
+   {
+    "route": "/discover",
+    "tag": "INPUT",
+    "testid": "discover-search-input",
+    "text": "",
+    "w": 309,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-quality-ANY",
+    "text": "All",
+    "w": 49,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-quality-AVAILABLE",
+    "text": "Available",
+    "w": 97,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-quality-STALE",
+    "text": "Stale",
+    "w": 68,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-quality-UNAVAILABLE",
+    "text": "Unavailable",
+    "w": 116,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-venue-ANY",
+    "text": "All venues",
+    "w": 106,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-venue-verified-allowlist",
+    "text": "Verified allowlist",
+    "w": 153,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-venue-s3-01-registry",
+    "text": "S3-01 registry",
+    "w": 134,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "filter-watched",
+    "text": "Watched only · on this page",
+    "w": 235,
+    "h": 44
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "",
+    "text": "WETH in pool inspector, pool c",
+    "w": 43,
+    "h": 15
+   },
+   {
+    "route": "/discover",
+    "tag": "A",
+    "testid": "",
+    "text": "USDG in pool inspector, pool c",
+    "w": 41,
+    "h": 15
+   },
+   {
+    "route": "/discover",
+    "tag": "BUTTON",
+    "testid": "",
+    "text": "",
+    "w": 26,
+    "h": 24
+   }
+  ]
+ }
+}

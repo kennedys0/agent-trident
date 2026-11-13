@@ -72,3 +72,33 @@ Measured minimum interactive dimension at 375×667 (Overview):
 cd apps/web && node e2e/qa-soft-bento-harness.mjs http://127.0.0.1:4373 <outDir> rev2
 ```
 API: `DATABASE_PATH=… PORT=8080 DISCOVERY_ENABLED=0 RPC_URL=https://rpc.mainnet.chain.robinhood.com`.
+
+---
+
+## Re-verification (head `fa7ca3f`, Pixel QA-fixes)
+
+Independent re-check of all four findings at head `fa7ca3f` (`fix(web): QA findings R-1/R-3/R-4/R-2`), production build served on `:4373` against a live local API (PAPER/HEALTHY, chain 4663). Harness: 20 screenshots, **0 horizontal overflow**, **0 axe violations**, nav **12/12** at 1440 and 375, motion `.1s/.17s/.22s` (100/170/220ms, inside CEO ranges), reduced-motion lift/press **0px**. All measured numbers below are from my own probes (`evidence/rev2/rev2fix-targeted-results.json`), not Pixel's claims.
+
+**R-1 (Serious, contrast) — PASS.** Repro: healthy load → route-intercept `**/api/v1/portfolio**` abort → `[data-testid=portfolio-error]` visible. Recomputed **every text pair** in the `.bento-tile--portfolio` charcoal panel, light and dark (WCAG luminance, first opaque ancestor bg): all pairs now **6.26:1 or higher** in both themes — `.state__text` and `.btn--quiet` "Retry" = `rgb(161,161,170)` on `rgb(34,33,35)` = **6.26:1** (was 2.07:1), `.state__title` 15.36:1, SIMULATED badge on lavender 8.9:1. (Pixel claimed 6.3 light / 5.8 dark; my own measurement is 6.26 in both — same pass, different dark figure.) Evidence: `rev2fix-r1-error-light.png`, `rev2fix-r1-error-dark.png`.
+
+**R-3 (Moderate, heading-order) — PASS.** Axe full run over 8 scan combinations (overview+discover × 320/375/768/1440 × light/dark): **0 violations**, `heading-order` gone. Harness also confirms no new axe issues introduced.
+
+**R-4 (Minor, first paint) — PARTIAL.** Rest-position measurement (scroll 0, `document.scrollingElement`), not fullPage:
+- **375×667: PASS.** Bottom-nav band starts y=607; input 352–396, Search button 404–452, chips All/Available 460–504 — all fully above the band.
+- **320×568: PARTIAL.** Band y=508; input 352–396 and Search 404–452 are clear, **but chips All/Available are still partially behind the band** (All: top 489, bottom 533 → ~25px overlapped; Available below it). This matches what Pixel disclosed; the agreed per-element target ("Search, input, and chips All/Available free of the band at 375 **and** 320") is met at 375 but not for chips at 320. Reaching the chips requires a normal scroll, which works with F-1 clearance intact.
+Evidence: `rev2fix-r4-firstpaint-375.png`, `rev2fix-r4-firstpaint-320.png`.
+
+**R-2 (Minor, touch targets) — PASS (scoped).** At 375, every named offender now measures ≥48px: `stop-new-entries` 224×48, Refresh 89×48 (both routes), `open-candidate` 309×48, "All candidates" 114×48, "Open risk" 70×48, "Open Discover" 116×48, "Open journal" 104×48 (padding + negative-margin compensation — line rhythm unchanged, table stays dense). Bottom-nav and filter chips unchanged (44px, as before — chips were never in the original finding). Residuals **outside the original finding scope**, noted honestly: discover search input 44px, a 26×24 icon button, and two 15px-high inline pool-inspector links (pre-existing, small area, pointer-tolerant); the visually-hidden skip-link reports 42px but is keyboard-focus only.
+
+**No regression found.** Overview hierarchy intact, honest data unchanged (Unavailable + reason, PAPER/SIMULATED everywhere), no forbidden files touched in `465c6b9..fa7ca3f` (verified `git diff --name-only`).
+
+**Cross-check of Sentinel's new finding (healthy-state PnL) — CONFIRMED.** My R-1 sweep covered the *error* state (portfolio failed to load → no PnL figures render), so it had a blind spot that Sentinel caught: in the *healthy* portfolio tile, `.bento-figure__value--positive` (`#065F46`) and `--negative` (`#991B1B`) sit on charcoal `#222123`. Recomputed: light **2.09:1 / 1.93:1 — FAIL AA**, dark 8.34:1 / 5.80:1 — pass. Same root cause as R-1 (light-calibrated status fg used on charcoal without override), and not a regression from `fa7ca3f` — it predates the fixes and passed my error-state audit. Needs a fix of its own before merge; noted here for the report owner.
+
+## Still not verifiable
+- Real screen-reader pass (VoiceOver/NVDA).
+- Physical touch-device interaction (geometry only).
+- Human perception of dark-surface layer separation (1.06–1.14:1 steps).
+- All API responses in evidence are labeled browser-intercepted fixtures (`results.json`), not live reads.
+
+## Re-verification evidence
+`docs/design/evidence/rev2/`: `rev2fix-r1-error-{light,dark}.png`, `rev2fix-r4-firstpaint-{375,320}.png`, `rev2fix-targeted-results.json`, `rev2fix-harness-summary.json` (harness output at `/tmp/opencode/probe-soft-bento/evidence-rev2fix/`).

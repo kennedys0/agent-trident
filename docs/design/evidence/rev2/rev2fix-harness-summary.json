@@ -1,0 +1,1127 @@
+{
+  "label": "rev2fix",
+  "base": "http://127.0.0.1:4373",
+  "generatedAt": "2026-11-13T11:34:57.305Z",
+  "responsive": [
+    {
+      "viewport": "320",
+      "theme": "light",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-320-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [
+        {
+          "tag": "nav",
+          "testid": "",
+          "cls": "bottom-nav"
+        }
+      ],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "320",
+      "theme": "light",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-320-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        },
+        {
+          "tag": "th",
+          "testid": "",
+          "cls": "",
+          "left": 276,
+          "right": 349,
+          "text": "Quality"
+        },
+        {
+          "tag": "th",
+          "testid": "",
+          "cls": "",
+          "left": 349,
+          "right": 416,
+          "text": "Watch"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [
+        {
+          "tag": "nav",
+          "testid": "",
+          "cls": "bottom-nav"
+        }
+      ],
+      "covered": [
+        {
+          "tag": "button",
+          "testid": "filter-quality-ANY",
+          "text": "All",
+          "bar": "bottom-nav"
+        },
+        {
+          "tag": "button",
+          "testid": "filter-quality-AVAILABLE",
+          "text": "Available",
+          "bar": "bottom-nav"
+        }
+      ],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "320",
+      "theme": "dark",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-320-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [
+        {
+          "tag": "nav",
+          "testid": "",
+          "cls": "bottom-nav"
+        }
+      ],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "320",
+      "theme": "dark",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-320-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        },
+        {
+          "tag": "th",
+          "testid": "",
+          "cls": "",
+          "left": 276,
+          "right": 349,
+          "text": "Quality"
+        },
+        {
+          "tag": "th",
+          "testid": "",
+          "cls": "",
+          "left": 349,
+          "right": 416,
+          "text": "Watch"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [
+        {
+          "tag": "nav",
+          "testid": "",
+          "cls": "bottom-nav"
+        }
+      ],
+      "covered": [
+        {
+          "tag": "button",
+          "testid": "filter-quality-ANY",
+          "text": "All",
+          "bar": "bottom-nav"
+        },
+        {
+          "tag": "button",
+          "testid": "filter-quality-AVAILABLE",
+          "text": "Available",
+          "bar": "bottom-nav"
+        }
+      ],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "375",
+      "theme": "light",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-375-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [
+        {
+          "tag": "nav",
+          "testid": "",
+          "cls": "bottom-nav"
+        }
+      ],
+      "covered": [
+        {
+          "tag": "button",
+          "testid": "",
+          "text": "Refresh",
+          "bar": "bottom-nav"
+        }
+      ],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "375",
+      "theme": "light",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-375-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        },
+        {
+          "tag": "th",
+          "testid": "",
+          "cls": "",
+          "left": 349,
+          "right": 416,
+          "text": "Watch"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [
+        {
+          "tag": "nav",
+          "testid": "",
+          "cls": "bottom-nav"
+        }
+      ],
+      "covered": [
+        {
+          "tag": "button",
+          "testid": "filter-venue-verified-allowlist",
+          "text": "Verified allowlist",
+          "bar": "bottom-nav"
+        },
+        {
+          "tag": "button",
+          "testid": "filter-venue-s3-01-registry",
+          "text": "S3-01 registry",
+          "bar": "bottom-nav"
+        }
+      ],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "375",
+      "theme": "dark",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-375-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [
+        {
+          "tag": "nav",
+          "testid": "",
+          "cls": "bottom-nav"
+        }
+      ],
+      "covered": [
+        {
+          "tag": "button",
+          "testid": "",
+          "text": "Refresh",
+          "bar": "bottom-nav"
+        }
+      ],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "375",
+      "theme": "dark",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-375-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        },
+        {
+          "tag": "th",
+          "testid": "",
+          "cls": "",
+          "left": 349,
+          "right": 416,
+          "text": "Watch"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [
+        {
+          "tag": "nav",
+          "testid": "",
+          "cls": "bottom-nav"
+        }
+      ],
+      "covered": [
+        {
+          "tag": "button",
+          "testid": "filter-venue-verified-allowlist",
+          "text": "Verified allowlist",
+          "bar": "bottom-nav"
+        },
+        {
+          "tag": "button",
+          "testid": "filter-venue-s3-01-registry",
+          "text": "S3-01 registry",
+          "bar": "bottom-nav"
+        }
+      ],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "768",
+      "theme": "light",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-768-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "768",
+      "theme": "light",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-768-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "768",
+      "theme": "dark",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-768-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "768",
+      "theme": "dark",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-768-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "1024",
+      "theme": "light",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-1024-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "1024",
+      "theme": "light",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-1024-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "1024",
+      "theme": "dark",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-1024-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "1024",
+      "theme": "dark",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-1024-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "1440",
+      "theme": "light",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-1440-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "1440",
+      "theme": "light",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-1440-light.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "1440",
+      "theme": "dark",
+      "route": "overview",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-overview-1440-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    },
+    {
+      "viewport": "1440",
+      "theme": "dark",
+      "route": "discover",
+      "shot": "/tmp/opencode/probe-soft-bento/evidence-rev2fix/rev2fix-discover-1440-dark.png",
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "a",
+          "testid": "",
+          "cls": "skip-link",
+          "left": -9999,
+          "right": -9851,
+          "text": "Skip to content"
+        }
+      ],
+      "clipped": [],
+      "bottomBars": [],
+      "covered": [],
+      "bentoIssues": []
+    }
+  ],
+  "navigation": [
+    {
+      "viewport": "1440",
+      "links": 12,
+      "pages": [
+        {
+          "link": "Overview",
+          "testid": "nav-overview",
+          "href": "/",
+          "url": "/",
+          "mainText": 1507,
+          "h1": "Overview",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Discover",
+          "testid": "nav-discover",
+          "href": "/discover",
+          "url": "/discover",
+          "mainText": 1315,
+          "h1": "Discover",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Risk",
+          "testid": "nav-risk",
+          "href": "/risk",
+          "url": "/risk",
+          "mainText": 662,
+          "h1": "Risk",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Portfolio",
+          "testid": "nav-portfolio",
+          "href": "/portfolio",
+          "url": "/portfolio",
+          "mainText": 609,
+          "h1": "Paper portfolio",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Candidates",
+          "testid": "nav-candidates",
+          "href": "/candidates",
+          "url": "/candidates",
+          "mainText": 1199,
+          "h1": "Candidates",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "More",
+          "testid": "nav-more",
+          "href": "/more",
+          "url": "/more",
+          "mainText": 840,
+          "h1": "More",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Journal",
+          "testid": "",
+          "href": "/journal",
+          "url": "/journal",
+          "mainText": 19859,
+          "h1": "Journal",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Overview",
+          "testid": "bottom-nav-overview",
+          "href": "/",
+          "url": "/",
+          "mainText": 1504,
+          "h1": "Overview",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Discover",
+          "testid": "bottom-nav-discover",
+          "href": "/discover",
+          "url": "/discover",
+          "mainText": 1315,
+          "h1": "Discover",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Portfolio",
+          "testid": "bottom-nav-portfolio",
+          "href": "/portfolio",
+          "url": "/portfolio",
+          "mainText": 609,
+          "h1": "Paper portfolio",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Risk",
+          "testid": "bottom-nav-risk",
+          "href": "/risk",
+          "url": "/risk",
+          "mainText": 662,
+          "h1": "Risk",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "More",
+          "testid": "bottom-nav-more",
+          "href": "/more",
+          "url": "/more",
+          "mainText": 840,
+          "h1": "More",
+          "notFound": false,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "viewport": "375",
+      "links": 12,
+      "pages": [
+        {
+          "link": "Overview",
+          "testid": "nav-overview",
+          "href": "/",
+          "url": "/",
+          "mainText": 1507,
+          "h1": "Overview",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Discover",
+          "testid": "nav-discover",
+          "href": "/discover",
+          "url": "/discover",
+          "mainText": 1315,
+          "h1": "Discover",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Risk",
+          "testid": "nav-risk",
+          "href": "/risk",
+          "url": "/risk",
+          "mainText": 662,
+          "h1": "Risk",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Portfolio",
+          "testid": "nav-portfolio",
+          "href": "/portfolio",
+          "url": "/portfolio",
+          "mainText": 609,
+          "h1": "Paper portfolio",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Candidates",
+          "testid": "nav-candidates",
+          "href": "/candidates",
+          "url": "/candidates",
+          "mainText": 1199,
+          "h1": "Candidates",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "More",
+          "testid": "nav-more",
+          "href": "/more",
+          "url": "/more",
+          "mainText": 840,
+          "h1": "More",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Journal",
+          "testid": "",
+          "href": "/journal",
+          "url": "/journal",
+          "mainText": 19859,
+          "h1": "Journal",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Overview",
+          "testid": "bottom-nav-overview",
+          "href": "/",
+          "url": "/",
+          "mainText": 1504,
+          "h1": "Overview",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Discover",
+          "testid": "bottom-nav-discover",
+          "href": "/discover",
+          "url": "/discover",
+          "mainText": 1315,
+          "h1": "Discover",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Portfolio",
+          "testid": "bottom-nav-portfolio",
+          "href": "/portfolio",
+          "url": "/portfolio",
+          "mainText": 609,
+          "h1": "Paper portfolio",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "Risk",
+          "testid": "bottom-nav-risk",
+          "href": "/risk",
+          "url": "/risk",
+          "mainText": 662,
+          "h1": "Risk",
+          "notFound": false,
+          "ok": true
+        },
+        {
+          "link": "More",
+          "testid": "bottom-nav-more",
+          "href": "/more",
+          "url": "/more",
+          "mainText": 840,
+          "h1": "More",
+          "notFound": false,
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "keyboard": [
+    {
+      "viewport": "1440",
+      "route": "overview",
+      "tabStops": 16,
+      "chain": [
+        "a||Skip to content",
+        "a|nav-overview|Overview",
+        "a|nav-discover|Discover",
+        "a|nav-risk|Risk",
+        "a|nav-portfolio|Portfolio",
+        "a|nav-candidates|Candidates",
+        "a|nav-more|More",
+        "a||Journal",
+        "button|theme-toggle|Switch to dark theme",
+        "button|stop-new-entries|STOP NEW ENTRIES",
+        "button||Refresh",
+        "a||All candidates",
+        "a|open-candidate|Open candidate",
+        "a||Open risk",
+        "a||Open Discover",
+        "a||Open journal"
+      ],
+      "ringMissing": [],
+      "cycleLength": 16,
+      "navEnter": {
+        "label": "Overview",
+        "href": "/",
+        "enterOpens": true
+      }
+    },
+    {
+      "viewport": "1440",
+      "route": "discover",
+      "tabStops": 24,
+      "chain": [
+        "a||Skip to content",
+        "a|nav-overview|Overview",
+        "a|nav-discover|Discover",
+        "a|nav-risk|Risk",
+        "a|nav-portfolio|Portfolio",
+        "a|nav-candidates|Candidates",
+        "a|nav-more|More",
+        "a||Journal",
+        "button|theme-toggle|Switch to dark theme",
+        "button|stop-new-entries|STOP NEW ENTRIES",
+        "input|discover-search-input|",
+        "button|discover-search-submit|Search",
+        "button|filter-quality-ANY|All",
+        "button|filter-quality-AVAILABLE|Available",
+        "button|filter-quality-STALE|Stale",
+        "button|filter-quality-UNAVAILABLE|Unavailable",
+        "button|filter-venue-ANY|All venues",
+        "button|filter-venue-verified-allowlist|Verified allowlist",
+        "button|filter-venue-s3-01-registry|S3-01 registry",
+        "button|filter-watched|Watched only · on this page",
+        "button|discover-refresh|Refresh",
+        "a||WETH in pool inspector, pool c",
+        "a||USDG in pool inspector, pool c",
+        "button||Copy address 0x52e65b17fb6e5ba"
+      ],
+      "ringMissing": [],
+      "cycleLength": 24,
+      "navEnter": {
+        "label": "Overview",
+        "href": "/",
+        "enterOpens": true
+      }
+    },
+    {
+      "viewport": "375",
+      "route": "overview",
+      "tabStops": 13,
+      "chain": [
+        "a||Skip to content",
+        "button|stop-new-entries|STOP NEW ENTRIES",
+        "button||Refresh",
+        "a||All candidates",
+        "a|open-candidate|Open candidate",
+        "a||Open risk",
+        "a||Open Discover",
+        "a||Open journal",
+        "a|bottom-nav-overview|Overview",
+        "a|bottom-nav-discover|Discover",
+        "a|bottom-nav-portfolio|Portfolio",
+        "a|bottom-nav-risk|Risk",
+        "a|bottom-nav-more|More"
+      ],
+      "ringMissing": [],
+      "cycleLength": 13,
+      "navEnter": {
+        "label": "Overview",
+        "href": "/",
+        "enterOpens": true
+      }
+    },
+    {
+      "viewport": "375",
+      "route": "discover",
+      "tabStops": 21,
+      "chain": [
+        "a||Skip to content",
+        "button|stop-new-entries|STOP NEW ENTRIES",
+        "input|discover-search-input|",
+        "button|discover-search-submit|Search",
+        "button|filter-quality-ANY|All",
+        "button|filter-quality-AVAILABLE|Available",
+        "button|filter-quality-STALE|Stale",
+        "button|filter-quality-UNAVAILABLE|Unavailable",
+        "button|filter-venue-ANY|All venues",
+        "button|filter-venue-verified-allowlist|Verified allowlist",
+        "button|filter-venue-s3-01-registry|S3-01 registry",
+        "button|filter-watched|Watched only · on this page",
+        "button|discover-refresh|Refresh",
+        "a||WETH in pool inspector, pool c",
+        "a||USDG in pool inspector, pool c",
+        "button||Copy address 0x52e65b17fb6e5ba",
+        "a|bottom-nav-overview|Overview",
+        "a|bottom-nav-discover|Discover",
+        "a|bottom-nav-portfolio|Portfolio",
+        "a|bottom-nav-risk|Risk",
+        "a|bottom-nav-more|More"
+      ],
+      "ringMissing": [],
+      "cycleLength": 21,
+      "navEnter": {
+        "label": "Overview",
+        "href": "/",
+        "enterOpens": false
+      }
+    }
+  ],
+  "axe": [
+    {
+      "viewport": "1440",
+      "theme": "light",
+      "route": "overview",
+      "violations": []
+    },
+    {
+      "viewport": "1440",
+      "theme": "light",
+      "route": "discover",
+      "violations": []
+    },
+    {
+      "viewport": "1440",
+      "theme": "dark",
+      "route": "overview",
+      "violations": []
+    },
+    {
+      "viewport": "1440",
+      "theme": "dark",
+      "route": "discover",
+      "violations": []
+    },
+    {
+      "viewport": "375",
+      "theme": "light",
+      "route": "overview",
+      "violations": []
+    },
+    {
+      "viewport": "375",
+      "theme": "light",
+      "route": "discover",
+      "violations": []
+    },
+    {
+      "viewport": "375",
+      "theme": "dark",
+      "route": "overview",
+      "violations": []
+    },
+    {
+      "viewport": "375",
+      "theme": "dark",
+      "route": "discover",
+      "violations": []
+    }
+  ],
+  "motion": [
+    {
+      "mode": "normal",
+      "route": "overview",
+      "badDuration": [],
+      "badTransitionAll": [
+        "div"
+      ],
+      "infinite": [],
+      "numericAnimated": [],
+      "animationNames": [
+        "page-in"
+      ],
+      "lift": "-2px",
+      "press": "1px",
+      "motionFast": ".1s",
+      "motion": ".17s",
+      "motionSlow": ".22s"
+    },
+    {
+      "mode": "normal",
+      "route": "discover",
+      "badDuration": [],
+      "badTransitionAll": [
+        "div"
+      ],
+      "infinite": [],
+      "numericAnimated": [],
+      "animationNames": [
+        "page-in"
+      ],
+      "lift": "-2px",
+      "press": "1px",
+      "motionFast": ".1s",
+      "motion": ".17s",
+      "motionSlow": ".22s"
+    },
+    {
+      "mode": "reduced",
+      "route": "overview",
+      "badDuration": [],
+      "badTransitionAll": [
+        "div",
+        "a",
+        "aside",
+        "span[brand-mark]",
+        "img",
+        "span",
+        "nav",
+        "svg",
+        "rect",
+        "path",
+        "circle",
+        "header",
+        "main",
+        "h1",
+        "p"
+      ],
+      "infinite": [],
+      "numericAnimated": [],
+      "animationNames": [
+        "page-in"
+      ],
+      "lift": "0px",
+      "press": "0px",
+      "motionFast": ".1s",
+      "motion": ".17s",
+      "motionSlow": ".22s"
+    },
+    {
+      "mode": "reduced",
+      "route": "discover",
+      "badDuration": [],
+      "badTransitionAll": [
+        "div",
+        "a",
+        "aside",
+        "span[brand-mark]",
+        "img",
+        "span",
+        "nav",
+        "svg",
+        "rect",
+        "path",
+        "circle",
+        "header",
+        "main",
+        "h1",
+        "section"
+      ],
+      "infinite": [],
+      "numericAnimated": [],
+      "animationNames": [
+        "page-in"
+      ],
+      "lift": "0px",
+      "press": "0px",
+      "motionFast": ".1s",
+      "motion": ".17s",
+      "motionSlow": ".22s"
+    }
+  ]
+}
