@@ -85,6 +85,8 @@ pnpm --filter @trident/web dev
 
 Open http://127.0.0.1:5173. The dev server proxies `/api` and `/health` to the API on port 8080.
 
+Both dev scripts build `@trident/api-contract` before starting, so a missing or stale contract `dist` cannot break the dev server with a missing-export error.
+
 ### 6. Stop both processes
 
 Press `Ctrl+C` in each terminal. The API releases its database lock and closes SQLite on `SIGINT`. Only one API process can use a database file at a time.
@@ -129,7 +131,7 @@ pnpm test
 pnpm build
 ```
 
-Expected results: typecheck and build finish clean; tests report contract 25, API 195 passed with 5 skipped real-RPC tests, and web 80.
+Expected results: typecheck and build finish clean; tests report contract 29, API 195 passed with 5 skipped real-RPC tests, and web 85.
 
 To include the five tests that call the live RPC:
 
