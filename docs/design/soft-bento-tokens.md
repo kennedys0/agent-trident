@@ -4,6 +4,21 @@ Status: DRAFT untuk design exploration (issue #39). Bukan implementasi; menggant
 
 Sumber gaya: Taste Engine `minimalism` (style pack), `references/anti-slop.md`, `references/responsive-baseline.md`, `references/web-interface-quality.md`, `references/motion-engine.md` (lihat `soft-bento-motion.md`). Blend dinyatakan: **primary = Minimalism**, fitur yang dipinjam = Bento Grid (tile asimetris multi-span diizinkan) + aksen brand Robinhood-style lime + micro-interaction tactile ringan.
 
+## Revision 2 (CEO brief — visual hierarchy, komposisi Bento, motion fidelity)
+
+Verdict CEO terhadap Rev 1: REVISION REQUIRED — masih terbaca "admin dashboard", bukan Soft Bento Trading Cockpit. Revisi ini presentation-layer saja; semua angka tetap dari endpoint nyata.
+
+Perubahan token inti (semua kontras diverifikasi AA+):
+
+1. **Ladder dark terkalibrasi** (§1 Rev 1: canvas dan surface nyaris sama): dark `--canvas #131214` → `--surface #201f22` → `--surface-raised #29272b`; ink 17,0/14,9:1, muted 7,3/6,4/5,8:1; sidebar dark `#0e0d0f` (chrome lebih gelap dari canvas).
+2. **Feature panel**: token baru `--feature-bg/ink/muted/line`. Light = charcoal `#222123` di atas canvas abu lembut (feature-ink `#fafafa` 15,4:1, muted 6,3:1, lime 13,8:1); dark = raised layer `#29272b` (lime 12,7:1). Dipakai oleh modul portfolio dominan dan tidak oleh modul lain.
+3. **Tipografi**: font sistem humanist + mono sistem — `--font-sans: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial` dan `--font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas'`; nama webfont (Inter/Space Grotesk/JetBrains Mono) dihapus dari token. Token baru `--text-hero: 40px` untuk figur equity dominan. Mono hanya untuk address/hash/identifier teknis; nilai finansial = sans + `tabular-nums`.
+4. **Label sentence-case**: `text-transform: uppercase` dihapus dari section/figure/strip/panel/table-header/stat label; badge tetap uppercase.
+5. **Motion** (detail di motion spec): `--motion-fast 100ms` (press), `--motion 170ms` (hover), `--motion-slow 220ms` (panel/page) — di dalam rentang brief CEO 80–140/150–200/180–240ms.
+6. **Komposisi Overview 12 kolom** (peta di §6): status-strip span 12; modul portfolio CHARCOAL dominan span 7 × 2 baris (equity hero lime, cash, PnL); modul market/strategy span 5 × 2 baris dengan surface-well (beda visual); row ringkas risk 3 + discovery 3 + activity 6. Span DAN tinggi bervariasi; tanpa kartu pengisi.
+
+Asumsi yang diambil (menunggu konfirmasi CEO): aksen tetap lime `#D2FF00` (CEO menyebut "Robinhood-green" tanpa hex; lime disetujui di Rev 1 dan kontrasnya terkuat), charcoal feature panel diterapkan pada modul portfolio + sidebar, lavender tetap badge PAPER + aksen sekunder, dan font sistem tanpa unduhan webfont.
+
 ## 1. Keputusan palet dan alasannya
 
 Kandidat CEO dievaluasi dengan perhitungan WCAG (rasio aktual, bukan klaim):
@@ -198,10 +213,11 @@ Catatan kontras dark semantic: semua fg lulus AA pada tintnya yang di-blend ke c
 ## 5. Tipografi
 
 - Display/h1: `--text-display` 30px, weight 700, `letter-spacing: -0.025em` (28→26px mobile).
-- Judul panel/section: 20px, weight 600.
-- Body: 15px, line-height 1.6. Meta/label: 13px, weight 500, uppercase opsional untuk section label.
+- **Hero figure (Revision 2)**: `--text-hero` 40px, weight 700, `letter-spacing: -0.02em` — hanya figur equity di modul portfolio dominan, warna brand accent.
+- Judul panel/section: 20px (`--text-h2`), weight 600, warna ink — bukan uppercase kecil.
+- Body: 15px, line-height 1.6. Meta/label: 13px, weight 500, **sentence case** (uppercase hanya badge).
 - Semua angka finansial/metric/timestamp: `font-variant-numeric: tabular-nums`, kolom numerik rata kanan, teks rata kiri (aturan minimalism).
-- Font: Inter (atau system-ui bila Inter tidak tersedia) untuk UI; Space Grotesk boleh dipertahankan hanya untuk brand mark. JetBrains Mono untuk address/hash/angka mono. Tidak menambah dependensi font baru tanpa keputusan (lihat §9).
+- Font (Revision 2): **stack sistem** `system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial` untuk UI; mono sistem `ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas'` **hanya** untuk address/hash/identifier teknis. Nilai finansial = sans + tabular-nums, bukan mono. Tanpa unduhan webfont.
 
 ## 6. Radius, spacing, grid bento
 
@@ -209,18 +225,18 @@ Catatan kontras dark semantic: semua fg lulus AA pada tintnya yang di-blend ke c
 - Spacing 4/8px, gap bento 16px (12px mobile).
 - **Bento 12 kolom** (`grid-template-columns: repeat(12, minmax(0, 1fr))`), tile minimal 4 span. Tile = satu owning surface; **dilarang tile di dalam tile** (anti-slop nested cards). Sisi nanekanan: tablet 6 kolom (span ×2), mobile 1 kolom.
 
-### Peta Overview (desktop ≥1280)
+### Peta Overview (desktop ≥1280, Revision 2)
 
 | Row | Tile | Span | Isi (semua dari backend yang ada) |
 | --- | --- | --- | --- |
 | 1 | `status-strip` | 12 | HUD strip hairline (bukan tile terpisah): PAPER badge, chain health, head block, RPC latency, snapshot freshness, kill-switch |
-| 2 | `equity` | 5 | Equity + saldo kas + watermark SIMULATED |
-| 2 | `pnl` | 4 | PnL realised/unrealised, tint semantic positive/negative |
-| 2 | `risk-state` | 3 | Risk verdict + HALT (critical/halted), link ke /risk |
-| 3 | `strategy-decision` | 7 | Keputusan strategi terakhir + reasons (gaya master-detail ringkas) |
-| 3 | `market-freshness` | 5 | Kesegaran market data + provenance + staleness |
-| 4 | `recent-activity` | 8 | Aktivitas PAPER terbaru (dari journal, list 32–40px/row) |
-| 4 | `discovery` | 4 | Ringkasan discovery: registry status ABSENT/OK, jumlah pool — jujur, tanpa angka karangan |
+| 2–3 | `portfolio` (feature panel charcoal) | **7 × 2 baris** | Equity hero 40px (accent), cash, PnL realised/unrealised (tint semantic), as-of, mode. Testid: `overview-equity-value`, `overview-cash-value`, `overview-pnl-realized`, `overview-pnl-unrealized` |
+| 2–3 | `market` (surface-well) | **5 × 2 baris** | Kesegaran snapshot + provenance + reference price, lalu sub-modul `overview-strategy`: keputusan strategi terakhir + strategy id. Beda visual dari portfolio |
+| 4 | `risk` | 3 | Risk verdict + HALT (critical/halted), link ke /risk |
+| 4 | `discovery` | 3 | Registry status, jumlah pool tracked, watchlist — jujur, tanpa angka karangan |
+| 4 | `activity` | 6 | Aktivitas PAPER terbaru (dari journal) |
+
+Tablet (6 kolom): strip 6, portfolio 6, market 6, risk 3, discovery 3, activity 6. Mobile: satu kolom. Testid `overview-strategy` dipertahankan di dalam modul market.
 
 ### Peta Discover
 
@@ -250,8 +266,7 @@ Bottom bar 5 item berlabel + ikon (Lucide, 20px, `currentColor`): Overview · Di
 
 ## 9. Yang masih perlu keputusan CEO
 
-1. **Font**: apakah boleh menambah Inter + JetBrains Mono sebagai aset (self-hosted) atau tetap system/Space Grotesk? Spec default: Inter bila diizinkan, fallback system-ui.
-2. **Lime vs Robinhood green asli**: Robinhood memakai hijau `#00C805`-ish; CEO memilih lime `#D2FF00` sebagai kandidat. Spec memakai lime (kontras teks gelap 15,4:1, terbaca di dark mode); kalau CEO ingin hijau Robinhood sungguhan sebagai fill CTA, `#00C805` butuh kalibrasi ulang (teks di atasnya `#06240a`-ish, perlu dihitung ulang).
-3. **Lavender**: dipakai sebagai apa persisnya di produk (empty-state, badge testnet, highlight PnL unrealised?) — perlu OK karena sekarang belum ada pemakaiannya.
-4. **Sidebar gelap di light mode** (charcoal + pill lime) vs sidebar terang: spec memilih gelap (pemisahan chrome vs konten yang khas Robinhood desktop); CEO bisa veto.
-5. **Scope implementasi**: prototype dua layar (Overview + Discover) sesuai brief Forge — halaman lain ikut token tapi tanpa redesign penuh; konfirmasi ini cukup.
+1. **Font**: ~~self-hosted Inter + JetBrains Mono vs system~~ — Revision 2 memakai **stack sistem humanist + mono sistem** (tanpa unduhan webfont); konfirmasi akhir CEO masih menunggu.
+2. **Lime vs Robinhood green asli**: Robinhood memakai hijau `#00C805`-ish; CEO memilih lime `#D2FF00` sebagai kandidat dan brief Revision 2 hanya menyebut "Robinhood-green accent" tanpa hex — implementasi tetap lime (kontras teks gelap 15,4:1, 13,8:1 di feature panel). Kalau CEO ingin `#00C805` sungguhan, butuh kalibrasi ulang pasangan teks.
+3. **Lavender**: Revision 2 menahan lavender pada badge PAPER + aksen sekunder bermakna; peran lebih luas menunggu OK.
+4. **Sidebar gelap di light mode**: dipertahankan (charcoal + pill lime) sesuai arah "charcoal feature panels" brief Revision 2.
