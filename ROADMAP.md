@@ -30,7 +30,9 @@ Every PR passed an independent security review and a QA gate before merge, and C
 - S3-03 Discover UI: pool list and pool Inspector rendering discovery data as recorded, plus design polish. (PR #26, merge `2355b6a679`; polish PR #27, merge `2026f731`)
 - S3-04 QA, reliability, and PAPER-only gate: sign-off reports and the acceptance matrix under `docs/qa`; the final gate ran the real-RPC suite against `main`. (issue #24, PR #28, merge `cafd6e9f`)
 - Test-only repair of the ageing real-RPC discovery seed so the gate keeps passing honestly. (PR #30, merge `381725e3`)
-- Remaining debt (documented, not hidden): 3 Low security findings on S3-01 (reorg rewind only verified the last checkpoint, `chain.raw` bypassed the internal throttle, error classification matched message text instead of numeric codes), the destructive reorg drill is synthetic only, and the default discovery lookback is 2,000 blocks. Still blocked: Phase 3 deployment (auth/TLS/CSRF/rate limiting/backup drill) and the product decisions listed in `PRD.md`.
+- The 3 Low security findings on S3-01 are fixed: the reorg rewind is replay-proof and re-scans the stored range, the discovery worker paces every RPC call, and error classification uses numeric JSON-RPC codes and HTTP status. (PR #33, merge `d54af9c`)
+- Watchlist click flow covered by automated tests (listing filter, inspector toggle, exact wire contract). (PR #34, merge `9aab25e9`)
+- Remaining debt (documented, not hidden): the `chain.raw` escape hatch and the message-based retry classifier inside `ChainClient` still need a separate hardening PR; the destructive reorg drill is synthetic only, and the default discovery lookback is 2,000 blocks. Still blocked: Phase 3 deployment (auth/TLS/CSRF/rate limiting/backup drill) and the product decisions listed in `PRD.md`.
 
 ## Phase 3 — Deployment readiness (blocked; requires CEO approval)
 

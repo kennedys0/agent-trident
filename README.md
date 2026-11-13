@@ -129,7 +129,7 @@ pnpm test
 pnpm build
 ```
 
-Expected results: typecheck and build finish clean; tests report contract 25, API 187 passed with 5 skipped real-RPC tests, and web 76.
+Expected results: typecheck and build finish clean; tests report contract 25, API 195 passed with 5 skipped real-RPC tests, and web 80.
 
 To include the five tests that call the live RPC:
 
