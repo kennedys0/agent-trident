@@ -131,7 +131,7 @@ pnpm test
 pnpm build
 ```
 
-Expected results: typecheck and build finish clean; tests report contract 29, API 195 passed with 5 skipped real-RPC tests, and web 85.
+Expected results: typecheck and build finish clean; tests report contract 29, API 195 passed with 5 skipped real-RPC tests, and web 132.
 
 To include the five tests that call the live RPC:
 
@@ -158,6 +158,7 @@ docs/evidence          Committed acceptance evidence for issue #5
 docs/qa                QA gate reports and the Sprint 3 acceptance matrix
 docs/s3-01-pool-discovery.md       Pool discovery design: codec, checkpoints, reorg semantics
 docs/s3-02-market-intelligence.md  Market intelligence design: registry, watchlist, metrics
+docs/design              Soft Bento design tokens, motion spec, QA report, security review, evidence
 ```
 
 The API builds `@trident/api-contract` before it type-checks or tests, so the API and the UI cannot drift from the contract quietly.
