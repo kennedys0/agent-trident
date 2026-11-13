@@ -258,3 +258,41 @@ describe('motion contract (soft-bento-motion.md)', () => {
     expect(baseReduce).toMatch(/transform:\s*none/);
   });
 });
+
+describe('charcoal feature panel PnL contrast (QA P-1)', () => {
+  it.each(['light', 'dark'] as const)(
+    'feature-positive-fg reaches AA on feature-bg in %s theme',
+    (theme) => {
+      expect(themeContrast('feature-positive-fg', 'feature-bg', theme)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it.each(['light', 'dark'] as const)(
+    'feature-negative-fg reaches AA on feature-bg in %s theme',
+    (theme) => {
+      expect(themeContrast('feature-negative-fg', 'feature-bg', theme)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it('keeps the feature PnL pair separate from the lime accent', () => {
+    for (const theme of ['light', 'dark'] as const) {
+      expect(tokenRaw('feature-positive-fg', theme)).not.toBe(tokenRaw('brand-accent', theme));
+      expect(tokenRaw('feature-negative-fg', theme)).not.toBe(tokenRaw('brand-accent', theme));
+    }
+  });
+
+  it('binds the panel scope to the feature pair with a scoped override', () => {
+    for (const [modifier, token] of [
+      ['--positive', '--feature-positive-fg'],
+      ['--negative', '--feature-negative-fg'],
+    ] as const) {
+      const block = cssBlock(baseCss, `.bento-tile--portfolio .bento-figure__value${modifier}`);
+      expect(block).toMatch(new RegExp(`color:\\s*var\\(${token}\\)`));
+    }
+  });
+
+  it('leaves semantic status fg outside the panel untouched', () => {
+    expect(tokenRaw('status-positive-fg', 'light')).toBe('#065f46');
+    expect(tokenRaw('status-negative-fg', 'light')).toBe('#991b1b');
+  });
+});

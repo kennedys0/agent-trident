@@ -3,9 +3,11 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { portfolioSchema } from '@trident/api-contract';
 import { StatusProvider } from '../src/app/StatusProvider.js';
 import { OverviewPage } from '../src/features/overview/OverviewPage.js';
 import { DiscoverPage } from '../src/features/discover/DiscoverPage.js';
+import { PAIR } from '../src/lib/pair.js';
 import { setTransport } from '../src/lib/api/client.js';
 
 /**
@@ -26,8 +28,28 @@ import { setTransport } from '../src/lib/api/client.js';
  */
 
 const baseCss = readFileSync(resolve(process.cwd(), 'src/styles/base.css'), 'utf8');
+const tokensCss = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8');
 const discoverCss = readFileSync(resolve(process.cwd(), 'src/styles/discover.css'), 'utf8');
 const portfolioViewSrc = readFileSync(resolve(process.cwd(), 'src/features/portfolio/PortfolioView.tsx'), 'utf8');
+
+function tokenBlock(opener: string): string {
+  const match = new RegExp(`${opener.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(tokensCss);
+  if (match?.[1] === undefined) {
+    throw new Error(`Missing token block ${opener}`);
+  }
+  return match[1];
+}
+
+const lightTokens = tokenBlock(':root');
+const darkTokens = tokenBlock("[data-theme='dark']");
+
+function tokenRaw(name: string, theme: 'light' | 'dark'): string {
+  const match = new RegExp(`--${name}:\\s*([^;]+);`).exec(theme === 'dark' ? darkTokens : lightTokens);
+  if (match?.[1] === undefined) {
+    throw new Error(`Missing token --${name} in ${theme}`);
+  }
+  return match[1].trim();
+}
 
 /** Returns the declaration blocks of every rule whose selector list contains
  * exactly `selector` (compound group selectors included); comments stripped
@@ -171,5 +193,119 @@ describe('R-4: Discover first paint clears the fixed bottom-nav band', () => {
     expect(rulesFor(baseMedia, '.topbar').join('\n')).toMatch(/gap:\s*var\(--space-1\)/);
     const discoverMedia = mediaBody(discoverCss, '@media (max-width: 767px)');
     expect(rulesFor(discoverMedia, '.discover-toolbar').join('\n')).toMatch(/padding:\s*var\(--space-1\)\s+var\(--space-2\)/);
+  });
+});
+
+describe('P-1: PnL fg inside the charcoal feature panel holds AA', () => {
+  const panelPositive = '.bento-tile--portfolio .bento-figure__value--positive';
+  const panelNegative = '.bento-tile--portfolio .bento-figure__value--negative';
+
+  it('defines the feature-scoped status fg tokens in both themes', () => {
+    expect(tokenRaw('feature-positive-fg', 'light')).toBe('#6ee7b7');
+    expect(tokenRaw('feature-negative-fg', 'light')).toBe('#fca5a5');
+    expect(tokenRaw('feature-positive-fg', 'dark')).toBe('#34d399');
+    expect(tokenRaw('feature-negative-fg', 'dark')).toBe('#f87171');
+  });
+
+  it('binds the panel scope to the feature pair, never the light semantic fg', () => {
+    expect(rulesFor(baseCss, panelPositive).join('\n')).toMatch(/color:\s*var\(--feature-positive-fg\)/);
+    expect(rulesFor(baseCss, panelNegative).join('\n')).toMatch(/color:\s*var\(--feature-negative-fg\)/);
+  });
+
+  it('never encodes status with the lime accent', () => {
+    const accent = tokenRaw('brand-accent', 'light');
+    for (const theme of ['light', 'dark'] as const) {
+      expect(tokenRaw('feature-positive-fg', theme)).not.toBe(accent);
+      expect(tokenRaw('feature-negative-fg', theme)).not.toBe(accent);
+    }
+  });
+
+  it('leaves the semantic status fg (outside the panel) untouched', () => {
+    expect(tokenRaw('status-positive-fg', 'light')).toBe('#065f46');
+    expect(tokenRaw('status-negative-fg', 'light')).toBe('#991b1b');
+  });
+
+  it('renders realised/unrealised PnL with the tint classes inside the charcoal panel (fixture)', async () => {
+    const portfolio = portfolioSchema.parse({
+      mode: 'PAPER',
+      asOf: '2026-11-13T04:00:00Z',
+      balances: [
+        { asset: PAIR.quote.address, available: { value: '9499950000', decimals: 6 }, reserved: { value: '0', decimals: 6 } },
+      ],
+      positions: [
+        {
+          asset: PAIR.base.address,
+          quantity: { value: '243530914141316398', decimals: 18 },
+          costBasisQuote: { value: '485050000', decimals: 6 },
+          valuationStatus: 'VALUED',
+          unrealizedPnlQuote: { value: '-102077', decimals: 6 },
+          valuationSnapshotId: 'snap-1',
+        },
+      ],
+      equityQuote: { value: '10149989793', decimals: 6 },
+      realizedPnlQuote: { value: '150000', decimals: 6 },
+      unrealizedPnlQuote: { value: '-102077', decimals: 6 },
+    });
+    setTransport(async (path) => {
+      const ok = (body: unknown): Response =>
+        new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+      if (path === '/health') {
+        return ok({
+          data: { mode: 'PAPER', chainId: 4663, rpcStatus: 'HEALTHY', headBlock: '123456', lagSeconds: 2 },
+          meta: { killSwitchEngaged: false, rpcLatencyMs: 42 },
+        });
+      }
+      if (path === '/api/v1/portfolio') {
+        return ok({ data: portfolio, meta: {} });
+      }
+      if (path === '/api/v1/markets/weth-usdg/snapshot') {
+        return ok({
+          data: {
+            chainId: 4663,
+            poolAddress: '0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca',
+            baseToken: '0x1111111111111111111111111111111111111111',
+            quoteToken: '0x2222222222222222222222222222222222222222',
+            blockNumber: '123456',
+            blockHash: `0x${'b'.repeat(64)}`,
+            sourceTime: '2026-11-13T05:00:00Z',
+            observedAt: '2026-11-13T05:00:05Z',
+            source: 'slot0 at block 123456',
+            status: 'COMPLETE',
+            reservesBase: { value: '10000000000000000000', decimals: 18 },
+            reservesQuote: { value: '25000000000', decimals: 6 },
+            price: { value: '2500000000000000000000', scale: '1000000000000000000' },
+            liquidityQuote: { value: '50000000000', decimals: 6 },
+          },
+          meta: {},
+        });
+      }
+      if (path.startsWith('/api/v1/candidates')) {
+        return ok({ data: [], meta: { strategyId: 'paper-momentum', configVersion: '1.0.0' } });
+      }
+      if (path.startsWith('/api/v1/journal')) {
+        return ok({ data: { events: [], nextCursor: null }, meta: {} });
+      }
+      if (path.startsWith('/api/v1/intents/')) {
+        return new Response(JSON.stringify({ error: { code: 'UNAVAILABLE', message: 'fixture: none' } }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (path.startsWith('/api/v1/pools')) {
+        return ok({ data: { pools: [], total: 0, offset: 0, limit: 1 }, meta: { registryStatus: 'OK', trackedPools: 0, watchlistEntries: 0 } });
+      }
+      throw new Error(`Unhandled fixture path: ${path}`);
+    });
+    renderPage(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('overview-pnl-realized')).toBeInTheDocument();
+    });
+    const panel = screen.getByTestId('overview-portfolio');
+    const realized = screen.getByTestId('overview-pnl-realized');
+    const unrealized = screen.getByTestId('overview-pnl-unrealized');
+    expect(realized.className).toContain('bento-figure__value--positive');
+    expect(unrealized.className).toContain('bento-figure__value--negative');
+    expect(panel.contains(realized)).toBe(true);
+    expect(panel.contains(unrealized)).toBe(true);
   });
 });

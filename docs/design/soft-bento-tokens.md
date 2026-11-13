@@ -250,6 +250,7 @@ Tablet (6 kolom): strip 6, portfolio 6, market 6, risk 3, discovery 3, activity 
 - **R-2 (tap target):** semua `.btn` memakai `min-height: var(--tap)` (48px); tautan teks di judul/foot bento dapat hit-area 48px (padding + margin kompensasi, ritme baris tidak berubah).
 - **R-3 (heading):** judul modul bento dan judul panel portfolio = `h2` (urutan h1→h2 valid; h3 hanya sebagai sub-judul di bawah h2).
 - **R-4 (first paint mobile):** gap baris topbar mobile 8px; padding vertikal toolbar Discover 8px; pada ≤374px `flex-basis` field search di-reset (`flex: 0 0 auto`) agar tombol Search tidak terdorong ~150px oleh basis 220px yang berubah makna jadi tinggi di form kolom. Baris chip lebih dalam tetap dicapai lewat scroll dengan clearance F-1 (`scroll-margin-bottom`).
+- **P-1 (kontras PnL, temuan Sentinel):** nilai PnL di dalam panel charcoal memakai pasangan token baru `--feature-positive-fg`/`--feature-negative-fg` lewat override scoped `.bento-tile--portfolio .bento-figure__value--{positive,negative}`. Light: `#6ee7b7` (10,5:1) dan `#fca5a5` (8,4:1) di atas `#222123` — menggantikan `--status-positive-fg`/`--status-negative-fg` yang dikalibrasi ke canvas terang (2,09:1 / 1,93:1). Dark: token feature sama dengan fg status dark (`#34d399` / `#f87171`, 7,7:1 / 5,35:1 di atas `#29272b`) sehingga dark tidak berubah. Status semantik di luar panel tidak disentuh; lime tetap bukan warna status; tanda +/− sudah ada sehingga makna plus/minus tidak bergantung warna.
 
 ### Navigasi mobile (<768px)
 

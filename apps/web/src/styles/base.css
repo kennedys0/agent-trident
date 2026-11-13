@@ -616,6 +616,19 @@ code,
   color: var(--feature-ink);
 }
 
+/* P-1 (QA rev2): PnL values inside the charcoal feature panel use the
+   feature-scoped status fg — the semantic --status-{positive,negative}-fg is
+   calibrated to the light canvas and fails AA on #222123 (2.09:1 / 1.93:1),
+   while --feature-{positive,negative}-fg hold AA in both themes
+   (light 10.5:1 / 8.4:1; dark unchanged 7.7:1 / 5.35:1). */
+.bento-tile--portfolio .bento-figure__value--positive {
+  color: var(--feature-positive-fg);
+}
+
+.bento-tile--portfolio .bento-figure__value--negative {
+  color: var(--feature-negative-fg);
+}
+
 /* Meta text inside the charcoal panel reads in the feature muted pair. */
 .bento-tile--portfolio .meta {
   color: var(--feature-muted);

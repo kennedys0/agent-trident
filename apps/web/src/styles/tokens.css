@@ -18,6 +18,13 @@
   --feature-muted: #a1a1aa;     /* 6.3:1 on feature */
   --feature-line: rgba(250, 250, 250, 0.12);
 
+  /* P-1 (QA rev2): PnL fg inside the charcoal feature panel. The semantic
+     status fg (#065F46 / #991B1B) is calibrated to the light canvas and fails
+     AA on #222123 (2.09:1 / 1.93:1); these feature-scoped fg hold AA in both
+     themes and never touch the lime accent. */
+  --feature-positive-fg: #6ee7b7;  /* emerald-300 — 10.5:1 on feature */
+  --feature-negative-fg: #fca5a5;  /* red-300 — 8.4:1 on feature */
+
   /* Ink */
   --ink: #171717;               /* primary text — 17.9:1 on surface */
   --muted: #52525b;             /* secondary text — 6.4:1 on canvas */
@@ -148,6 +155,11 @@
   --feature-ink: #f4f4f5;       /* 14.9:1 on feature */
   --feature-muted: #a1a1aa;     /* 5.8:1 on feature */
   --feature-line: rgba(244, 244, 245, 0.12);
+
+  /* P-1: match the dark status fg so dark mode is unchanged (7.7:1 / 5.35:1
+     on the raised feature layer). */
+  --feature-positive-fg: #34d399;  /* 7.7:1 on feature */
+  --feature-negative-fg: #f87171;  /* 5.35:1 on feature */
 
   /* Disabled controls (Sentinel S-4): readable by rule, never by opacity. */
   --disabled-fg: #a1a1aa;            /* 5.8:1 on --disabled-bg */

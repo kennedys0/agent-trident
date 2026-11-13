@@ -20,10 +20,79 @@ const OUT = new URL('../../../docs/design/evidence/rev2/qa-fixes/', import.meta.
 await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
 const results = {
-  fixtureLabel: 'real local PAPER API; GET /api/v1/portfolio blocked in the browser for the R-1 repro (disclosed)',
+  fixtureLabel: 'real local PAPER API; GET /api/v1/portfolio blocked in the browser for the R-1 repro (disclosed); P-1 PnL panel uses a schema-valid labelled fixture portfolio (disclosed below)',
+  p1: {},
   r1: {},
   r4: {},
 };
+
+/* ---------- P-1: PnL positive/negative in the charcoal panel, light + dark ---------- */
+{
+  // Labelled test-shaped fixture (never production data): positive realised,
+  // negative unrealised, so both PnL fg pairs render inside the panel.
+  const fixturePortfolio = {
+    mode: 'PAPER',
+    asOf: '2026-11-13T04:00:00Z',
+    balances: [
+      { asset: '0x2222222222222222222222222222222222222222', available: { value: '9499950000', decimals: 6 }, reserved: { value: '0', decimals: 6 } },
+    ],
+    positions: [
+      {
+        asset: '0x1111111111111111111111111111111111111111',
+        quantity: { value: '243530914141316398', decimals: 18 },
+        costBasisQuote: { value: '485050000', decimals: 6 },
+        valuationStatus: 'VALUED',
+        unrealizedPnlQuote: { value: '-102077', decimals: 6 },
+        valuationSnapshotId: 'snap-1',
+      },
+    ],
+    equityQuote: { value: '10149989793', decimals: 6 },
+    realizedPnlQuote: { value: '150000', decimals: 6 },
+    unrealizedPnlQuote: { value: '-102077', decimals: 6 },
+  };
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await context.route('**/api/v1/portfolio*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: fixturePortfolio, meta: {} }),
+    }),
+  );
+  const page = await context.newPage();
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await page.getByTestId('overview-pnl-realized').waitFor({ state: 'visible', timeout: 20_000 });
+  for (const theme of ['light', 'dark']) {
+    if (theme === 'dark') {
+      await page.evaluate(() => {
+        document.documentElement.dataset['theme'] = 'dark';
+      });
+      await page.waitForTimeout(200);
+    }
+    const panel = page.getByTestId('overview-portfolio');
+    await panel.screenshot({ path: `${OUT}p1-overview-pnl-${theme}-panel.png` });
+    await page.screenshot({ path: `${OUT}p1-overview-pnl-${theme}-full.png`, fullPage: true });
+    const readout = await page.evaluate(() => {
+      const fg = (selector) => {
+        const el = document.querySelector(selector);
+        if (el === null) return null;
+        const style = getComputedStyle(el);
+        const text = el.textContent?.trim() ?? '';
+        return { color: style.color, text, classes: el.className };
+      };
+      return {
+        realized: fg('[data-testid=overview-pnl-realized]'),
+        unrealized: fg('[data-testid=overview-pnl-unrealized]'),
+        panelBackground: getComputedStyle(document.querySelector('[data-testid=overview-portfolio]')).backgroundColor,
+      };
+    });
+    results.p1[theme] = {
+      fixture: 'labelled schema-valid portfolio: realizedPnlQuote +0.15 USDG, unrealizedPnlQuote −0.10 USDG',
+      screenshots: [`p1-overview-pnl-${theme}-panel.png`, `p1-overview-pnl-${theme}-full.png`],
+      computed: readout,
+    };
+  }
+  await context.close();
+}
 
 /* ---------- R-1: charcoal panel error state, light + dark ---------- */
 {
