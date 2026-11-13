@@ -14,10 +14,12 @@ import { scanWindowText, useIntentDecision, useRiskDecisionScan } from '../risk/
 import { poolsEndpoint } from '../discover/discoverApi.js';
 
 /**
- * Bento dashboard (issue #39, "Robinhood Soft Bento"). Every figure is read
- * from the backend endpoints that already exist — nothing is generated in the
- * browser, and when data is missing the tile says so instead of inventing a
- * number. Layout follows docs/design/soft-bento-tokens.md §6.
+ * Bento dashboard (issue #39, "Robinhood Soft Bento", Revision 2). Every
+ * figure is read from the backend endpoints that already exist — nothing is
+ * generated in the browser, and when data is missing the tile says so instead
+ * of inventing a number. Layout follows docs/design/soft-bento-tokens.md §6
+ * (Revision 2): one dominant charcoal portfolio module, one visually distinct
+ * market/strategy module, then compact risk/discovery/activity support tiles.
  */
 export function OverviewPage(): ReactNode {
   const { health, now, online } = useStatus();
@@ -146,7 +148,10 @@ export function OverviewPage(): ReactNode {
       </div>
 
       <div className="bento">
-        <section className="bento-tile bento-tile--equity" data-testid="overview-equity">
+        {/* Dominant module (Revision 2): charcoal feature panel, 7×2 on desktop.
+            Portfolio equity is the hero figure; the brand accent is a fill-only
+            colour for it and never encodes a status. */}
+        <section className="bento-tile bento-tile--portfolio" data-testid="overview-portfolio">
           <div className="bento-tile__title">
             <span>Simulated equity</span>
             <Badge tone="testnet">SIMULATED</Badge>
@@ -167,18 +172,48 @@ export function OverviewPage(): ReactNode {
             <>
               <div className="bento-figure">
                 <span className="bento-figure__label">Equity</span>
-                <span className="bento-figure__value" data-testid="overview-equity-value">
+                <span
+                  className="bento-figure__value bento-figure__value--hero bento-figure__value--accent"
+                  data-testid="overview-equity-value"
+                >
                   {formatMoney(portfolioData.equityQuote, { maxFrac: 2 })} {PAIR.quote.symbol}
                 </span>
               </div>
-              <div className="bento-figure">
-                <span className="bento-figure__label">Cash (quote)</span>
-                <span className="bento-figure__value" data-testid="overview-cash-value">
-                  {quoteBalance === null
-                    ? 'Unavailable'
-                    : `${formatMoney(quoteBalance.available, { maxFrac: 2 })} ${PAIR.quote.symbol}`}
-                </span>
+              <div className="bento-figures-row">
+                <div className="bento-figure">
+                  <span className="bento-figure__label">Cash (quote)</span>
+                  <span className="bento-figure__value" data-testid="overview-cash-value">
+                    {quoteBalance === null
+                      ? 'Unavailable'
+                      : `${formatMoney(quoteBalance.available, { maxFrac: 2 })} ${PAIR.quote.symbol}`}
+                  </span>
+                </div>
+                <div className="bento-figure">
+                  <span className="bento-figure__label">Realised</span>
+                  <span
+                    className={`bento-figure__value ${pnlTint(portfolioData.realizedPnlQuote)}`}
+                    data-testid="overview-pnl-realized"
+                  >
+                    {formatMoney(portfolioData.realizedPnlQuote, { maxFrac: 2, signed: true })} {PAIR.quote.symbol}
+                  </span>
+                </div>
+                <div className="bento-figure">
+                  <span className="bento-figure__label">Unrealised</span>
+                  <span
+                    className={`bento-figure__value ${pnlTint(unvaluable ? null : portfolioData.unrealizedPnlQuote)}`}
+                    data-testid="overview-pnl-unrealized"
+                  >
+                    {unvaluable
+                      ? 'Unavailable'
+                      : `${formatMoney(portfolioData.unrealizedPnlQuote, { maxFrac: 2, signed: true })} ${PAIR.quote.symbol}`}
+                  </span>
+                </div>
               </div>
+              <p className="meta">
+                {unvaluable
+                  ? 'unrealised PnL cannot be valued without a complete canonical snapshot'
+                  : 'valued by the backend with the canonical snapshot'}
+              </p>
               <div className="bento-tile__foot">
                 <span className="mono">as of {formatUtc(portfolioData.asOf)}</span>
                 <span>mode {portfolioData.mode}</span>
@@ -187,47 +222,101 @@ export function OverviewPage(): ReactNode {
           )}
         </section>
 
-        <section className="bento-tile bento-tile--pnl" data-testid="overview-pnl">
+        {/* Visually distinct counterpart (Revision 2): tinted well, 5×2 on
+            desktop — market freshness and the last strategy decision share the
+            module but keep their own data sources and honest states. */}
+        <section className="bento-tile bento-tile--market" data-testid="overview-market">
           <div className="bento-tile__title">
-            <span>PnL</span>
+            <span>Market & strategy</span>
           </div>
-          {portfolio.isLoading ? (
-            <p className="meta">Loading the simulated portfolio…</p>
-          ) : portfolio.error !== null ? (
-            <p className="meta">{portfolio.error.message}</p>
-          ) : portfolioData === null ? (
-            <p className="meta">No portfolio projection yet.</p>
+          {snapshot.isLoading ? (
+            <StateView kind="loading" title="Loading the market snapshot…" testId="market-loading" />
+          ) : snapshot.error !== null || snapshotData === null ? (
+            <StateView
+              kind={isOfflineError(snapshot.error ?? new Error('')) && !online ? 'offline' : 'error'}
+              title="Market snapshot unavailable"
+              text={snapshot.error?.message ?? 'No market snapshot has been recorded yet.'}
+              onRetry={snapshot.refresh}
+              testId="market-error"
+            />
           ) : (
             <>
               <div className="bento-figure">
-                <span className="bento-figure__label">Realised</span>
-                <span
-                  className={`bento-figure__value ${pnlTint(portfolioData.realizedPnlQuote)}`}
-                  data-testid="overview-pnl-realized"
-                >
-                  {formatMoney(portfolioData.realizedPnlQuote, { maxFrac: 2, signed: true })} {PAIR.quote.symbol}
+                <span className="bento-figure__label">Snapshot</span>
+                <span className="bento-figure__value">
+                  <SnapshotBadge status={snapshotData.status} />
                 </span>
               </div>
-              <div className="bento-figure">
-                <span className="bento-figure__label">Unrealised</span>
-                <span
-                  className={`bento-figure__value ${pnlTint(unvaluable ? null : portfolioData.unrealizedPnlQuote)}`}
-                  data-testid="overview-pnl-unrealized"
-                >
-                  {unvaluable ? 'Unavailable' : `${formatMoney(portfolioData.unrealizedPnlQuote, { maxFrac: 2, signed: true })} ${PAIR.quote.symbol}`}
-                </span>
-              </div>
-              <div className="bento-tile__foot">
-                <span className="meta">
-                  {unvaluable
-                    ? 'unrealised PnL cannot be valued without a complete canonical snapshot'
-                    : 'valued by the backend with the canonical snapshot'}
-                </span>
-              </div>
+              <dl className="rows">
+                <div className="row">
+                  <dt className="row__label">Observed</dt>
+                  <dd className="row__value mono">
+                    block {snapshotData.blockNumber} · {formatAge(snapshotAge)}
+                  </dd>
+                </div>
+                <div className="row">
+                  <dt className="row__label">Source</dt>
+                  <dd className="row__value mono">{snapshotData.source}</dd>
+                </div>
+                <div className="row">
+                  <dt className="row__label">Reference price</dt>
+                  <dd className="row__value mono">
+                    {snapshotData.status === 'INCOMPLETE' || snapshotData.status === 'UNAVAILABLE'
+                      ? 'Unavailable'
+                      : `${formatScaled(snapshotData.price)} ${PAIR.quote.symbol}/${PAIR.base.symbol}`}
+                  </dd>
+                </div>
+              </dl>
+              {snapshotData.status === 'UNAVAILABLE' ? (
+                <p className="meta">{snapshotData.reason}</p>
+              ) : snapshotData.status === 'INCOMPLETE' ? (
+                <p className="meta">Missing inputs: {snapshotData.missingInputs.join(', ')}</p>
+              ) : null}
             </>
           )}
+          <div className="bento-module" data-testid="overview-strategy">
+            <h3 className="bento-module__title">
+              <span>Last strategy decision</span>
+              <Link to="/candidates">All candidates</Link>
+            </h3>
+            {candidates.isLoading ? (
+              <StateView kind="loading" title="Loading the latest evaluation…" testId="candidates-loading" />
+            ) : candidates.error !== null ? (
+              <StateView
+                kind={isOfflineError(candidates.error) && !online ? 'offline' : 'error'}
+                title="Evaluations could not be loaded"
+                text={candidates.error.message}
+                onRetry={candidates.refresh}
+                testId="candidates-error"
+              />
+            ) : latestCandidate === null ? (
+              <StateView
+                kind="empty"
+                title="No eligible candidates in the latest scan"
+                text={
+                  scanAge === null
+                    ? 'The backend returned an empty evaluation list.'
+                    : `The scan completed ${formatAge(scanAge)}; no token passed the current filters.`
+                }
+                testId="candidates-empty"
+              />
+            ) : (
+              <>
+                <CandidateDecisionView candidate={latestCandidate} now={now} compact />
+                <div className="bento-module__foot">
+                  <span className="mono">
+                    {strategyId === null ? 'strategy unavailable' : strategyId} · {configVersion ?? 'version unavailable'}
+                  </span>
+                  <span className="mono">
+                    scan {scanAge === null ? 'Unavailable' : formatAge(scanAge)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
         </section>
 
+        {/* Compact support row (Revision 2): risk, discovery, activity. */}
         <section className="bento-tile bento-tile--risk bento-tile--interactive" data-testid="overview-risk">
           <div className="bento-tile__title">
             <span>Risk state</span>
@@ -290,132 +379,6 @@ export function OverviewPage(): ReactNode {
           </div>
         </section>
 
-        <section className="bento-tile bento-tile--strategy bento-tile--interactive" data-testid="overview-strategy">
-          <div className="bento-tile__title">
-            <span>Last strategy decision</span>
-            <Link to="/candidates">All candidates</Link>
-          </div>
-          {candidates.isLoading ? (
-            <StateView kind="loading" title="Loading the latest evaluation…" testId="candidates-loading" />
-          ) : candidates.error !== null ? (
-            <StateView
-              kind={isOfflineError(candidates.error) && !online ? 'offline' : 'error'}
-              title="Evaluations could not be loaded"
-              text={candidates.error.message}
-              onRetry={candidates.refresh}
-              testId="candidates-error"
-            />
-          ) : latestCandidate === null ? (
-            <StateView
-              kind="empty"
-              title="No eligible candidates in the latest scan"
-              text={
-                scanAge === null
-                  ? 'The backend returned an empty evaluation list.'
-                  : `The scan completed ${formatAge(scanAge)}; no token passed the current filters.`
-              }
-              testId="candidates-empty"
-            />
-          ) : (
-            <>
-              <CandidateDecisionView candidate={latestCandidate} now={now} compact />
-              <div className="bento-tile__foot">
-                <span className="mono">
-                  {strategyId === null ? 'strategy unavailable' : strategyId} · {configVersion ?? 'version unavailable'}
-                </span>
-                <span className="mono">
-                  scan {scanAge === null ? 'Unavailable' : formatAge(scanAge)}
-                </span>
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="bento-tile bento-tile--market" data-testid="overview-market">
-          <div className="bento-tile__title">
-            <span>Market freshness</span>
-          </div>
-          {snapshot.isLoading ? (
-            <StateView kind="loading" title="Loading the market snapshot…" testId="market-loading" />
-          ) : snapshot.error !== null || snapshotData === null ? (
-            <StateView
-              kind={isOfflineError(snapshot.error ?? new Error('')) && !online ? 'offline' : 'error'}
-              title="Market snapshot unavailable"
-              text={snapshot.error?.message ?? 'No market snapshot has been recorded yet.'}
-              onRetry={snapshot.refresh}
-              testId="market-error"
-            />
-          ) : (
-            <>
-              <div className="bento-figure">
-                <span className="bento-figure__label">Snapshot</span>
-                <span className="bento-figure__value">
-                  <SnapshotBadge status={snapshotData.status} />
-                </span>
-              </div>
-              <dl className="rows">
-                <div className="row">
-                  <dt className="row__label">Observed</dt>
-                  <dd className="row__value mono">
-                    block {snapshotData.blockNumber} · {formatAge(snapshotAge)}
-                  </dd>
-                </div>
-                <div className="row">
-                  <dt className="row__label">Source</dt>
-                  <dd className="row__value mono">{snapshotData.source}</dd>
-                </div>
-                <div className="row">
-                  <dt className="row__label">Reference price</dt>
-                  <dd className="row__value mono">
-                    {snapshotData.status === 'INCOMPLETE' || snapshotData.status === 'UNAVAILABLE'
-                      ? 'Unavailable'
-                      : `${formatScaled(snapshotData.price)} ${PAIR.quote.symbol}/${PAIR.base.symbol}`}
-                  </dd>
-                </div>
-              </dl>
-              {snapshotData.status === 'UNAVAILABLE' ? (
-                <p className="meta">{snapshotData.reason}</p>
-              ) : snapshotData.status === 'INCOMPLETE' ? (
-                <p className="meta">Missing inputs: {snapshotData.missingInputs.join(', ')}</p>
-              ) : null}
-            </>
-          )}
-        </section>
-
-        <section className="bento-tile bento-tile--activity bento-tile--interactive" data-testid="overview-activity">
-          <div className="bento-tile__title">
-            <span>Recent PAPER activity</span>
-            <Link to="/journal">Open journal</Link>
-          </div>
-          {journal.isLoading ? (
-            <StateView kind="loading" title="Loading the audit journal…" testId="activity-loading" />
-          ) : journal.error !== null ? (
-            <StateView
-              kind={isOfflineError(journal.error) && !online ? 'offline' : 'error'}
-              title="The audit journal could not be read"
-              text={journal.error.message}
-              onRetry={journal.refresh}
-              testId="activity-error"
-            />
-          ) : journal.data === null || journal.data.events.length === 0 ? (
-            <StateView
-              kind="empty"
-              title="No PAPER activity recorded yet"
-              text="The audit journal is empty; entries appear here once the strategy produces a PAPER intent."
-              testId="activity-empty"
-            />
-          ) : (
-            <ul className="bento-list">
-              {journal.data.events.map((event) => (
-                <li className="bento-list__item" key={event.id}>
-                  <span className="mono">{event.type}</span>
-                  <span className="meta mono">{formatUtc(event.createdAt)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
         <section className="bento-tile bento-tile--discovery bento-tile--interactive" data-testid="overview-discovery">
           <div className="bento-tile__title">
             <span>Discovery</span>
@@ -455,6 +418,40 @@ export function OverviewPage(): ReactNode {
                 </span>
               </div>
             </>
+          )}
+        </section>
+
+        <section className="bento-tile bento-tile--activity bento-tile--interactive" data-testid="overview-activity">
+          <div className="bento-tile__title">
+            <span>Recent PAPER activity</span>
+            <Link to="/journal">Open journal</Link>
+          </div>
+          {journal.isLoading ? (
+            <StateView kind="loading" title="Loading the audit journal…" testId="activity-loading" />
+          ) : journal.error !== null ? (
+            <StateView
+              kind={isOfflineError(journal.error) && !online ? 'offline' : 'error'}
+              title="The audit journal could not be read"
+              text={journal.error.message}
+              onRetry={journal.refresh}
+              testId="activity-error"
+            />
+          ) : journal.data === null || journal.data.events.length === 0 ? (
+            <StateView
+              kind="empty"
+              title="No PAPER activity recorded yet"
+              text="The audit journal is empty; entries appear here once the strategy produces a PAPER intent."
+              testId="activity-empty"
+            />
+          ) : (
+            <ul className="bento-list">
+              {journal.data.events.map((event) => (
+                <li className="bento-list__item" key={event.id}>
+                  <span className="mono">{event.type}</span>
+                  <span className="meta mono">{formatUtc(event.createdAt)}</span>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       </div>
