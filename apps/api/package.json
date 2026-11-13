@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "node ../../packages/api-contract/scripts/ensure-dist.mjs && tsx watch src/server.ts",
     "build": "pnpm --filter @trident/api-contract build && tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "pnpm --filter @trident/api-contract build && tsc -p tsconfig.json --noEmit",
