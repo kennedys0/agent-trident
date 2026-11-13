@@ -13,7 +13,7 @@ The operator needs a truthful, auditable way to observe Robinhood Chain market d
 - Produce a block-pinned market snapshot with provenance and freshness state.
 - Evaluate one deterministic strategy and enforce a fail-closed risk policy.
 - Simulate paper orders and persist an auditable portfolio journal.
-- Show actual system, market, decision, risk, and paper-portfolio states in a responsive neo-brutalist UI.
+- Show actual system, market, decision, risk, and paper-portfolio states in a responsive Soft Bento UI (Taste Engine `minimalism` with a Bento Grid layout).
 
 ## Out of scope
 
