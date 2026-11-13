@@ -102,3 +102,110 @@ Evidence: `rev2fix-r4-firstpaint-375.png`, `rev2fix-r4-firstpaint-320.png`.
 
 ## Re-verification evidence
 `docs/design/evidence/rev2/`: `rev2fix-r1-error-{light,dark}.png`, `rev2fix-r4-firstpaint-{375,320}.png`, `rev2fix-targeted-results.json`, `rev2fix-harness-summary.json` (harness output at `/tmp/opencode/probe-soft-bento/evidence-rev2fix/`).
+
+---
+
+## Re-verification (head `10c03f6` — P-1 fix, independent sweep)
+
+Independent re-check of Pixel's P-1 commit `10c03f6` (1 commit above `d8ac8ac`, no merge/force-push). Method: my own production build of `10c03f6` served by `vite preview` on `:4373`, local API `PAPER` / `HEALTHY` on chain 4663 (`/health` read: `mode PAPER, chainId 4663, rpcStatus HEALTHY`), Playwright + `@axe-core/playwright`. Every number below is my own measurement from `getComputedStyle` (colours composited for alpha and ancestor `opacity`, then WCAG relative luminance) — not hex read from CSS and not Pixel's claims. Harnesses `apps/web/e2e/p1re-verify.mjs` and `p1re-extra.mjs` in my local clone (not committed); raw output and screenshots in `docs/design/evidence/rev2/rev2p1-*`.
+
+Scope note: `d8ac8ac..10c03f6` touches only `apps/web/e2e/qa-fixes-evidence.mjs`, `base.css`, `tokens.css`, two test files, docs and evidence — no component/TSX change. I re-measured the behavioural items anyway.
+
+### Verdict per item
+
+| # | Item | Verdict | Evidence |
+|---|------|---------|----------|
+| 1 | P-1 — PnL contrast in healthy state, light + dark ≥4.5:1 | **PASS** | 4/4 pairs, `rev2p1-pnl-{light,dark}-panel.png` |
+| 2 | Wide fg sweep of the charcoal panel + sidebar (incl. opacity-composited pairs) | **PASS — no new findings** | 26 text pairs per theme, 0 below 4.5:1 |
+| 3a | Horizontal overflow 320/375/768/1440 × light/dark | **PASS** | 16 combos × 2 routes, `overflowPx = 0` |
+| 3b | axe incl. `heading-order` | **PASS** | 16 scans, 0 violations |
+| 3c | Motion 100/170/220ms, reduced-motion 0px | **PASS** | computed durations `{100,170,220}`, lift/press `0px` |
+| 3d | Touch targets ≥48px | **PASS (scoped)** — blanket reading still fails on 14 pre-existing elements | see table below |
+| 3e | Overview hierarchy intact | **PASS** | `h1 → h2`, no skipped level |
+| 3f | Discover first paint 375 clean | **PASS** | band y=607, all controls ≤556 |
+| 3g | Discover first paint 320, first chip row | **PARTIAL (unchanged, reason valid)** | All 489–533 vs band 508 → ~25px overlap |
+| 3h | Honest data (Unavailable, PAPER/SIMULATED) | **PASS** | see below |
+| 4 | Gateway: web 165/165 + typecheck/test/build | **PASS** | run by me at `10c03f6` |
+
+### 1. P-1 — PnL contrast, state HEALTHY (PASS)
+
+The live API returns `0.00` realised/unrealised, so no tint class renders live (`0.00 USDG` in feature ink = **15.36:1** light / **13.46:1** dark — `rev2p1-pnl-live-{light,dark}-panel.png`). To measure the positive and negative pairs I loaded a **labelled, schema-valid fixture portfolio** (browser-intercepted `GET /api/v1/portfolio`, disclosed here and in `rev2p1-results.json`), which is the only way to render both signs from a real healthy load.
+
+Ratios from computed style (`rgb()` values read off the live element, composited over the first opaque ancestor background):
+
+| Theme | Element | Text | fg (computed) | bg (computed) | Ratio | ≥4.5 |
+|---|---|---|---|---|---|---|
+| light | `overview-pnl-realized` | `+0.15 USDG` | `rgb(110,231,183)` `#6ee7b7` | `rgb(34,33,35)` `#222123` | **10.52:1** | ✓ |
+| light | `overview-pnl-unrealized` | `−0.10 USDG` | `rgb(252,165,165)` `#fca5a5` | `rgb(34,33,35)` `#222123` | **8.45:1** | ✓ |
+| dark | `overview-pnl-realized` | `+0.15 USDG` | `rgb(52,211,153)` `#34d399` | `rgb(41,39,43)` `#29272b` | **7.70:1** | ✓ |
+| dark | `overview-pnl-unrealized` | `−0.10 USDG` | `rgb(248,113,113)` `#f87171` | `rgb(41,39,43)` `#29272b` | **5.35:1** | ✓ |
+
+Signs: both values are rendered with `signed: true`, so the literal `+` and `−` (U+2212) are in the text nodes — meaning and direction do not depend on colour alone (verified in the DOM readout and in `rev2p1-pnl-{light,dark}-panel.png`). The four values match the target palette exactly; nothing else in the diff changes the panel. P-1 is **CLOSED**.
+
+### 2. Wide fg sweep — panel charcoal + sidebar (PASS, no new findings)
+
+Coverage proof: every text node in `.bento-tile--portfolio` (13) and `.sidebar` (13) was swept in both themes — 13/13 and 13/13, nothing skipped. Effective colours include alpha compositing and ancestor `opacity` (nav link / foot `0.72`, group title `0.55`).
+
+Light — panel bg `#222123`, sidebar bg `#222123`:
+
+| Scope | Pair | Effective fg | Ratio |
+|---|---|---|---|
+| panel | feature ink (values) | `#fafafa` | 15.36:1 |
+| panel | feature muted (labels, meta, mono, title) | `#a1a1aa` | 6.26:1 |
+| panel | hero accent lime | `#d2ff00` | 13.78:1 |
+| panel | PnL positive (P-1) | `#6ee7b7` | 10.52:1 |
+| panel | PnL negative (P-1) | `#fca5a5` | 8.45:1 |
+| panel | SIMULATED badge (on lavender `#b9aef4`) | `#171717` | 8.90:1 |
+| sidebar | ink @0.72 (nav link, theme button, foot) | `#bebdbe` | 8.56:1 |
+| sidebar | group title @0.55 | `#999899` | 5.59:1 |
+| sidebar | brand sub "PAPER" @0.72 | `#bebdbe` | 8.56:1 |
+| sidebar | active nav link (text on lime) | `#171717` on `#d2ff00` | 15.40:1 |
+
+Dark — panel bg `#29272b`, sidebar bg `#0e0d0f`:
+
+| Scope | Pair | Effective fg | Ratio |
+|---|---|---|---|
+| panel | feature ink | `#f4f4f5` | 13.46:1 |
+| panel | feature muted | `#a1a1aa` | 5.77:1 |
+| panel | hero accent lime | `#d2ff00` | 12.71:1 |
+| panel | PnL positive | `#34d399` | 7.70:1 |
+| panel | PnL negative | `#f87171` | 5.35:1 |
+| panel | SIMULATED badge | `#171717` on `#b9aef4` | 8.90:1 |
+| sidebar | ink @0.72 | `#b4b3b5` | 9.30:1 |
+| sidebar | group title @0.55 | `#8d8c8e` | 5.78:1 |
+| sidebar | brand sub "PAPER" @0.72 | `#b4b3b5` | 9.30:1 |
+| sidebar | active nav link (text on lime) | `#171717` on `#d2ff00` | 15.40:1 |
+
+**0 pairs below 4.5:1 in either theme — no new finding.** The lowest values in the whole sweep are 5.59:1 (light group title) and 5.35:1 (dark PnL negative).
+
+R-1 error state re-checked at this head (my earlier finding): all pairs still pass — `.state__text` / Retry `#a1a1aa` = **6.26:1** light, **5.77:1** dark; `.state__title` 15.36 / 13.46; badge 8.90 (`rev2p1-r1-error-{light,dark}.png`).
+
+### 3. Regressions
+
+- **Overflow — PASS.** 4 viewports × 2 themes × 2 routes (`/`, `/discover`): `documentElement.scrollWidth - clientWidth = 0` everywhere. The only element reported off-box is the visually-hidden `.skip-link` (off-screen left by design, keyboard-focus only; it does not create scrollable overflow).
+- **axe — PASS.** 16 scans (2 routes × 320/375/768/1440 × light/dark), tags `wcag2a/aa/21a/21aa`: **0 violations**, `heading-order` included.
+- **Motion — PASS.** Tokens `--motion-fast .1s`, `--motion .17s`, `--motion-slow .22s`; every measured duration in the runtime is one of `100/170/220ms`; 0 infinite loops; 0 `transition: all` with a duration; single easing `cubic-bezier(0.2,0,0,1)`. Under `prefers-reduced-motion: reduce`: `--lift: 0px`, `--press: 0px`, probe transform `none`, all durations `1e-05s`.
+- **Touch targets — PASS (scoped), blanket reading still fails.** Every element named in R-2 is ≥48px: `stop-new-entries` 224×48, `open-candidate` 309×48, `discover-search-submit` 48, `discover-refresh` 123×48, `discover-prev/next` 91/92×48, bottom-nav links 75×59, all five bottom-nav items. Below 48px remain 14 **pre-existing, previously disclosed** elements outside the finding scope: discover search input 309×44, 8 filter chips ×44, one 26×24 icon button, two 15px inline pool-inspector links, skip-link 148×42 (keyboard only). Unchanged from `d8ac8ac`.
+- **Hierarchy — PASS.** Overview renders `h1 "Overview"` → `h2` module title (`Last strategy decision` + `All candidates` link); no skipped level, confirmed by axe on 16 scans. Unchanged by the P-1 commit.
+- **Discover first paint 375 — PASS.** Band top y=607; input 352–396, Search 404–452, chips `All`/`Available` 460–504, `Stale`/`Unavailable` 512–556 — all free of the band at rest (`rev2p1-discover-firstpaint-375.png`).
+- **Discover first paint 320 — PARTIAL, Pixel's reason is valid.** Band top y=508; input 352–396 and Search 404–452 free; `All` 489–533 (~25px behind the band), `Available` 541–585, `Stale` 593–637, `Unavailable` 645–689, venue chips 726–926 all below the band at rest (`rev2p1-discover-firstpaint-320.png`). Geometry check of the stated reason: the eight chips occupy **437px** of vertical space (one per row at 320), the form ends at y=452 and the page starts at y=239 — for every chip to clear y=508 they would have to start at **y=71**, i.e. above the page title. That is impossible at 568px viewport height without shrinking targets below 48px or dropping content, so "all 8 chips cannot fit" holds. (For the *first row alone* only ~25px would be needed — the gap between Search and the chips is 37px — but clearing that row alone would still leave rows 2–4 behind the band, so it would not make 320 clean.) F-1 clearance intact: 96px main bottom padding, page scrollable, chips free of the band at max scroll. Residual is unchanged from `d8ac8ac` — not a regression of the P-1 commit, non-blocking.
+- **Honest data — PASS.** Overview: `PAPER` ×7, `SIMULATED` ×3 on a live healthy load; Discover: `Unavailable` ×3 with the field kept as "Unavailable", confidence `LOW` visible. No invented numbers, no success-before-backend introduced by this commit. The only fixture in this run is the disclosed labelled portfolio above; other endpoints hit the real local API.
+
+### 4. Gateway at `10c03f6` (run by me)
+
+```sh
+pnpm typecheck   # exit 0 (api-contract, web, api)
+pnpm -r test     # exit 0 — contract 29/29 · api 195 passed + 5 skipped · web 165/165
+pnpm -r build    # exit 0
+```
+
+Web is **165/165** = 153 + 12 new (`revision2-qa-fixes.test.tsx` 15 total, `theme-contrast.test.ts` 40 total, both suites green). Forbidden-file check `git diff --name-only a8bef6e3..10c03f6` contains no `chain/`, `rpc-guard`, `config.ts`, audit-gate, lockfile, `apps/api` or `packages/` path.
+
+### Still not verifiable
+- Real screen-reader pass (VoiceOver/NVDA) — heading/landmark order checked by axe only.
+- Physical touch-device feel (geometry only).
+- Human perception of dark-surface layer separation (1.06–1.14:1 steps).
+- All API responses are the real local PAPER API except the one disclosed labelled portfolio fixture; nothing here is a live mainnet account read.
+
+### Re-verification evidence (head `10c03f6`)
+`docs/design/evidence/rev2/`: `rev2p1-pnl-{light,dark}-panel.png`, `rev2p1-pnl-{light,dark}-full.png`, `rev2p1-pnl-live-{light,dark}-panel.png`, `rev2p1-r1-error-{light,dark}.png`, `rev2p1-discover-firstpaint-{375,320}.png`, `rev2p1-results.json`, `rev2p1-extra.json`.
