@@ -160,3 +160,49 @@ test **143/143** saya jalankan sendiri; `useWatchlist.ts` dan `StopControl.tsx` 
 - **Info (kecil):** lime hero equity di modul portfolio bisa terbaca "hijau = nilai bagus" oleh pengguna; ini pilihan desain berlabel eksplisit "accent never encodes status", dan PnL tetap pakai token status. Tidak melanggar kriteria, tapi layak masuk daftar keputusan CEO bersama §9 (lime vs `#00C805`).
 - **Info (inheren):** N-1 pesan RPC mentah di API masih terbuka di jalur yang sama dengan UI (PR Nexus terpisah).
 - **Tidak ada temuan regresi keselamatan di Revision 2.** Semua butir preserve pada brief CEO §1 tetap terpenuhi: PAPER labeling, STOP control, state jujur, aksesibilitas, fail-closed. Merge tetap keputusan CEO.
+
+### 5.6 Re-check pasca perbaikan QA (head `fa7ca3f`, oleh Sentinel)
+
+Konteks: Probe menemukan R-1 (kontras 2,07:1), R-3 (heading-order), R-4 (first-paint 375/320),
+R-2 (tap target <48px). Pixel memperbaiki semuanya di 1 commit di atas `465c6b9`. Re-check saya
+pada HEAD `fa7ca3f`: typecheck bersih, web test **153/153** (10 tes kontrak baru) saya jalankan
+sendiri; `StopControl.tsx` dan `useWatchlist.ts` diff tetap kosong.
+
+**Verdict per pertanyaan:**
+
+1. **Lime/charcoal/lavender kembali menyamar sebagai status? TIDAK — CLOSED.** Diff kontras
+   (`base.css`) hanya menambahkan scope `.bento-tile--portfolio` untuk teks muted/tombol quiet,
+   border `--feature-line`, tap target 48px, dan perbaikan layout mobile — tidak ada perubahan
+   pemakaian `--brand-accent`/`--brand-secondary`. Audit grep tetap: lime hanya nav aktif,
+   bottom-nav tint, hero equity, `btn--primary`, filter chip; lavender tetap hanya badge PAPER;
+   status tetap emerald/danger/halted. Komentar "Accent never encodes status" tetap.
+2. **Semua pasangan teks di panel charcoal ≥4,5:1? HAMPIR — 1 temuan baru (Serious).** Dihitung
+   ulang: `--feature-muted #A1A1AA` di charcoal = **6,26:1** (light) / di dark feature `#29272B` =
+   **5,77:1**; `--feature-ink` = 15,4:1 / 13,46:1; hero lime = 13,78:1 / 12,71:1 — semua lulus.
+   R-1 lama (`.state__text`/`.btn--quiet` 2,07:1) tertutup oleh scope baru.
+   **TEMUAN BARU (Serious): nilai PnL di panel charcoal LIGHT mode gagal** —
+   `.bento-figure__value--positive` `#065F46` di `#222123` = **2,09:1** dan `--negative` `#991B1B`
+   = **1,93:1** (`base.css:762-768`); dipakai di tile portfolio charcoal (`OverviewPage.tsx:194,203`
+   realized/unrealised via `pnlTint`). Dark mode aman (fg token dark `#34D399` = 7,70:1,
+   `#F87171` = 5,35:1). Akar sama dengan R-1: fg status dikalibrasi ke surface terang, dipakai
+   di charcoal tanpa override. Tes kontrak baru tidak mencakup pasangan ini (blind spot audit).
+   Perbaikan terkecil: override `.bento-tile--portfolio .bento-figure__value--positive` →
+   `#065F46` ditingkatkan (mis. putih/`feature-ink` + tint chip, atau fg emerald gelap yang
+   lulus di charcoal, mis. `#34D399`-analog di light = pilih fg ≥4,5:1 di `#222123`) — keputusan
+   warna milik Pixel, masalahnya sudah terukur.
+3. **Kontrol keselamatan tetap tak ambigu & terjangkau? CLOSED.** `StopControl.tsx`/`useWatchlist.ts`
+   tak tersentuh; perubahan TSX hanya heading h3→h2 (`OverviewPage.tsx`, `PortfolioView.tsx`),
+   `SubjectHeader.description` opsional, intro Discover pindah bawah toolbar (teks sama) — nol
+   perubahan logika/status. PAPER/HALTED/verdict/state/reorg badge sama seperti §5.1. Mobile 375:
+   topbar gap 16→8px (`base.css` media ≤767px) mempercepat clearance; STOP tetap `<button>`
+   natural → keyboard reachable.
+4. **Target sentuh ≥48px di kontrol emergency? CLOSED.** `.btn` min-height 44→`var(--tap)` 48px
+   (`base.css`) — `stop-new-entries` dan Refresh ikut naik; tautan judul tile dapat hit-area 48px
+   via padding + margin kompensasi; `--tap` tetap 48px.
+5. **Non-optimistic & tanpa data karangan? CLOSED.** Logika toggle/watchlist tak berubah;
+   heading/layout saja; nol chart; fallback 'Unavailable' tetap.
+
+**Ringkasan: 1 regression-adjacent temuan baru (Serious, light-mode PnL di charcoal) — bukan
+regresi dari perbaikan Pixel (sudah ada sejak rev2, lolos audit R-1), tapi satu-satunya pasangan
+charcoal yang masih gagal AA. Butir lain semua CLOSED. Yang tetap tak terverifikasi: screen
+reader nyata, perangkat sentuh fisik, persepsi layer dark 1,06–1,14:1 (catatan Probe).**
