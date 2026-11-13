@@ -206,3 +206,57 @@ sendiri; `StopControl.tsx` dan `useWatchlist.ts` diff tetap kosong.
 regresi dari perbaikan Pixel (sudah ada sejak rev2, lolos audit R-1), tapi satu-satunya pasangan
 charcoal yang masih gagal AA. Butir lain semua CLOSED. Yang tetap tak terverifikasi: screen
 reader nyata, perangkat sentuh fisik, persepsi layer dark 1,06–1,14:1 (catatan Probe).**
+
+### 5.7 Re-check setelah perbaikan P-1 (head `10c03f6`, oleh Sentinel)
+
+Cakupan: diff token `d8ac8ac..10c03f6`, hitung ulang kontras semua pasangan charcoal, cek logika
+& label kontrol keselamatan, gate dijalankan sendiri. Sisa minor R-4 di 320px diterima non-blocking
+(alasan Pixel valid: 8 chip tak muat di atas band nav pada tinggi 568px tanpa mengorbankan target
+48px atau clearance F-1; chip tetap reachable via scroll).
+
+1. **Status baru terpisah semantik dari lime & lavender? CLOSED.** Diff token hanya menambah
+   `--feature-positive-fg`/`--feature-negative-fg` (light `#6EE7B7`/`#FCA5A5`, dark
+   `#34D399`/`#F87171`) — nol perubahan token `--status-*`; emerald/danger/halted di luar panel
+   charcoal tidak tersentuh (tes kontrak mengunci `--status-positive-fg` light tetap `#065F46`).
+   Pemakaian hanya 2 titik: override scoped `.bento-tile--portfolio
+   .bento-figure__value--{positive,negative}` (`base.css:624-629`) — tidak dipakai di luar panel
+   portfolio, tidak menyamar sebagai status global. Bukan lime `#D2FF00` (hue berbeda; lime tetap
+   hero accent), bukan lavender (PAPER badge tetap satu-satunya makna lavender). Tanda `+/−`
+   terbaca dari format `signed: true` (`OverviewPage.tsx:197,208`) tanpa bergantung warna.
+2. **Semua pasangan fg/bg panel charcoal ≥4,5:1? CLOSED.** Dihitung ulang sendiri (WCAG relative
+   luminance, pasangan ber-opacity di-composite; light sidebar `#222123`, dark `#0e0d0f`):
+   | Pasangan | Light | Dark |
+   |---|---|---|
+   | panel ink `#FAFAFA`/`#F4F4F5` | 15,36:1 | 13,46:1 |
+   | panel muted `#A1A1AA` | 6,26:1 | 5,77:1 |
+   | panel positive `#6EE7B7`/`#34D399` | **10,52:1** | **7,70:1** |
+   | panel negative `#FCA5A5`/`#F87171` | **8,45:1** | **5,35:1** |
+   | hero lime `#D2FF00` | 13,78:1 | 12,71:1 |
+   | sidebar ink | 15,36:1 | 17,64:1 |
+   | sidebar ink @0,72 (nav link, foot) | 8,56:1 | 9,28:1 |
+   | sidebar ink @0,55 (group title) | 5,58:1 | 5,79:1 |
+   | nav aktif `#171717` on lime | 15,40:1 | 15,40:1 |
+   Terendah 5,35:1 (negative dark) — semua ≥4,5:1; P-1 lama (2,09:1 / 1,93:1) tertutup. Tidak ada
+   komponen non-teks yang berubah di commit ini (diff murni `color:` pada teks), jadi ambang 3:1
+   non-teks tidak relevan untuk delta ini.
+3. **Kontrol keselamatan utuh & keyboard? CLOSED.** `git diff a8bef6e3..10c03f6 --
+   StopControl.tsx useWatchlist.ts` **kosong**. Semua label tetap ada: STOP NEW ENTRIES
+   (`StopControl.tsx`), PAPER/SIMULATED, HALTED, verdict risk + reasons, state
+   stale/unavailable/pending/offline, reorg "MANUAL REVIEW REQUIRED". Delta `d8ac8ac..10c03f6`
+   hanya 25 baris CSS warna (scope `color:`) + 12 tes + harness/evidence — nol sentuh layout,
+   pointer-events, tabindex, atau handler → keyboard reachability & target 48px tidak berubah.
+4. **Non-optimistic & tanpa data karangan? CLOSED.** Nol perubahan TSX di delta ini (diff `src`
+   hanya `tokens.css` + `base.css`); grep nol chart library / polyline dekoratif; satu-satunya
+   kata kunci "optimistic" adalah komentar yang menyatakan TIDAK ada optimistic update
+   (`useWatchlist.ts:32`); fallback 'Unavailable' tetap. Screenshot PnL = fixture berlabel yang
+   di-intercept di browser dan didisclosure di `results.json` — bukan data karangan.
+5. **Gate dijalankan sendiri di `10c03f6`:** typecheck OK · contract **29/29** · API **195 passed
+   + 5 skipped** · web **165/165** (153 + 12 tes kontrak baru yang mengunci pasangan charcoal dan
+   token status global) · file terlarang nol diff vs `a8bef6e3` (juga `StopControl.tsx`/
+   `useWatchlist.ts`). Red proof 2 mutasi dilaporkan Pixel (ikat ulang ke `--status-positive-fg` →
+   2 tes gagal; ubah token dark → 2 tes gagal), kedua mutasi dipulihkan.
+
+**Ringkasan: P-1 CLOSED; nol regresi; semua butir 1–5 CLOSED. Sisa minor R-4 di 320px non-blocking
+(chip reachable via scroll). Belum terverifikasi (v1 & v2): screen reader nyata (VoiceOver/NVDA),
+sentuhan perangkat fisik, persepsi pemisahan layer dark 1,06–1,14:1, review frame-by-frame webm.
+Temuan di luar cakupan ini (N-1 raw RPC message, dsb.) tetap terbuka seperti laporan sebelumnya.**
