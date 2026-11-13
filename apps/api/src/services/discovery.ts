@@ -214,8 +214,16 @@ export async function verifyDiscoveryCheckpoint(input: {
       );
       withTransaction(db, () =>
         saveDiscoveryCheckpoint(db, {
+          // Re-anchor as a fresh marker at the START of the stored range, not
+          // just below the divergence: PoolCreated events on the replacement
+          // fork between the divergence block and toBlock-1 would otherwise
+          // never be re-scanned (silent ingest gap). A null-hash marker with
+          // toBlock == fromBlock makes the next tick scan [fromBlock..head],
+          // bounded by the stored range width, with idempotent inserts via
+          // UNIQUE (tx, log_index). (CHECK to_block >= from_block forbids a
+          // fromBlock-1 anchor; the fresh marker is its supported equivalent.)
           fromBlock: checkpoint.fromBlock,
-          toBlock: checkpoint.toBlock - 1,
+          toBlock: checkpoint.fromBlock,
           blockHash: null,
         }),
       );

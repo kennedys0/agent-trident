@@ -339,7 +339,49 @@ describe('reorg semantics', () => {
     expect(verdict).toBe('rewound');
     const kept = (db.prepare('SELECT pool_address FROM discovered_pools ORDER BY first_seen_block').all() as { pool_address: string }[]).map((r) => r.pool_address);
     expect(kept).toEqual([`0x${'d1'.repeat(20)}`]);
-    expect(getDiscoveryCheckpoint(db)!.toBlock).toBe(109);
+    expect(getDiscoveryCheckpoint(db)!.toBlock).toBe(100); // fresh marker at the stored-range start
+  });
+
+  it('re-scans the whole stored range after a rewind so replacement-fork events are ingested', async () => {
+    const db = makeDb();
+    const { token0, token1 } = tokenPair();
+    insertDiscoveredPool(db, {
+      poolAddress: `0x${'d1'.repeat(20)}`, factory: FACTORY_ADDRESS, token0, token1,
+      token0Symbol: 'A', token1Symbol: 'B', token0Decimals: 18, token1Decimals: 6,
+      fee: 100, tickSpacing: 1, firstSeenBlock: 100, firstSeenTx: `0x${'cd'.repeat(32)}`, logIndex: 0,
+    });
+    saveDiscoveryCheckpoint(db, { fromBlock: 100, toBlock: 110, blockHash: `0x${'aa'.repeat(32)}` });
+    const forkHead = 120;
+    const headBlock = { number: forkHead, hash: `0x${'bb'.repeat(32)}` as `0x${string}`, parentHash: `0x${'cd'.repeat(32)}` as `0x${string}`, timestamp: Math.floor(Date.now() / 1000) };
+    // A PoolCreated event that only exists on the replacement fork, below the
+    // old divergence block. It must be picked up by the re-scan.
+    const forkLog = makeLog({
+      pool: `0x${'f1'.repeat(20)}`, fee: 500, tickSpacing: 10,
+      blockNumber: 105, transactionHash: `0x${'77'.repeat(32)}`, logIndex: 0,
+    });
+    let scannedFrom: number | null = null;
+    const verifyPort = makePort({
+      async getHead() { return headBlock; },
+      async getBlockByNumber() { return { ...headBlock, number: 110 }; }, // same height, replaced hash
+      async getLogs() { return [makeLog({ blockNumber: 100, transactionHash: `0x${'cd'.repeat(32)}`, logIndex: 0 })]; },
+    });
+    expect(await verifyDiscoveryCheckpoint({ db, chain: verifyPort, correlationId: 't' })).toBe('rewound');
+    expect(getDiscoveryCheckpoint(db)!.toBlock).toBe(100);
+
+    const tickPort = makePort({
+      async getHead() { return headBlock; },
+      async getLogs(request: { fromBlock: number }) {
+        scannedFrom = request.fromBlock;
+        if (request.fromBlock <= 105) return [forkLog];
+        return [];
+      },
+    });
+    const result = await runDiscoveryTick({ db, chain: tickPort, correlationId: 't' });
+    expect(result.status).toBe('OK');
+    expect(scannedFrom).toBe(100); // re-scan starts at the stored-range start, not toBlock+1
+    const pools = (db.prepare('SELECT pool_address FROM discovered_pools').all() as { pool_address: string }[]).map((r) => r.pool_address);
+    expect(pools).toContain(`0x${'f1'.repeat(20)}`); // fork event below the divergence is now ingested
+    expect(pools).toContain(`0x${'d1'.repeat(20)}`); // canonical row proven by replay survives
   });
 
   it('freezes without deleting when the canonical replay is unreadable', async () => {
