@@ -6,9 +6,10 @@ The system never signs a transaction, never holds a key, and has no live executi
 
 ## Status
 
-Local PAPER operation is implemented, tested, and merged to `main`. Public deployment is blocked; see [Limitations](#limitations).
+Local PAPER operation is implemented, tested, and merged to `main`. Sprint 3 (market intelligence, verified on-chain pool discovery, and the Discover UI) is merged. Public deployment is blocked; see [Limitations](#limitations).
 
 - Proven: real RPC chain check, block-pinned quotes, deterministic strategy, risk rules `R01`–`R15`, one fill per evaluation, replay idempotency, balanced double-entry ledger, restart and reorg recovery, atomic audit, kill switch, responsive UI with honest stale, unavailable, and manual-review states.
+- Proven in Sprint 3: verified `PoolCreated` pool discovery on Robinhood Chain (`s3-01-registry` venue, factory bytecode pinned), a pool registry with price/liquidity/provenance and a server-persisted watchlist, and the Discover list plus pool Inspector UI.
 - Not yet proven: destructive reorg on the live chain (synthetic provider only), physical devices, Firefox, WebKit, real screen readers, and any deployment behind auth, TLS, or a container.
 - Never in scope for this phase: `LIVE` mode, wallets, signing, `eth_send*`.
 
@@ -112,6 +113,8 @@ The preview server listens on http://127.0.0.1:4173 and uses the same API proxy.
 | `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, or `debug` |
 | `MARKET_FRESHNESS_SECONDS` | `30` | A snapshot older than this reads as `STALE` |
 | `OPENING_CASH_USDG_BASE` | `10000000000` | Simulated opening cash in USDG base units (6 decimals) |
+| `DISCOVERY_ENABLED` | `1` | Set to `0` to switch off the pool-discovery worker entirely |
+| `DISCOVERY_LOOKBACK_BLOCKS` | `2000` | Blocks the first discovery scan looks back; capped at `25000` |
 
 The web dev server reads `TRIDENT_API_URL` to change its proxy target. The default is `http://127.0.0.1:8080`.
 
@@ -127,9 +130,9 @@ pnpm test
 pnpm build
 ```
 
-Expected results: typecheck and build finish clean; tests report contract 19, API 156 with 4 skipped real-RPC tests, and web 42.
+Expected results: typecheck and build finish clean; tests report contract 25, API 187 with 5 skipped real-RPC tests, and web 76.
 
-To include the four tests that call the live RPC:
+To include the eight tests that call the live RPC:
 
 ```bash
 RUN_RPC_TESTS=1 pnpm --filter @trident/api test
@@ -142,15 +145,18 @@ pnpm --filter @trident/web exec playwright install chromium
 pnpm --filter @trident/web exec playwright test
 ```
 
-The suite covers the desktop Chromium viewport only. It expects a reachable API and a fresh database.
+The suite covers the desktop Chromium viewport only. It expects a reachable API and a fresh database. It includes `e2e/watchlist.spec.ts`, which clicks the Watch button on a live pool and proves the change reaches the API and survives a reload.
 
 ## Project layout
 
 ```
-apps/api               Fastify API, chain client, strategy, risk gate, ledger, SQLite, worker, Discover (read-only market intelligence, S3-02)
-apps/web               React + Vite operations console
+apps/api               Fastify API, chain client, strategy, risk gate, ledger, SQLite, worker, Discover (read-only market intelligence, S3-02), pool discovery worker (S3-01)
+apps/web               React + Vite operations console, Discover list and pool Inspector UI (S3-03)
 packages/api-contract  Zod schemas, generated OpenAPI document, and shared wire types
 docs/evidence          Committed acceptance evidence for issue #5
+docs/qa               Sprint 3 QA summary, acceptance matrix, and gate reports
+docs/s3-01-pool-discovery.md       Pool discovery design and invariants
+docs/s3-02-market-intelligence.md  Registry, watchlist, and market-intelligence contracts
 ```
 
 The API builds `@trident/api-contract` before it type-checks or tests, so the API and the UI cannot drift from the contract quietly.
@@ -163,6 +169,7 @@ The API builds `@trident/api-contract` before it type-checks or tests, so the AP
 - QuoterV2: `0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7`
 - WETH/USDG pool at Uniswap v3 **fee tier 100** (100/1,000,000 = 0.01%, tick spacing 1): `0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca`. "Fee tier 100" is the protocol term; "0.01%" is the same thing in plain percent. It is not "100 bps" (that would be 1%). The other on-chain tiers are `500` (0.05%, spacing 10), `3000` (0.3%, spacing 60), and `10000` (1%, spacing 200). Verified against the mainnet contract on 2026-11-12: `getPool(WETH, USDG, 100)` → `0x52e6…71Ca`, `pool.fee()` → `100`, `tickSpacing()` → `1`
 - The public RPC is polling-only and non-archive. Historical state reaches roughly 5,000 blocks back, so the risk gate rejects snapshots beyond that window.
+- Fee tiers are shown in percent in the Discover UI: tier `100` → `0.01%`, `500` → `0.05%`, `3000` → `0.3%`, `10000` → `1%`. The label divides the tier by `10000`. The string `0.0001%` belongs to tier `1`, which is not a Uniswap v3 tier on this chain and never appears in the UI.
 
 The testnet, chain ID `46630`, has no Uniswap v3 deployment and no USDG. It is unusable for this system.
 
@@ -175,6 +182,9 @@ Do not expose this application to a network you do not control.
 - No Dockerfile or Compose file is committed, so container hardening and backup and restore drills are unproven. CI covers deterministic gates only; see [docs/CI.md](docs/CI.md).
 - Completed Phase 1 issues are reconciled, with close recommendations, in [docs/phase-1-reconciliation.md](docs/phase-1-reconciliation.md). They remain open until the coordinator closes them.
 - One venue and one pool, no independent price oracle. A second RPC provider for finality and failover is future work.
+- Discovered pools are read-only. A pool found by the discovery worker is never actionable: `POST /api/v1/intents` for a discovered pool answers `422 INTENT_NOT_ACTIONABLE`, and only the verified allowlist can be traded.
+- Discovery reads a bounded window. The first scan looks back `DISCOVERY_LOOKBACK_BLOCKS` blocks (default `2000`, capped at `25000`); older pools are only found when the worker has been running long enough or the lookback is raised.
+- Discovered pools carry no volume. The public RPC has no verifiable volume source, so volume reads `UNAVAILABLE` with a reason and confidence stays `LOW`.
 - The kill switch is not released automatically after a reorg or missing chain evidence. An operator must clear it.
 - The public RPC has no `eth_subscribe`, so latency and freshness depend on the 10-second poll.
 

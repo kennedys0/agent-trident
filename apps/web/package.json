@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm --filter @trident/api-contract build && vite",
     "build": "pnpm --filter @trident/api-contract build && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "pnpm --filter @trident/api-contract build && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
