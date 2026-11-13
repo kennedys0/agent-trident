@@ -1,5 +1,7 @@
 /* Discover: listing, filters, metric provenance and watchlist controls.
-   Only tokens from styles/tokens.css are used; no new colours or sizes. */
+   Robinhood Soft Bento (issue #39): dense readable table — tabular numerics,
+   right-aligned number columns, explicit headers. Bento does not turn the
+   table into cards. Only tokens from styles/tokens.css are used. */
 
 .discover-toolbar {
   display: flex;
@@ -7,7 +9,7 @@
   gap: var(--space-2);
   padding: var(--space-3);
   background: var(--surface);
-  border: var(--border-width) solid var(--ink);
+  border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
 }
@@ -18,6 +20,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--muted);
 }
 
 .discover-search {
@@ -46,11 +49,16 @@
   width: 100%;
   min-height: 44px;
   padding: 8px 12px;
-  border: var(--border-width) solid var(--ink);
-  border-radius: var(--radius);
-  background: var(--canvas);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-well);
   color: var(--ink);
   font: inherit;
+  transition: border-color var(--motion-fast) var(--ease);
+}
+
+.discover-input:hover {
+  border-color: var(--border-strong);
 }
 
 .discover-input::placeholder {
@@ -76,22 +84,30 @@
   align-items: center;
   gap: 6px;
   min-height: 44px;
-  padding: 6px 12px;
-  border: var(--border-width) solid var(--ink);
-  border-radius: var(--radius);
-  background: var(--canvas);
+  padding: 6px 14px;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
   font-size: var(--text-meta);
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--motion);
+  transition: background-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
 }
 
+.filter-chip:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+/* Selected filter: brand lime accent (brand ≠ status); the hairline edge keeps
+   the lime fill readable against the light canvas (spec §1.1). */
 .filter-chip[aria-pressed='true'] {
-  background: var(--wait);
-  color: var(--status-ink);
-  box-shadow: var(--shadow-sm);
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+  border-color: var(--border-strong);
 }
 
 /* ---------- Listing ---------- */
@@ -145,12 +161,13 @@
 }
 
 .token-link {
-  text-decoration-thickness: 2px;
+  text-decoration-thickness: 1px;
+  border-radius: var(--radius-sm);
 }
 
 .token-link:hover {
-  background: var(--wait);
-  color: var(--status-ink);
+  background: var(--surface-hover);
+  color: var(--ink);
 }
 
 .discover-metrics .inline {
@@ -167,6 +184,8 @@
 }
 
 .metric__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   overflow-wrap: anywhere;
 }

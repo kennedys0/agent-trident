@@ -77,6 +77,11 @@ Untuk setiap token status: **fg/bg/border adalah satu paket yang tidak boleh dic
   --status-unavailable-fg: #52525b;--status-unavailable-bg: #f4f4f5; --status-unavailable-border: #e4e4e7;
   --status-pending-fg: #1d4ed8;    --status-pending-bg: #dbeafe;   --status-pending-border: #bfdbfe;
 
+  /* Disabled controls (Sentinel S-4): readable by rule, never by opacity.
+     offline (browser/RPC OFFLINE) is status-critical/negative, NOT these. */
+  --disabled-fg: #52525b;            /* 7.0:1 on --disabled-bg */
+  --disabled-bg: #f4f4f5;
+
   /* Focus + info */
   --focus: #2563eb;             /* 2px outline, offset 2px — AA vs both modes */
   --info: #1d4ed8;
@@ -173,7 +178,7 @@ Untuk setiap token status: **fg/bg/border adalah satu paket yang tidak boleh dic
 }
 ```
 
-Catatan kontras dark semantic: semua fg lulus AA pada tintnya yang di-blend ke canvas `#1A191B` (positive 7,23; warning 7,99; negative 5,43; unavailable 5,64; pending 8,08; critical = negative diperkuat alpha 0,22; halted fill putih-di-`#B91C1C` 6,47).
+Catatan kontras dark semantic: semua fg lulus AA pada tintnya yang di-blend ke canvas `#1A191B` (positive 7,23; warning 7,99; negative 5,43; unavailable 5,64; pending 8,08; **critical 4,94 — lulus AA normal-text tanpa margin; jangan turunkan alpha, dan untuk teks yang butuh margin pakai `status-negative` atau perbesar alpha ≥0,25** — angka ini dicantumkan agar regresi terdeteksi (Sentinel S-5); halted fill putih-di-`#B91C1C` 6,47).
 
 ## 4. Status → token mapping (fitur nyata, bukan baru)
 
@@ -184,9 +189,11 @@ Catatan kontras dark semantic: semua fg lulus AA pada tintnya yang di-blend ke c
 | UNAVAILABLE | `status-unavailable` (neutral gray; selalu dengan reason) |
 | Error / gagal | `status-negative` |
 | Risk breach / RPC offline | `status-critical` |
+| Browser offline, RPC OFFLINE | `status-critical`/`status-negative` + banner — **jangan pernah abu-abu unavailable** (Sentinel S-4); data terakhir tetap tampil dengan label "not live" |
+| Kontrol disabled | `--disabled-fg` pada `--disabled-bg` (terbaca by-rule, tanpa opacity); label tetap terbaca; `aria-disabled` bila bukan tombol asli |
 | Kill switch engaged (STOP) | `status-halted` (fill solid merah — satu-satunya status filled) |
 | Refresh in-flight, pending | `status-pending` (blue) |
-| PAPER mode, testnet info | `brand-secondary` lavender atau `info` — bukan lime |
+| PAPER mode, testnet info | **Token PAPER eksplisit (Sentinel S-1): fill `brand-secondary` lavender + ink `#171717` + `border-strong`** — bukan pilihan "atau info". Wajib tampil di tiga tempat: brand sidebar, topbar/header tiap halaman, dan status-strip HUD. Bukan tag dekoratif, tidak boleh disembunyikan, dan tidak boleh memakai `status-unavailable` gray. |
 
 ## 5. Tipografi
 

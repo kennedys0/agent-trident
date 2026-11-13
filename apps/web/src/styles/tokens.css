@@ -1,54 +1,158 @@
-/* TRIDENT design tokens — source of truth: DESIGN.md (Taste Engine neo-brutalism). */
+/* TRIDENT design tokens — Robinhood Soft Bento (design exploration, issue #39).
+   Source of truth: docs/design/soft-bento-tokens.md (Pixel) + soft-bento-motion.md.
+   Replaces the neo-brutalism token set; names keep English per repo convention.
+   Extension beyond the spec: --brand-accent-tint (soft lime tint for the active
+   bottom-nav item); flagged for Pixel in the PR. */
 :root {
-  --canvas: #fffdf7;
-  --surface: #ffffff;
-  --ink: #121212;
-  --status-ink: #121212;
-  --muted: #4b4b4b;
-  --wait: #ffe600;
-  --danger: #ff5757;
-  --info: #4deeea;
-  --success: #00f0a8;
-  --testnet: #d8b4fe;
-  --focus: #3b5bff;
+  /* Surfaces (light) */
+  --canvas: #e9e9e9;            /* page base — warm light gray */
+  --surface: #ffffff;           /* tile / card fill */
+  --surface-well: #f4f4f5;      /* recessed wells: inputs, table headers */
+  --surface-hover: #f8fafc;     /* row hover */
 
-  --border-width: 2.5px;
-  --radius: 6px;
-  --shadow-sm: 3px 3px 0 var(--ink);
-  --shadow-md: 5px 5px 0 var(--ink);
-  --shadow-lg: 8px 8px 0 var(--ink);
+  /* Ink */
+  --ink: #171717;               /* primary text — 17.9:1 on surface */
+  --muted: #52525b;             /* secondary text — 6.4:1 on canvas */
 
+  /* Structure */
+  --border: rgba(23, 23, 23, 0.12);       /* hairline tile border */
+  --border-strong: rgba(23, 23, 23, 0.24);/* emphasized boundary, e.g. lime fills */
+  --hairline: rgba(23, 23, 23, 0.08);     /* internal dividers */
+
+  /* Brand (identity + primary action — NEVER a status meaning) */
+  --brand-accent: #d2ff00;      /* lime fill: primary CTA, active nav pill */
+  --brand-on-accent: #171717;   /* text on lime — 15.4:1 */
+  --brand-accent-tint: rgba(210, 255, 0, 0.32); /* soft lime tint (extension) */
+  --brand-secondary: #b9aef4;   /* lavender fill: light tags, empty-state art */
+  --brand-on-secondary: #171717;
+  --sidebar-bg: #222123;        /* dark sidebar on light canvas */
+  --sidebar-ink: #fafafa;       /* 15.4:1 on charcoal */
+  --sidebar-line: rgba(250, 250, 250, 0.14);  /* dividers inside the sidebar (extension) */
+  --sidebar-hover: rgba(255, 255, 255, 0.08); /* nav hover wash (extension) */
+
+  /* Semantic status — separate from brand, fixed fg/bg/border pairs (AA verified) */
+  --status-positive-fg: #065f46;   --status-positive-bg: #ecfdf5;  --status-positive-border: #a7f3d0;
+  --status-negative-fg: #991b1b;   --status-negative-bg: #fee2e2;  --status-negative-border: #fecaca;
+  --status-warning-fg: #9a3412;    --status-warning-bg: #ffedd5;   --status-warning-border: #fed7aa;
+  --status-critical-fg: #7f1d1d;   --status-critical-bg: #fecaca;  --status-critical-border: #f87171;
+  --status-halted-fg: #ffffff;     --status-halted-bg: #b91c1c;    --status-halted-border: #b91c1c; /* filled; 6.5:1 */
+  --status-stale-fg: #854d0e;      --status-stale-bg: #fef3c7;     --status-stale-border: #fde68a;
+  --status-unavailable-fg: #52525b;--status-unavailable-bg: #f4f4f5; --status-unavailable-border: #e4e4e7;
+  --status-pending-fg: #1d4ed8;    --status-pending-bg: #dbeafe;   --status-pending-border: #bfdbfe;
+
+  /* Disabled controls (Sentinel S-4): readable by rule, never by opacity.
+     offline (browser/RPC OFFLINE) is status-critical/negative, NOT these. */
+  --disabled-fg: #52525b;            /* 7.0:1 on --disabled-bg */
+  --disabled-bg: #f4f4f5;
+
+  /* Focus + info */
+  --focus: #2563eb;             /* 2px outline, offset 2px — AA vs both modes */
+  --info: #1d4ed8;
+
+  /* Geometry */
+  --radius-sm: 8px;             /* controls, inputs, badges */
+  --radius: 12px;               /* tiles, panels */
+  --radius-lg: 16px;            /* bento feature tile */
+  --radius-pill: 999px;         /* pills, toggle track */
+
+  --border-width: 1px;          /* hairline — replaces 2.5px brutalist border */
+
+  /* Elevation (soft, zero offset; no hard brutalist shadow) */
+  --shadow-sm: 0 1px 2px rgba(23, 23, 23, 0.05);
+  --shadow-md: 0 2px 8px rgba(23, 23, 23, 0.08);
+  --shadow-lg: 0 8px 24px rgba(23, 23, 23, 0.12);   /* overlays/dropdowns only */
+
+  /* Spacing — keep 8px grid, add half-step */
+  --space-05: 4px;
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
   --space-4: 32px;
   --space-5: 48px;
 
-  --font-sans: 'Space Grotesk', 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  /* Typography */
+  --font-sans: 'Inter', 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  --text-display: 30px;   /* page h1, weight 700, letter-spacing -0.025em */
+  --text-h2: 20px;        /* panel/section title, weight 600 */
+  --text-body: 15px;      /* body, line-height 1.6 */
+  --text-meta: 13px;      /* meta/labels, weight 500 */
+  --text-mono-num: 13px;  /* table numerics, tabular-nums, right-aligned */
 
-  --text-h1: 32px;
-  --text-h2: 22px;
-  --text-body: 16px;
-  --text-meta: 14px;
+  /* Motion (full contract in soft-bento-motion.md) */
+  --motion-fast: 120ms;
+  --motion: 160ms;
+  --motion-slow: 240ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --lift: -2px;              /* card hover travel */
+  --press: 1px;              /* button press travel */
 
-  --motion: 130ms ease-out;
+  /* Layout */
   --sidebar: 240px;
   --content-max: 1440px;
+  --bento-gap: 16px;
   --tap: 48px;
 }
 
+/* Dark mode — own tokens, NOT an invert of light. */
 [data-theme='dark'] {
-  --canvas: #18181b;
-  --surface: #222227;
-  --ink: #fafafa;
-  --muted: #a1a1aa;
+  --canvas: #1a191b;            /* warm charcoal, not pitch black */
+  --surface: #222123;           /* candidate charcoal becomes surface */
+  --surface-well: #2a292c;      /* recessed wells */
+  --surface-hover: #2a292c;     /* row hover */
+
+  --ink: #f4f4f5;               /* 15.9:1 on canvas */
+  --muted: #a1a1aa;             /* 6.8:1 on canvas */
+
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.20);
+  --hairline: rgba(255, 255, 255, 0.08);
+
+  --brand-accent: #d2ff00;      /* lime stays; 13.8:1 vs charcoal — reads */
+  --brand-on-accent: #171717;
+  --brand-accent-tint: rgba(210, 255, 0, 0.18); /* extension */
+  --brand-secondary: #b9aef4;   /* non-text accent in dark; text on it stays dark */
+  --brand-on-secondary: #171717;
+  --sidebar-bg: #141314;        /* sidebar darker than canvas */
+  --sidebar-ink: #f4f4f5;
+  --sidebar-line: rgba(244, 244, 245, 0.14);  /* extension */
+  --sidebar-hover: rgba(255, 255, 255, 0.08); /* extension */
+
+  /* Semantic dark: bright fg on low-alpha tint of the same hue over canvas */
+  --status-positive-fg: #34d399;  --status-positive-bg: rgba(16, 185, 129, 0.15);  --status-positive-border: rgba(16, 185, 129, 0.35);
+  --status-negative-fg: #f87171;  --status-negative-bg: rgba(239, 68, 68, 0.15);   --status-negative-border: rgba(239, 68, 68, 0.35);
+  --status-warning-fg: #fbbf24;   --status-warning-bg: rgba(245, 158, 11, 0.15);   --status-warning-border: rgba(245, 158, 11, 0.35);
+  --status-critical-fg: #f87171;  --status-critical-bg: rgba(239, 68, 68, 0.22);   --status-critical-border: rgba(239, 68, 68, 0.5);
+  --status-halted-fg: #ffffff;    --status-halted-bg: #b91c1c;                     --status-halted-border: #ef4444; /* filled */
+  --status-stale-fg: #fbbf24;     --status-stale-bg: rgba(251, 191, 36, 0.12);     --status-stale-border: rgba(251, 191, 36, 0.3);
+  --status-unavailable-fg: #9ca3af; --status-unavailable-bg: rgba(156, 163, 175, 0.12); --status-unavailable-border: rgba(156, 163, 175, 0.25);
+  --status-pending-fg: #93c5fd;   --status-pending-bg: rgba(59, 130, 246, 0.15);   --status-pending-border: rgba(59, 130, 246, 0.35);
+
+  /* Disabled controls (Sentinel S-4): readable by rule, never by opacity. */
+  --disabled-fg: #a1a1aa;            /* 4.4:1 on --disabled-bg */
+  --disabled-bg: #2a292c;
+
+  --focus: #60a5fa;
+  --info: #93c5fd;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 @media (max-width: 767px) {
   :root {
-    --text-h1: 28px;
+    --text-display: 26px;
     --space-3: 16px;
     --space-4: 16px;
+    --bento-gap: 12px;
+  }
+}
+
+/* Reduced motion (FLOOR): travel and timing collapse; colour state changes stay. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lift: 0px;
+    --press: 0px;
   }
 }

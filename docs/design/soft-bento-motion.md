@@ -111,6 +111,8 @@ Track pill 40×24, thumb lingkaran 18px dengan `aspect-ratio: 1/1; flex-shrink: 
 .toggle[aria-checked='true'] .toggle__thumb { transform: translateX(16px); background: var(--brand-on-accent); }
 ```
 
+**Aturan non-optimistic (Sentinel S-2, wajib):** `aria-checked` dan warna track/thumb hanya berubah SETELAH backend mengonfirmasi perubahan state — bukan saat klik. Nilai optimistik dilarang pada toggle, watchlist action, dan filter yang menyentuh state server: klik menandai in-flight (`aria-busy` / disabled + `status-pending`), lalu state visual mengikuti respons server. Referensi pola yang benar di repo: `apps/web/src/components/StopControl.tsx:24-31` (sukses hanya setelah re-read `/health`). Toggle tema lokal (light/dark) dikecualikan karena state-nya di klien.
+
 ### 3.5 Row hover (tabel)
 
 ```css
