@@ -7,8 +7,16 @@
   /* Surfaces (light) */
   --canvas: #e9e9e9;            /* page base — warm light gray */
   --surface: #ffffff;           /* tile / card fill */
+  --surface-raised: #ffffff;    /* feature layer: white + stronger shadow */
   --surface-well: #f4f4f5;      /* recessed wells: inputs, table headers */
   --surface-hover: #f8fafc;     /* row hover */
+
+  /* Feature panel (Revision 2, CEO brief §2): the dominant Bento module.
+     Light = charcoal panel on the soft gray canvas; dark = raised layer. */
+  --feature-bg: #222123;        /* light mode charcoal feature panel */
+  --feature-ink: #fafafa;       /* 15.4:1 on feature */
+  --feature-muted: #a1a1aa;     /* 6.3:1 on feature */
+  --feature-line: rgba(250, 250, 250, 0.12);
 
   /* Ink */
   --ink: #171717;               /* primary text — 17.9:1 on surface */
@@ -70,19 +78,23 @@
   --space-4: 32px;
   --space-5: 48px;
 
-  /* Typography */
-  --font-sans: 'Inter', 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  /* Typography (Revision 2, CEO brief §3): system humanist/geometric stacks —
+     no webfont downloads. Mono reserved for addresses, hashes, logs and
+     technical identifiers only. */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
   --text-display: 30px;   /* page h1, weight 700, letter-spacing -0.025em */
+  --text-hero: 40px;      /* dominant portfolio figure, weight 700, tabular-nums */
   --text-h2: 20px;        /* panel/section title, weight 600 */
   --text-body: 15px;      /* body, line-height 1.6 */
-  --text-meta: 13px;      /* meta/labels, weight 500 */
+  --text-meta: 13px;      /* metadata, weight 500, sentence case */
   --text-mono-num: 13px;  /* table numerics, tabular-nums, right-aligned */
 
-  /* Motion (full contract in soft-bento-motion.md) */
-  --motion-fast: 120ms;
-  --motion: 160ms;
-  --motion-slow: 240ms;
+  /* Motion (full contract in soft-bento-motion.md; Revision 2 ranges:
+     press 80–140ms, hover 150–200ms, panel/page 180–240ms) */
+  --motion-fast: 100ms;
+  --motion: 170ms;
+  --motion-slow: 220ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --lift: -2px;              /* card hover travel */
   --press: 1px;              /* button press travel */
@@ -94,15 +106,18 @@
   --tap: 48px;
 }
 
-/* Dark mode — own tokens, NOT an invert of light. */
+/* Dark mode — own tokens, NOT an invert of light. Revision 2 (CEO brief §4):
+   a calibrated surface ladder instead of two near-identical grays —
+   canvas #131214 → card #201f22 → raised #29272b, all AA+ verified. */
 [data-theme='dark'] {
-  --canvas: #1a191b;            /* warm charcoal, not pitch black */
-  --surface: #222123;           /* candidate charcoal becomes surface */
-  --surface-well: #2a292c;      /* recessed wells */
-  --surface-hover: #2a292c;     /* row hover */
+  --canvas: #131214;            /* deep warm near-black */
+  --surface: #201f22;           /* card layer */
+  --surface-raised: #29272b;    /* feature/overlay layer */
+  --surface-well: #1b1a1c;      /* recessed wells */
+  --surface-hover: #29272b;     /* row hover */
 
-  --ink: #f4f4f5;               /* 15.9:1 on canvas */
-  --muted: #a1a1aa;             /* 6.8:1 on canvas */
+  --ink: #f4f4f5;               /* 17.0:1 on canvas */
+  --muted: #a1a1aa;             /* 7.3:1 on canvas */
 
   --border: rgba(255, 255, 255, 0.10);
   --border-strong: rgba(255, 255, 255, 0.20);
@@ -113,7 +128,7 @@
   --brand-accent-tint: rgba(210, 255, 0, 0.18); /* extension */
   --brand-secondary: #b9aef4;   /* non-text accent in dark; text on it stays dark */
   --brand-on-secondary: #171717;
-  --sidebar-bg: #141314;        /* sidebar darker than canvas */
+  --sidebar-bg: #0e0d0f;        /* chrome darker than the canvas layer */
   --sidebar-ink: #f4f4f5;
   --sidebar-line: rgba(244, 244, 245, 0.14);  /* extension */
   --sidebar-hover: rgba(255, 255, 255, 0.08); /* extension */
@@ -128,9 +143,15 @@
   --status-unavailable-fg: #9ca3af; --status-unavailable-bg: rgba(156, 163, 175, 0.12); --status-unavailable-border: rgba(156, 163, 175, 0.25);
   --status-pending-fg: #93c5fd;   --status-pending-bg: rgba(59, 130, 246, 0.15);   --status-pending-border: rgba(59, 130, 246, 0.35);
 
+  /* Feature panel (Revision 2): raised layer carries the hero module. */
+  --feature-bg: #29272b;        /* raised feature layer in dark */
+  --feature-ink: #f4f4f5;       /* 14.9:1 on feature */
+  --feature-muted: #a1a1aa;     /* 5.8:1 on feature */
+  --feature-line: rgba(244, 244, 245, 0.12);
+
   /* Disabled controls (Sentinel S-4): readable by rule, never by opacity. */
-  --disabled-fg: #a1a1aa;            /* 4.4:1 on --disabled-bg */
-  --disabled-bg: #2a292c;
+  --disabled-fg: #a1a1aa;            /* 5.8:1 on --disabled-bg */
+  --disabled-bg: #29272b;
 
   --focus: #60a5fa;
   --info: #93c5fd;
@@ -143,6 +164,7 @@
 @media (max-width: 767px) {
   :root {
     --text-display: 26px;
+    --text-hero: 32px;      /* hero figure fits the narrow viewport on one line */
     --space-3: 16px;
     --space-4: 16px;
     --bento-gap: 12px;
