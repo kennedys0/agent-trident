@@ -112,6 +112,8 @@ The preview server listens on http://127.0.0.1:4173 and uses the same API proxy.
 | `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, or `debug` |
 | `MARKET_FRESHNESS_SECONDS` | `30` | A snapshot older than this reads as `STALE` |
 | `OPENING_CASH_USDG_BASE` | `10000000000` | Simulated opening cash in USDG base units (6 decimals) |
+| `DISCOVERY_ENABLED` | `1` | Set to `0` to switch off the pool-discovery worker entirely |
+| `DISCOVERY_LOOKBACK_BLOCKS` | `2000` | Blocks the first discovery scan looks back; capped at `25000` |
 
 The web dev server reads `TRIDENT_API_URL` to change its proxy target. The default is `http://127.0.0.1:8080`.
 
@@ -166,6 +168,7 @@ The API builds `@trident/api-contract` before it type-checks or tests, so the AP
 - QuoterV2: `0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7`
 - WETH/USDG pool at Uniswap v3 **fee tier 100** (100/1,000,000 = 0.01%, tick spacing 1): `0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca`. "Fee tier 100" is the protocol term; "0.01%" is the same thing in plain percent. It is not "100 bps" (that would be 1%). The other on-chain tiers are `500` (0.05%, spacing 10), `3000` (0.3%, spacing 60), and `10000` (1%, spacing 200). Verified against the mainnet contract on 2026-11-12: `getPool(WETH, USDG, 100)` → `0x52e6…71Ca`, `pool.fee()` → `100`, `tickSpacing()` → `1`
 - The public RPC is polling-only and non-archive. Historical state reaches roughly 5,000 blocks back, so the risk gate rejects snapshots beyond that window.
+- Fee tiers are shown in percent in the Discover UI: tier `100` → `0.01%`, `500` → `0.05%`, `3000` → `0.3%`, `10000` → `1%`. The label divides the tier by `10000`. The string `0.0001%` belongs to tier `1`, which is not a Uniswap v3 tier on this chain and never appears in the UI.
 
 The testnet, chain ID `46630`, has no Uniswap v3 deployment and no USDG. It is unusable for this system.
 
