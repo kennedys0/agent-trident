@@ -109,3 +109,54 @@ dilakukan sendiri (bukan mewarisi klaim Pixel/Forge) pada HEAD `28ac069`.
 Tidak ada temuan keamanan operasional baru pada prototipe `28ac069`. Semua kriteria 1–7 pada
 tugas terpenuhi di level implementasi; kedua temuan Medium (S-1, S-2) dan tiga Low (S-3/S-4/S-5)
 telah ditutup di spec maupun kode. Keputusan merge tetap milik CEO (§9 spec tokens).
+
+---
+
+## 5. Revision 2 — review keselamatan operasional (branch `design/soft-bento-rev2`, oleh Sentinel)
+
+Konteks: CEO meminta Revision 2 ("REVISION REQUIRED — DO NOT MERGE", brief §1 preserve / §8
+butir 8). Basis: `main` `a8bef6e3` + 5 commit Pixel, HEAD `9fde781`. DRAFT PR #44, tanpa merge,
+tanpa force-push. Verifikasi ini dilakukan sendiri pada HEAD `9fde781` (typecheck bersih; web
+test **143/143** saya jalankan sendiri; `useWatchlist.ts` dan `StopControl.tsx` diff = kosong).
+
+### 5.1 Butir 1 — Kontrol keselamatan tetap tak ambigu setelah rekomposisi
+
+| Kontrol | Verdict | Bukti |
+| --- | --- | --- |
+| STOP NEW ENTRIES / kill switch | ✓ CLOSED | `StopControl.tsx` tak disentuh (diff kosong) dan tetap di topbar (`Shell.tsx:131`); badge kill switch di HUD strip (`OverviewPage.tsx:128-137`): `STOPPED` tone halted / `New entries allowed` tone success / `State unavailable` tone muted — tidak pernah diam saat null. Badge "Entries stopped" di topbar (`Shell.tsx:114`). |
+| PAPER — SIMULATED | ✓ CLOSED | Sidebar brand `Shell.tsx:64`, topbar badge `Shell.tsx:104`, HUD strip `OverviewPage.tsx:82`, plus badge `SIMULATED` di modul portfolio dominan (`OverviewPage.tsx:157`). Modul portfolio charcoal tidak menyembunyikan PAPER — justru diberi badge berulang. |
+| HALTED | ✓ CLOSED | `badge--halted` tetap satu-satunya status filled solid (`base.css`, `tokens.css:46,141`); di risk tile (`OverviewPage.tsx:323`). |
+| Verdict risk + reasons | ✓ CLOSED | Risk tile tetap: verdict APPROVED→success / lainnya→danger, reasons[0] tampil, link `/risk` (`OverviewPage.tsx` modul risk, `data-testid="overview-risk"`). |
+| STALE/UNAVAILABLE/PENDING/offline | ✓ CLOSED | Snapshot strip tetap bawa nilai terakhir + block + age; offline = `banner--danger` + `StateView kind="offline"`; meta null → "Unavailable" fallback (semua tak berubah dari rev1, diformat ulang saja). |
+| Reorg "MANUAL REVIEW REQUIRED" | ✓ CLOSED | `IntentAction.tsx:183` tetap `Badge tone="danger"`, tak diubah. |
+| Tenggelam di panel? | ✓ TIDAK | Modul portfolio hanya berisi nilai finansial + badge SIMULATED; risk/chain health tetap modul ringkas baris kedua; status-strip span 12 tetap paling atas. Panel besar TIDAK menampung kontrol keselamatan. |
+
+### 5.2 Butir 2 — Lime bukan makna status; lavender bermakna; kontras charcoal/dark
+
+- Audit pemakaian `--brand-accent` (grep penuh): nav aktif (`base.css:292`), bottom-nav aktif = tint (`:394`), hero equity (`:628`), `btn--primary` (`:913`), filter chip terpilih (`discover.css:105`). Semuanya aksen interaksi/identitas, bukan status. `badge--success` tetap emerald `status-positive`; PnL tetap `pnlTint` emerald/merah (`OverviewPage.tsx:467`); verdict REJECTED tetap danger. **Lime TIDAK dipakai untuk BUY/healthy/approved — CLOSED.**
+- Hero equity lime = nilai finansial unggulan, bukan status; komentar kode eksplisit "Accent never encodes status" (`base.css:625-628`). Diterima sebagai aksen; catatan minor di §5.4.
+- Lavender `#B9AEF4` hanya: badge PAPER (`badge--testnet`, `base.css:854`) — bermakna. Tidak ada pemakaian dekoratif lain. **CLOSED.**
+- Kontras dihitung ulang independen (formula WCAG):
+  - lime `#D2FF00` di charcoal `#222123` = **13,78:1** (klaim 13,8 ✓); di dark feature `#201F22` = **14,09:1**.
+  - `--feature-ink #FAFAFA` di charcoal = 15,4:1; `--feature-muted #A1A1AA` di charcoal = 6,4:1 (klaim 6,3 ✓).
+  - Dark ladder `#131214` canvas / `#201F22` surface / `#29272B` raised — pasangan fg semua ≥5,77:1 (muted di raised = 5,77, terendah, tetap >4,5). Tidak ada dua layer yang nyaris identik.
+  - Sidebar dark `#0E0D0F` + ink 18,6:1; ink di lavender 8,9:1; ink di lime 15,4:1.
+- Semua di atas ≥ AA. **CLOSED.**
+
+### 5.3 Butir 3 — Non-optimistic & tanpa data karangan
+
+- `useWatchlist.ts:41-43,72-89` dan `StopControl.tsx:24-31` **tidak berubah** antara rev1→rev2 (diff kosong); aturan non-optimistic tetap di spec `soft-bento-motion.md:116`. **CLOSED.**
+- Tidak ada `<svg>`/chart/sparkline di fitur Overview (grep nol); angka dari `endpoints.*` + meta dengan fallback 'Unavailable'; halaman tak ada tetap tak dipalsukan. **CLOSED.**
+
+### 5.4 Butir 4 — Aksesibilitas kontrol emergency (cek statis)
+
+- Keyboard: `:focus-visible` global outline 2px `--focus` (`base.css:77-80`); skip-link (`:85-101`); StopControl tetap elemen `<button>` natural dengan `data-testid="stop-new-entries"`.
+- Mobile 375: topbar `flex-wrap: wrap` (`base.css:327`) jadi StopControl turun ke baris baru, tidak terpotong; `shell__main` padding-bottom 96px (`base.css:128`) mencegah bottom-nav menutup kontrol (perbaikan baseline rev1 dipertahankan); F-1 `scroll-margin-bottom` tetap (`discover.css:302`).
+- Target sentuh: `--tap: 48px` (`tokens.css:106`), bottom-nav link `min-height: var(--tap)` (`base.css:372-379`), tombol `.btn` min-height 44px dengan area klik ≥48px lewat padding.
+- **Belum terverifikasi oleh saya (statis saja):** pengukuran runtime keyboard ke STOP di 375 dan perangkat sentuh fisik — itu ranah Probe (harness + device). Saya menyatakan ini eksplisit.
+
+### 5.5 Sisa & kesimpulan
+
+- **Info (kecil):** lime hero equity di modul portfolio bisa terbaca "hijau = nilai bagus" oleh pengguna; ini pilihan desain berlabel eksplisit "accent never encodes status", dan PnL tetap pakai token status. Tidak melanggar kriteria, tapi layak masuk daftar keputusan CEO bersama §9 (lime vs `#00C805`).
+- **Info (inheren):** N-1 pesan RPC mentah di API masih terbuka di jalur yang sama dengan UI (PR Nexus terpisah).
+- **Tidak ada temuan regresi keselamatan di Revision 2.** Semua butir preserve pada brief CEO §1 tetap terpenuhi: PAPER labeling, STOP control, state jujur, aksesibilitas, fail-closed. Merge tetap keputusan CEO.
