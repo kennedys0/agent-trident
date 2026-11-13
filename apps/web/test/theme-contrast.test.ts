@@ -217,9 +217,11 @@ describe('soft geometry (neo-brutalism removed)', () => {
 
 describe('motion contract (soft-bento-motion.md)', () => {
   it('keeps the three-tier duration scale and the single easing', () => {
-    expect(tokenRaw('motion-fast', 'light')).toBe('120ms');
-    expect(tokenRaw('motion', 'light')).toBe('160ms');
-    expect(tokenRaw('motion-slow', 'light')).toBe('240ms');
+    // Revision 2 ranges (CEO brief §5): press 80–140ms, hover 150–200ms,
+    // panel/page 180–240ms — 100/170/220 sits inside all three.
+    expect(tokenRaw('motion-fast', 'light')).toBe('100ms');
+    expect(tokenRaw('motion', 'light')).toBe('170ms');
+    expect(tokenRaw('motion-slow', 'light')).toBe('220ms');
     expect(tokenRaw('ease', 'light')).toBe('cubic-bezier(0.2, 0, 0, 1)');
   });
 
@@ -254,5 +256,43 @@ describe('motion contract (soft-bento-motion.md)', () => {
     const baseReduce = /prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\n\}/.exec(baseCss)?.[0] ?? '';
     expect(baseReduce).toMatch(/transition-duration:\s*0\.01ms/);
     expect(baseReduce).toMatch(/transform:\s*none/);
+  });
+});
+
+describe('charcoal feature panel PnL contrast (QA P-1)', () => {
+  it.each(['light', 'dark'] as const)(
+    'feature-positive-fg reaches AA on feature-bg in %s theme',
+    (theme) => {
+      expect(themeContrast('feature-positive-fg', 'feature-bg', theme)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it.each(['light', 'dark'] as const)(
+    'feature-negative-fg reaches AA on feature-bg in %s theme',
+    (theme) => {
+      expect(themeContrast('feature-negative-fg', 'feature-bg', theme)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it('keeps the feature PnL pair separate from the lime accent', () => {
+    for (const theme of ['light', 'dark'] as const) {
+      expect(tokenRaw('feature-positive-fg', theme)).not.toBe(tokenRaw('brand-accent', theme));
+      expect(tokenRaw('feature-negative-fg', theme)).not.toBe(tokenRaw('brand-accent', theme));
+    }
+  });
+
+  it('binds the panel scope to the feature pair with a scoped override', () => {
+    for (const [modifier, token] of [
+      ['--positive', '--feature-positive-fg'],
+      ['--negative', '--feature-negative-fg'],
+    ] as const) {
+      const block = cssBlock(baseCss, `.bento-tile--portfolio .bento-figure__value${modifier}`);
+      expect(block).toMatch(new RegExp(`color:\\s*var\\(${token}\\)`));
+    }
+  });
+
+  it('leaves semantic status fg outside the panel untouched', () => {
+    expect(tokenRaw('status-positive-fg', 'light')).toBe('#065f46');
+    expect(tokenRaw('status-negative-fg', 'light')).toBe('#991b1b');
   });
 });

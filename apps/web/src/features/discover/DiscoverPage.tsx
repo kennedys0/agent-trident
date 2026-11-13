@@ -139,11 +139,11 @@ export function DiscoverPage(): ReactNode {
 
   return (
     <>
-      <SubjectHeader
-        title="Discover"
-        description="Pools indexed from Robinhood Chain 4663. Price and liquidity each carry their own status and provenance; anything the backend could not verify is marked unavailable, never zero."
-        meta="Read-only discovery. No trading control exists on this page."
-      />
+      {/* R-4 (QA rev2): the intro paragraphs moved below the search toolbar
+          (same text, same classes) so the toolbar's input, Search button and
+          first chip row are above the fixed bottom-nav band at first paint
+          on 375/320. Heading order stays valid: h1, then the toolbar h2. */}
+      <SubjectHeader title="Discover" />
 
       <section className="discover-toolbar" aria-labelledby="discover-filters">
         <h2 className="discover-toolbar__title" id="discover-filters">
@@ -232,6 +232,14 @@ export function DiscoverPage(): ReactNode {
           totals below keep describing what the API returned.
         </p>
       </section>
+
+      {/* R-4 (QA rev2): Discover intro, moved below the search toolbar — the
+          text is unchanged and still rendered on every width. */}
+      <p className="meta">
+        Pools indexed from Robinhood Chain 4663. Price and liquidity each carry their own status and provenance; anything
+        the backend could not verify is marked unavailable, never zero.
+      </p>
+      <p className="provenance">Read-only discovery. No trading control exists on this page.</p>
 
       {pools.error !== null && pools.data !== null ? (
         <p className="banner banner--danger" role="alert" data-testid="discover-refresh-error">

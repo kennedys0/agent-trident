@@ -8,7 +8,7 @@ Sumber: Taste Engine `references/motion-engine.md` (FLOOR/REFLEX/FINISH), sectio
 
 1. **Terasa, bukan tontonan.** Motion hanya untuk konfirmasi, kontinuitas, orientasi, atau affordance. Bila efek dihapus dan pemahaman tidak berkurang, efek itu dibuang.
 2. **Satu easing untuk semua**: `--ease: cubic-bezier(0.2, 0, 0, 1)` — decelerate, tanpa bounce, tanpa elastic.
-3. **Durasi tiga tingkat**: `--motion-fast: 120ms` (hover/focus/warna), `--motion: 160ms` (press, pill, thumb, panel), `--motion-slow: 240ms` (transisi halaman/masuk viewport pertama). Rentang sesuai brief 120–240ms.
+3. **Durasi tiga tingkat (Revision 2)**: `--motion-fast: 100ms` (press/warna), `--motion: 170ms` (hover, pill, thumb, panel), `--motion-slow: 220ms` (transisi halaman/masuk viewport pertama). Rentang brief CEO Revision 2: press 80–140ms, hover 150–200ms, panel/page 180–240ms — ketiga nilai berada di dalam rentangnya masing-masing.
 4. **Hanya properti compositor-friendly**: `transform`, `opacity`, `background-color`, `border-color`, `box-shadow`. Dilarang menganimasikan `top/left/width/height`, blur, atau glow.
 5. **Start static**: tidak ada entrance stagger, tidak ada loop idle, tidak ada autoplay yang menutupi konten.
 
@@ -16,9 +16,11 @@ Sumber: Taste Engine `references/motion-engine.md` (FLOOR/REFLEX/FINISH), sectio
 
 ```css
 :root {
-  --motion-fast: 120ms;
-  --motion: 160ms;
-  --motion-slow: 240ms;
+  /* Revision 2 (CEO brief §5): press 80–140ms, hover 150–200ms,
+     panel/page 180–240ms — 100/170/220 berada di dalam ketiga rentang. */
+  --motion-fast: 100ms;
+  --motion: 170ms;
+  --motion-slow: 220ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --lift: -2px;              /* card hover travel */
   --press: 1px;              /* button press travel */

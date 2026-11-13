@@ -253,6 +253,20 @@ code,
   gap: var(--space-05);
 }
 
+/* Revision 2: group headings inside the single navigation element. */
+.nav-group__title {
+  margin: var(--space-2) var(--space-2) var(--space-05);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--sidebar-ink);
+  opacity: 0.55;
+}
+
+.nav-group__title:first-child {
+  margin-top: 0;
+}
+
 .nav-link {
   display: flex;
   align-items: center;
@@ -338,6 +352,15 @@ code,
   color: var(--muted);
 }
 
+@media (max-width: 767px) {
+  /* R-4 (QA rev2): every wrapped topbar row costs 16px of first paint on
+     mobile — tighten the row gap so page controls clear the fixed bottom
+     nav band sooner. */
+  .topbar {
+    gap: var(--space-1);
+  }
+}
+
 /* ---------- Bottom navigation (mobile <768px) ---------- */
 
 .bottom-nav {
@@ -407,11 +430,10 @@ code,
 }
 
 .panel__title {
-  font-size: var(--text-meta);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: var(--text-h2);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .panel__actions {
@@ -502,9 +524,8 @@ code,
   justify-content: space-between;
   gap: var(--space-1);
   font-size: var(--text-meta);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
@@ -558,8 +579,7 @@ code,
 .status-strip__label {
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
@@ -574,6 +594,95 @@ code,
   color: var(--ink);
 }
 
+/* Revision 2 composition (CEO brief §2): vary span AND height — one dominant
+   portfolio module (charcoal feature panel), one visually distinct market
+   module (tinted well), then a compact row for risk + discovery + activity. */
+.bento-tile--portfolio {
+  background: var(--feature-bg);
+  border-color: var(--feature-line);
+  color: var(--feature-ink);
+  box-shadow: var(--shadow-md);
+}
+
+.bento-tile--portfolio .bento-tile__title {
+  color: var(--feature-muted);
+}
+
+.bento-tile--portfolio .bento-figure__label {
+  color: var(--feature-muted);
+}
+
+.bento-tile--portfolio .bento-figure__value {
+  color: var(--feature-ink);
+}
+
+/* P-1 (QA rev2): PnL values inside the charcoal feature panel use the
+   feature-scoped status fg — the semantic --status-{positive,negative}-fg is
+   calibrated to the light canvas and fails AA on #222123 (2.09:1 / 1.93:1),
+   while --feature-{positive,negative}-fg hold AA in both themes
+   (light 10.5:1 / 8.4:1; dark unchanged 7.7:1 / 5.35:1). */
+.bento-tile--portfolio .bento-figure__value--positive {
+  color: var(--feature-positive-fg);
+}
+
+.bento-tile--portfolio .bento-figure__value--negative {
+  color: var(--feature-negative-fg);
+}
+
+/* Meta text inside the charcoal panel reads in the feature muted pair. */
+.bento-tile--portfolio .meta {
+  color: var(--feature-muted);
+}
+
+/* R-1 (QA rev2): every muted-text and quiet-control class inside the charcoal
+   panel reads in the feature pair — --muted is calibrated to the light canvas
+   and fails on #222123 (2.07:1), while --feature-muted holds AA in both
+   themes (6.3:1 light / 5.8:1 dark). Enumerated explicitly so each rule
+   outranks its single-class definition later in the file. */
+.bento-tile--portfolio .state__text,
+.bento-tile--portfolio .btn--quiet,
+.bento-tile--portfolio .muted,
+.bento-tile--portfolio .row__label,
+.bento-tile--portfolio .fact dt,
+.bento-tile--portfolio .metric__prov,
+.bento-tile--portfolio .provenance,
+.bento-tile--portfolio .bento-module__title,
+.bento-tile--portfolio .bento-module__foot,
+.bento-tile--portfolio .status-strip__label {
+  color: var(--feature-muted);
+}
+
+.bento-tile--portfolio .btn--quiet {
+  border-color: var(--feature-line);
+}
+
+/* Balance the tall module: the figure group breathes between the title and
+   the foot instead of leaving one big void — empty space stays deliberate. */
+.bento-tile--portfolio > .bento-figure {
+  margin-top: auto;
+}
+
+.bento-tile--portfolio > .bento-figures-row {
+  margin-bottom: auto;
+}
+
+/* Signature look: the hero equity figure reads in the brand accent on
+   charcoal (13.8:1 in light, 12.7:1 in dark). Accent never encodes status. */
+.bento-tile--portfolio .bento-figure__value--accent {
+  color: var(--brand-accent);
+}
+
+.bento-tile--portfolio .bento-tile__foot {
+  border-top-color: var(--feature-line);
+  color: var(--feature-muted);
+}
+
+.bento-tile--market {
+  background: var(--surface-well);
+  border-color: var(--hairline);
+  box-shadow: none;
+}
+
 /* Tablet: 6-column bento. Mobile (<768px) collapses to one column (base rule). */
 @media (min-width: 768px) {
   .bento {
@@ -581,19 +690,17 @@ code,
   }
 
   .bento-tile--strip,
-  .bento-tile--strategy,
   .bento-tile--market,
-  .bento-tile--activity,
+  .bento-tile--activity {
+    grid-column: span 6;
+  }
+
+  .bento-tile--portfolio {
+    grid-column: span 6;
+  }
+
+  .bento-tile--risk,
   .bento-tile--discovery {
-    grid-column: span 6;
-  }
-
-  .bento-tile--equity {
-    grid-column: span 6;
-  }
-
-  .bento-tile--pnl,
-  .bento-tile--risk {
     grid-column: span 3;
   }
 }
@@ -607,32 +714,29 @@ code,
     grid-column: span 12;
   }
 
-  .bento-tile--equity {
+  /* Dominant module: 7 columns, two rows tall. */
+  .bento-tile--portfolio {
+    grid-column: span 7;
+    grid-row: span 2;
+  }
+
+  /* Visually distinct counterpart: 5 columns, two rows tall. */
+  .bento-tile--market {
     grid-column: span 5;
+    grid-row: span 2;
   }
 
-  .bento-tile--pnl {
-    grid-column: span 4;
-  }
-
+  /* Compact support row. */
   .bento-tile--risk {
     grid-column: span 3;
   }
 
-  .bento-tile--strategy {
-    grid-column: span 7;
-  }
-
-  .bento-tile--market {
-    grid-column: span 5;
+  .bento-tile--discovery {
+    grid-column: span 3;
   }
 
   .bento-tile--activity {
-    grid-column: span 8;
-  }
-
-  .bento-tile--discovery {
-    grid-column: span 4;
+    grid-column: span 6;
   }
 }
 
@@ -647,17 +751,25 @@ code,
 .bento-figure__label {
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
 .bento-figure__value {
-  font-family: var(--font-mono);
-  font-size: 20px;
+  /* Financial figures read in the UI sans with tabular numerals; mono is
+     reserved for addresses, hashes and technical identifiers (CEO brief §3). */
+  font-family: var(--font-sans);
+  font-size: 22px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+}
+
+/* Dominant portfolio figure inside the charcoal feature panel. */
+.bento-figure__value--hero {
+  font-size: var(--text-hero);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .bento-figure__value--positive {
@@ -666,6 +778,46 @@ code,
 
 .bento-figure__value--negative {
   color: var(--status-negative-fg);
+}
+
+/* Revision 2: side-by-side support figures inside the dominant module. */
+.bento-figures-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+
+/* A named sub-section inside a tile (market & strategy module). */
+.bento-module {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--hairline);
+}
+
+.bento-module__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-meta);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
+.bento-module__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  font-size: var(--text-meta);
+  color: var(--muted);
 }
 
 .bento-list {
@@ -768,7 +920,8 @@ code,
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
+  /* R-2 (QA rev2): 48px minimum for every button target, in pointer modes. */
+  min-height: var(--tap);
   padding: 8px 16px;
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-sm);
@@ -850,6 +1003,20 @@ code,
   }
 }
 
+/* R-2 (QA rev2): the inline title links ("All candidates", "Open risk",
+   "Open Discover", "Open journal") are interactive targets hidden inside
+   small text rows. Give each link the 48px tap minimum with padding plus a
+   compensating negative margin, so the row's visual rhythm stays dense. */
+.bento-tile__title a,
+.bento-module__title a,
+.bento-tile__foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--space-05);
+  margin: -14px calc(var(--space-05) * -1);
+}
+
 /* ---------- Status rows ---------- */
 
 .rows {
@@ -929,9 +1096,8 @@ code,
 .table th {
   text-align: left;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--muted);
   background: var(--surface-well);
   padding: 8px 12px;
@@ -987,8 +1153,7 @@ code,
     content: attr(data-label);
     color: var(--muted);
     font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.01em;
   }
 
   .table td.num {
@@ -1146,13 +1311,12 @@ code,
 
 .stat__label {
   font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
 .stat__value {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

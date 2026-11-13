@@ -6,8 +6,8 @@
 .discover-toolbar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
   background: var(--surface);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
@@ -16,11 +16,10 @@
 
 .discover-toolbar__title,
 .discover-section-title {
-  font-size: var(--text-meta);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: var(--text-h2);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .discover-search {
@@ -40,8 +39,7 @@
 
 .discover-field__label {
   font-size: var(--text-meta);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
@@ -74,8 +72,7 @@
 
 .discover-filters__label {
   font-size: var(--text-meta);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
@@ -184,7 +181,9 @@
 }
 
 .metric__value {
-  font-family: var(--font-mono);
+  /* Financial figures read in the sans stack (CEO brief §3); mono is for
+     identifiers only. */
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   overflow-wrap: anywhere;
@@ -304,7 +303,10 @@
   }
 
   .discover-toolbar {
-    padding: var(--space-2);
+    /* R-4 (QA rev2): tighter vertical padding on mobile so the toolbar's
+       input, Search button and first chip row clear the fixed bottom-nav
+       band at first paint (375/320); horizontal rhythm stays 16px. */
+    padding: var(--space-1) var(--space-2);
   }
 
   .discover-table,
@@ -350,6 +352,14 @@
   .discover-search {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  /* R-4 (QA rev2): flex-basis 220px is a width hint in the row layout, but the
+     stacked column form applies it to height — the field would stretch to
+     220px tall and push the Search button ~150px into the bottom-nav band at
+     first paint on 320. Reset the basis so the button follows the input. */
+  .discover-field {
+    flex: 0 0 auto;
   }
 
   .filter-chip {

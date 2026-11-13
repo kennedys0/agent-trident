@@ -63,25 +63,17 @@ export function Shell(): ReactNode {
           <BrandMark />
           <span className="brand__sub">PAPER</span>
         </div>
+        {/* Revision 2 (CEO brief §6): ONE navigation element whose groups follow
+            the real information architecture — no second nav duplicating purpose. */}
         <nav className="sidebar__nav" aria-label="Sections">
-          {NAV.map((item) => {
-            const Icon = item.icon;
-            const current = isCurrent(location.pathname, item.to);
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className="nav-link"
-                {...(current ? { 'aria-current': 'page' as const } : {})}
-                data-testid={`nav-${item.label.toLowerCase()}`}
-              >
-                <Icon size={18} aria-hidden="true" />
-                {item.label}
-              </NavLink>
-            );
-          })}
-        </nav>
-        <nav className="sidebar__nav" aria-label="Resources">
+          <span className="nav-group__title">Trading</span>
+          {NAV.filter((item) => ['/', '/discover', '/risk', '/portfolio'].includes(item.to)).map((item) => (
+            <SidebarLink key={item.to} item={item} pathname={location.pathname} />
+          ))}
+          <span className="nav-group__title">Research & system</span>
+          {NAV.filter((item) => ['/candidates', '/more'].includes(item.to)).map((item) => (
+            <SidebarLink key={item.to} item={item} pathname={location.pathname} />
+          ))}
           <NavLink
             to="/journal"
             className="nav-link"
@@ -123,12 +115,14 @@ export function Shell(): ReactNode {
           </div>
           <div className="topbar__spacer" />
           <div className="topbar__meta">
-            <span className="mono">
-              {healthData === null
-                ? 'head block Unavailable'
-                : `head ${healthData.headBlock ?? 'Unavailable'}${lag === null ? '' : ` · lag ${lag}s`}`}
+            <span>
+              head{' '}
+              <span className="mono">
+                {healthData === null || healthData.headBlock === null ? 'Unavailable' : healthData.headBlock}
+              </span>
+              {healthData === null || lag === null ? '' : ` · lag ${lag}s`}
             </span>
-            <span className="mono">
+            <span>
               {latency === null ? 'RPC latency Unavailable' : `RPC ${latency} ms`} ·{' '}
               {health.receivedAt === null ? 'no sync yet' : `seen ${formatUtc(new Date(health.receivedAt).toISOString())}`}
             </span>
@@ -169,5 +163,28 @@ export function Shell(): ReactNode {
         })}
       </nav>
     </div>
+  );
+}
+
+/** Sidebar entry: real route only, labelled testid, current-page semantics. */
+function SidebarLink({
+  item,
+  pathname,
+}: {
+  readonly item: { readonly to: string; readonly label: string; readonly icon: typeof LayoutDashboard };
+  readonly pathname: string;
+}): ReactNode {
+  const Icon = item.icon;
+  const current = isCurrent(pathname, item.to);
+  return (
+    <NavLink
+      to={item.to}
+      className="nav-link"
+      {...(current ? { 'aria-current': 'page' as const } : {})}
+      data-testid={`nav-${item.label.toLowerCase()}`}
+    >
+      <Icon size={18} aria-hidden="true" />
+      {item.label}
+    </NavLink>
   );
 }

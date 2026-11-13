@@ -1,0 +1,189 @@
+{
+  "fixtureLabel": "real local PAPER API; GET /api/v1/portfolio blocked in the browser for the R-1 repro (disclosed); P-1 PnL panel uses a schema-valid labelled fixture portfolio (disclosed below)",
+  "p1": {
+    "light": {
+      "fixture": "labelled schema-valid portfolio: realizedPnlQuote +0.15 USDG, unrealizedPnlQuote −0.10 USDG",
+      "screenshots": [
+        "p1-overview-pnl-light-panel.png",
+        "p1-overview-pnl-light-full.png"
+      ],
+      "computed": {
+        "realized": {
+          "color": "rgb(110, 231, 183)",
+          "text": "+0.15 USDG",
+          "classes": "bento-figure__value bento-figure__value--positive"
+        },
+        "unrealized": {
+          "color": "rgb(252, 165, 165)",
+          "text": "−0.10 USDG",
+          "classes": "bento-figure__value bento-figure__value--negative"
+        },
+        "panelBackground": "rgb(34, 33, 35)"
+      }
+    },
+    "dark": {
+      "fixture": "labelled schema-valid portfolio: realizedPnlQuote +0.15 USDG, unrealizedPnlQuote −0.10 USDG",
+      "screenshots": [
+        "p1-overview-pnl-dark-panel.png",
+        "p1-overview-pnl-dark-full.png"
+      ],
+      "computed": {
+        "realized": {
+          "color": "rgb(52, 211, 153)",
+          "text": "+0.15 USDG",
+          "classes": "bento-figure__value bento-figure__value--positive"
+        },
+        "unrealized": {
+          "color": "rgb(248, 113, 113)",
+          "text": "−0.10 USDG",
+          "classes": "bento-figure__value bento-figure__value--negative"
+        },
+        "panelBackground": "rgb(41, 39, 43)"
+      }
+    }
+  },
+  "r1": {
+    "light": {
+      "errorStateVisible": true,
+      "retryVisible": true,
+      "screenshots": [
+        "r1-overview-error-light-full.png",
+        "r1-overview-error-light-panel.png"
+      ]
+    },
+    "dark": {
+      "errorStateVisible": true,
+      "retryVisible": true,
+      "screenshots": [
+        "r1-overview-error-dark-full.png",
+        "r1-overview-error-dark-panel.png"
+      ]
+    }
+  },
+  "r4": {
+    "320": {
+      "viewport": "320x568",
+      "scrollY": 0,
+      "navTop": 508,
+      "controls": {
+        "scrollY": 0,
+        "navTop": 508,
+        "input": {
+          "top": 352,
+          "bottom": 396
+        },
+        "searchBtn": {
+          "top": 404,
+          "bottom": 452
+        },
+        "chips": [
+          {
+            "label": "All",
+            "top": 489,
+            "bottom": 533
+          },
+          {
+            "label": "Available",
+            "top": 541,
+            "bottom": 585
+          },
+          {
+            "label": "Stale",
+            "top": 593,
+            "bottom": 637
+          },
+          {
+            "label": "Unavailable",
+            "top": 645,
+            "bottom": 689
+          },
+          {
+            "label": "All venues",
+            "top": 726,
+            "bottom": 770
+          },
+          {
+            "label": "Verified allowlist",
+            "top": 778,
+            "bottom": 822
+          },
+          {
+            "label": "S3-01 registry",
+            "top": 830,
+            "bottom": 874
+          },
+          {
+            "label": "Watched only · on this page",
+            "top": 882,
+            "bottom": 926
+          }
+        ]
+      },
+      "searchBtnAboveBand": true,
+      "inputAboveBand": true,
+      "firstChips": false
+    },
+    "375": {
+      "viewport": "375x667",
+      "scrollY": 0,
+      "navTop": 607,
+      "controls": {
+        "scrollY": 0,
+        "navTop": 607,
+        "input": {
+          "top": 352,
+          "bottom": 396
+        },
+        "searchBtn": {
+          "top": 404,
+          "bottom": 452
+        },
+        "chips": [
+          {
+            "label": "All",
+            "top": 460,
+            "bottom": 504
+          },
+          {
+            "label": "Available",
+            "top": 460,
+            "bottom": 504
+          },
+          {
+            "label": "Stale",
+            "top": 512,
+            "bottom": 556
+          },
+          {
+            "label": "Unavailable",
+            "top": 512,
+            "bottom": 556
+          },
+          {
+            "label": "All venues",
+            "top": 564,
+            "bottom": 608
+          },
+          {
+            "label": "Verified allowlist",
+            "top": 616,
+            "bottom": 660
+          },
+          {
+            "label": "S3-01 registry",
+            "top": 616,
+            "bottom": 660
+          },
+          {
+            "label": "Watched only · on this page",
+            "top": 668,
+            "bottom": 712
+          }
+        ]
+      },
+      "searchBtnAboveBand": true,
+      "inputAboveBand": true,
+      "firstChips": true
+    }
+  }
+}
