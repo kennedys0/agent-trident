@@ -1,6 +1,6 @@
 # TRIDENT
 
-PAPER-only trading system for Robinhood Chain (chain ID `4663`). It polls the verified WETH/USDG Uniswap v3 pool, turns each block-pinned snapshot into a deterministic trading candidate, runs the candidate through a fail-closed risk gate, and records simulated orders, fills, ledger entries, and portfolio state in SQLite. A web console shows chain status, candidates, risk evidence, the paper portfolio, and the append-only audit journal.
+PAPER-only trading system for Robinhood Chain (chain ID `4663`). It polls the verified WETH/USDG Uniswap v3 pool, turns each block-pinned snapshot into a deterministic trading candidate, runs the candidate through a fail-closed risk gate, and records simulated orders, fills, ledger entries, and portfolio state in SQLite. It also discovers new Uniswap v3 pools from on-chain `PoolCreated` events and serves a read-only Discover view with block-pinned market metrics and persistent watchlists. A web console shows chain status, candidates, risk evidence, the paper portfolio, and the append-only audit journal.
 
 The system never signs a transaction, never holds a key, and has no live execution path.
 
@@ -8,8 +8,8 @@ The system never signs a transaction, never holds a key, and has no live executi
 
 Local PAPER operation is implemented, tested, and merged to `main`. Public deployment is blocked; see [Limitations](#limitations).
 
-- Proven: real RPC chain check, block-pinned quotes, deterministic strategy, risk rules `R01`–`R15`, one fill per evaluation, replay idempotency, balanced double-entry ledger, restart and reorg recovery, atomic audit, kill switch, responsive UI with honest stale, unavailable, and manual-review states.
-- Not yet proven: destructive reorg on the live chain (synthetic provider only), physical devices, Firefox, WebKit, real screen readers, and any deployment behind auth, TLS, or a container.
+- Proven: real RPC chain check, block-pinned quotes, deterministic strategy, risk rules `R01`–`R15`, one fill per evaluation, replay idempotency, balanced double-entry ledger, restart and reorg recovery, atomic audit, kill switch, responsive UI with honest stale, unavailable, and manual-review states. Sprint 3 added verified on-chain pool discovery (factory identity check, `PoolCreated` decode, checkpoint resume without duplicates), block-pinned market metrics with provenance and honest `UNAVAILABLE` states, a persistent per-token watchlist, and the Discover UI, each behind its QA and security gates.
+- Not yet proven: destructive reorg on the live chain (synthetic provider only; rewind cleanup is replay-proven but has not faced a live deep reorg), physical devices, Firefox, WebKit, real screen readers, and any deployment behind auth, TLS, or a container.
 - Never in scope for this phase: `LIVE` mode, wallets, signing, `eth_send*`.
 
 ## Requirements
