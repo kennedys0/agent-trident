@@ -21,6 +21,17 @@ approval that has never been given.
    no transactional outbox (single synchronous writer), `portfolio_snapshots` /
    `strategy_configs` retained but unused, halt reason exposed at `/health` meta.
 
+## Sprint 3 — Verified discovery and market intelligence (complete, PAPER only)
+
+Every PR passed an independent security review and a QA gate before merge, and CI was green on each merge commit.
+
+- S3-01 verified on-chain pool discovery: `PoolCreated` codec, bounded `eth_getLogs` scanning with durable checkpoint resume, reorg freeze/rewind, additive migration 006, and a discovered-pool registry that stays non-actionable. (issue #21, PR #29, merge `1e950a27`)
+- S3-02 market intelligence: pool registry, block-pinned metrics with honest `ABSENT`/`OK`/`UNAVAILABLE` states, and a persistent watchlist. (issue #22, PR #25, merge `9ddc77e5d7`)
+- S3-03 Discover UI: pool list and pool Inspector rendering discovery data as recorded, plus design polish. (PR #26, merge `2355b6a679`; polish PR #27, merge `2026f731`)
+- S3-04 QA, reliability, and PAPER-only gate: sign-off reports and the acceptance matrix under `docs/qa`; the final gate ran the real-RPC suite against `main`. (issue #24, PR #28, merge `cafd6e9f`)
+- Test-only repair of the ageing real-RPC discovery seed so the gate keeps passing honestly. (PR #30, merge `381725e3`)
+- Remaining debt (documented, not hidden): 3 Low security findings on S3-01 (reorg rewind only verified the last checkpoint, `chain.raw` bypassed the internal throttle, error classification matched message text instead of numeric codes), the destructive reorg drill is synthetic only, and the default discovery lookback is 2,000 blocks. Still blocked: Phase 3 deployment (auth/TLS/CSRF/rate limiting/backup drill) and the product decisions listed in `PRD.md`.
+
 ## Phase 3 — Deployment readiness (blocked; requires CEO approval)
 
 6. Auth (single-admin), CSRF/Origin checks, rate limiting, body limits, TLS proxy, non-root read-only container, backup/restore drill with RPO/RTO, persistent volume, observability. None of this is implemented or approved yet.

@@ -8,8 +8,8 @@ The system never signs a transaction, never holds a key, and has no live executi
 
 Local PAPER operation is implemented, tested, and merged to `main`. Public deployment is blocked; see [Limitations](#limitations).
 
-- Proven: real RPC chain check, block-pinned quotes, deterministic strategy, risk rules `R01`–`R15`, one fill per evaluation, replay idempotency, balanced double-entry ledger, restart and reorg recovery, atomic audit, kill switch, responsive UI with honest stale, unavailable, and manual-review states.
-- Not yet proven: destructive reorg on the live chain (synthetic provider only), physical devices, Firefox, WebKit, real screen readers, and any deployment behind auth, TLS, or a container.
+- Proven: real RPC chain check, block-pinned quotes, deterministic strategy, risk rules `R01`–`R15`, one fill per evaluation, replay idempotency, balanced double-entry ledger, restart and reorg recovery, atomic audit, kill switch, responsive UI with honest stale, unavailable, and manual-review states. Sprint 3 added verified on-chain pool discovery (S3-01: `PoolCreated` events from the verified Uniswap v3 factory `0x1f7d7550b1b028f7571e69a784071f0205fd2efa`, durable checkpoint resume, reorg freeze/rewind, and a discovered-pool registry that is never actionable), Discover market intelligence (S3-02: pool registry, persistent watchlist, and block-pinned metrics with honest `ABSENT`/`OK`/`UNAVAILABLE` states), and the Discover UI with the pool Inspector (S3-03).
+- Not yet proven: destructive reorg on the live chain (synthetic provider only), discovery of pools older than the default lookback (2,000 blocks; `DISCOVERY_LOOKBACK_BLOCKS`), physical devices, Firefox, WebKit, real screen readers, and any deployment behind auth, TLS, or a container.
 - Never in scope for this phase: `LIVE` mode, wallets, signing, `eth_send*`.
 
 ## Requirements
@@ -127,9 +127,9 @@ pnpm test
 pnpm build
 ```
 
-Expected results: typecheck and build finish clean; tests report contract 19, API 156 with 4 skipped real-RPC tests, and web 42.
+Expected results: typecheck and build finish clean; tests report contract 25, API 187 passed with 5 skipped real-RPC tests, and web 76.
 
-To include the four tests that call the live RPC:
+To include the five tests that call the live RPC:
 
 ```bash
 RUN_RPC_TESTS=1 pnpm --filter @trident/api test
@@ -147,10 +147,13 @@ The suite covers the desktop Chromium viewport only. It expects a reachable API 
 ## Project layout
 
 ```
-apps/api               Fastify API, chain client, strategy, risk gate, ledger, SQLite, worker, Discover (read-only market intelligence, S3-02)
+apps/api               Fastify API, chain client, strategy, risk gate, ledger, SQLite, market worker, discovery worker (S3-01 pool discovery), Discover (read-only market intelligence, S3-02)
 apps/web               React + Vite operations console
 packages/api-contract  Zod schemas, generated OpenAPI document, and shared wire types
 docs/evidence          Committed acceptance evidence for issue #5
+docs/qa                QA gate reports and the Sprint 3 acceptance matrix
+docs/s3-01-pool-discovery.md       Pool discovery design: codec, checkpoints, reorg semantics
+docs/s3-02-market-intelligence.md  Market intelligence design: registry, watchlist, metrics
 ```
 
 The API builds `@trident/api-contract` before it type-checks or tests, so the API and the UI cannot drift from the contract quietly.
@@ -172,9 +175,10 @@ Do not expose this application to a network you do not control.
 
 - No authentication, CSRF protection, rate limiting, request body limit, or TLS. The API binds loopback only.
 - RPC endpoints require HTTPS, an exact `RPC_ALLOWED_HOSTS` match, public DNS resolution, and chain ID `4663`; redirects are rejected. DNS-rebinding between boot validation and later requests is not fully eliminated.
-- No Dockerfile or Compose file is committed, so container hardening and backup and restore drills are unproven. CI covers deterministic gates only; see [docs/CI.md](docs/CI.md).
+- No Dockerfile or Compose file is committed, so container hardening and backup and restore drills are unproven. CI covers deterministic gates only and does not run the real-RPC suite (gated behind `RUN_RPC_TESTS=1`); see [docs/CI.md](docs/CI.md).
 - Completed Phase 1 issues are reconciled, with close recommendations, in [docs/phase-1-reconciliation.md](docs/phase-1-reconciliation.md). They remain open until the coordinator closes them.
 - One venue and one pool, no independent price oracle. A second RPC provider for finality and failover is future work.
+- Discovery and the pool registry are bounded by design: the initial scan covers only the default lookback (2,000 blocks, `DISCOVERY_LOOKBACK_BLOCKS`), so pools created earlier are never discovered; discovered pools are non-actionable (watchlist only, no intents or trades); and reorg rewind has only been drilled against a synthetic provider.
 - The kill switch is not released automatically after a reorg or missing chain evidence. An operator must clear it.
 - The public RPC has no `eth_subscribe`, so latency and freshness depend on the 10-second poll.
 
