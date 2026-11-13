@@ -33,9 +33,13 @@ if (RUN_RPC) {
       seedReferenceData(db, { venue: VERIFIED_VENUE, pool: { id: '0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca', venueId: VERIFIED_VENUE.id, token0: WETH, token1: USDG, fee: 100, tickSpacing: 1 }, assets: [WETH, USDG] });
       seedStrategyConfig(db, DEFAULT_STRATEGY_CONFIG);
       seedOpeningCash(db, '10000000000');
-      // Seed the checkpoint at a block that contains real PoolCreated events,
-      // so the live scan is bounded and deterministic despite the chain moving.
-      saveDiscoveryCheckpoint(db, { fromBlock: 112_712_000, toBlock: 112_712_000, blockHash: null });
+      // Seed the checkpoint a fixed window behind the head at test time, so the
+      // live scan stays bounded and finds real PoolCreated events without a
+      // pinned historical block number.
+      const headForSeed = await chain.getHead();
+      const seedFrom = Math.max(0, headForSeed.number - 25_000);
+      expect(headForSeed.number - seedFrom).toBeLessThanOrEqual(100_000);
+      saveDiscoveryCheckpoint(db, { fromBlock: seedFrom, toBlock: seedFrom, blockHash: null });
       const result = await runDiscoveryTick({ db, chain: port, correlationId: 'discovery-rpc' });
       expect(result.status).toBe('OK');
       expect(result.accepted).toBeGreaterThanOrEqual(1);
@@ -59,7 +63,10 @@ if (RUN_RPC) {
       seedReferenceData(db, { venue: VERIFIED_VENUE, pool: { id: '0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca', venueId: VERIFIED_VENUE.id, token0: WETH, token1: USDG, fee: 100, tickSpacing: 1 }, assets: [WETH, USDG] });
       seedStrategyConfig(db, DEFAULT_STRATEGY_CONFIG);
       seedOpeningCash(db, '10000000000');
-      saveDiscoveryCheckpoint(db, { fromBlock: 112_712_000, toBlock: 112_712_000, blockHash: null });
+      const headForSeed = await chain.getHead();
+      const seedFrom = Math.max(0, headForSeed.number - 25_000);
+      expect(headForSeed.number - seedFrom).toBeLessThanOrEqual(100_000);
+      saveDiscoveryCheckpoint(db, { fromBlock: seedFrom, toBlock: seedFrom, blockHash: null });
       await runDiscoveryTick({ db, chain: port, correlationId: 'discovery-rpc' });
       const afterFirst = countDiscoveredPools(db);
       await runDiscoveryTick({ db, chain: port, correlationId: 'discovery-rpc' });
