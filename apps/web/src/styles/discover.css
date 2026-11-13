@@ -294,6 +294,15 @@
 }
 
 @media (max-width: 767px) {
+  /* F-1 (QA Probe, issue #39): the fixed bottom-nav covers the lower band of
+     the viewport. When keyboard focus or programmatic scroll brings the
+     filter toolbar or a chip into view, leave one nav band of clearance so
+     the control is never sitting under the nav. */
+  .discover-toolbar,
+  .filter-chip {
+    scroll-margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
   .discover-toolbar {
     padding: var(--space-2);
   }
