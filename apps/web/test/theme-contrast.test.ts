@@ -217,9 +217,11 @@ describe('soft geometry (neo-brutalism removed)', () => {
 
 describe('motion contract (soft-bento-motion.md)', () => {
   it('keeps the three-tier duration scale and the single easing', () => {
-    expect(tokenRaw('motion-fast', 'light')).toBe('120ms');
-    expect(tokenRaw('motion', 'light')).toBe('160ms');
-    expect(tokenRaw('motion-slow', 'light')).toBe('240ms');
+    // Revision 2 ranges (CEO brief §5): press 80–140ms, hover 150–200ms,
+    // panel/page 180–240ms — 100/170/220 sits inside all three.
+    expect(tokenRaw('motion-fast', 'light')).toBe('100ms');
+    expect(tokenRaw('motion', 'light')).toBe('170ms');
+    expect(tokenRaw('motion-slow', 'light')).toBe('220ms');
     expect(tokenRaw('ease', 'light')).toBe('cubic-bezier(0.2, 0, 0, 1)');
   });
 
