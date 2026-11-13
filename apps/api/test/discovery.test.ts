@@ -267,24 +267,72 @@ describe('getLogs halving', () => {
     expect(calls.length).toBeLessThan(20);
     expect(DISCOVERY_CHUNK_BACKOFF).toEqual([200, 100, 25]);
   });
+
+  it('halves on the numeric JSON-RPC cap code -32062 with no message sniffing', async () => {
+    const db = makeDb();
+    let calls = 0;
+    const port = makePort({
+      async getHead() {
+        return { number: 111_408_100, hash: `0x${'ab'.repeat(32)}` as `0x${string}`, parentHash: `0x${'cd'.repeat(32)}` as `0x${string}`, timestamp: Math.floor(Date.now() / 1000) };
+      },
+      async getLogs() {
+        calls += 1;
+        // A provider that reveals nothing in the message but signals via code.
+        const err = new Error('unhelpful') as Error & { code: number };
+        err.code = -32062;
+        throw err;
+      },
+    });
+    saveDiscoveryCheckpoint(db, { fromBlock: 111_408_000, toBlock: 111_408_000, blockHash: null });
+    const result = await runDiscoveryTick({ db, chain: port, correlationId: 't' });
+    expect(result.status).toBe('UNAVAILABLE');
+    expect(calls).toBeGreaterThan(1); // halving actually engaged
+  });
+
+  it('does NOT retry a non-transient numeric code even when the message says timeout', async () => {
+    const db = makeDb();
+    let calls = 0;
+    const port = makePort({
+      async getHead() {
+        return { number: 111_408_100, hash: `0x${'ab'.repeat(32)}` as `0x${string}`, parentHash: `0x${'cd'.repeat(32)}` as `0x${string}`, timestamp: Math.floor(Date.now() / 1000) };
+      },
+      async getLogs() {
+        calls += 1;
+        const err = new Error('timeout while waiting') as Error & { code: number };
+        err.code = -32602; // invalid params: retrying cannot help
+        throw err;
+      },
+    });
+    saveDiscoveryCheckpoint(db, { fromBlock: 111_408_000, toBlock: 111_408_000, blockHash: null });
+    // Invalid-params is not cap and not transient: it surfaces immediately
+    // (contained by the tick's own error containment upstream), never retried.
+    await expect(runDiscoveryTick({ db, chain: port, correlationId: 't' })).rejects.toThrow(/timeout/);
+    expect(calls).toBe(1); // numeric code wins over message text
+  });
 });
 
 describe('reorg semantics', () => {
-  it('deletes rows at/above a proven same-height replacement block', async () => {
+  it('keeps rows below a divergence only when the canonical replay proves them', async () => {
     const db = makeDb();
     const { token0, token1 } = tokenPair();
-    const mk = (pool: string, block: number, fee = 100) =>
+    const canonicalTx = `0x${'cd'.repeat(32)}`;
+    const mk = (pool: string, block: number, fee = 100, tx = canonicalTx) =>
       insertDiscoveredPool(db, {
         poolAddress: pool, factory: FACTORY_ADDRESS, token0, token1,
         token0Symbol: 'A', token1Symbol: 'B', token0Decimals: 18, token1Decimals: 6,
-        fee, tickSpacing: fee === 100 ? 1 : 10, firstSeenBlock: block, firstSeenTx: `0x${String(block).padEnd(64, '0').slice(0, 64)}`, logIndex: 0,
+        fee, tickSpacing: fee === 100 ? 1 : 10, firstSeenBlock: block, firstSeenTx: tx, logIndex: 0,
       });
-    mk(`0x${'d1'.repeat(20)}`, 100);
-    mk(`0x${'d2'.repeat(20)}`, 110, 500);
+    mk(`0x${'d1'.repeat(20)}`, 100); // below divergence, present in canonical replay → kept
+    mk(`0x${'d2'.repeat(20)}`, 105, 500, `0x${'55'.repeat(32)}`); // below divergence, absent from replay → deleted
+    mk(`0x${'d3'.repeat(20)}`, 110, 3000, `0x${'66'.repeat(32)}`); // at the divergence block → always deleted
     saveDiscoveryCheckpoint(db, { fromBlock: 100, toBlock: 110, blockHash: `0x${'aa'.repeat(32)}` });
     const port = makePort({
       async getBlockByNumber() {
         return { number: 110, hash: `0x${'bb'.repeat(32)}` as `0x${string}`, parentHash: `0x${'cd'.repeat(32)}` as `0x${string}`, timestamp: Math.floor(Date.now() / 1000) };
+      },
+      async getLogs() {
+        // Canonical re-read of [100..109]: only d1's event survives there.
+        return [makeLog({ blockNumber: 100, transactionHash: canonicalTx, logIndex: 0 })];
       },
     });
     const verdict = await verifyDiscoveryCheckpoint({ db, chain: port, correlationId: 't' });
@@ -292,6 +340,29 @@ describe('reorg semantics', () => {
     const kept = (db.prepare('SELECT pool_address FROM discovered_pools ORDER BY first_seen_block').all() as { pool_address: string }[]).map((r) => r.pool_address);
     expect(kept).toEqual([`0x${'d1'.repeat(20)}`]);
     expect(getDiscoveryCheckpoint(db)!.toBlock).toBe(109);
+  });
+
+  it('freezes without deleting when the canonical replay is unreadable', async () => {
+    const db = makeDb();
+    const { token0, token1 } = tokenPair();
+    insertDiscoveredPool(db, {
+      poolAddress: `0x${'e1'.repeat(20)}`, factory: FACTORY_ADDRESS, token0, token1,
+      token0Symbol: 'A', token1Symbol: 'B', token0Decimals: 18, token1Decimals: 6,
+      fee: 100, tickSpacing: 1, firstSeenBlock: 100, firstSeenTx: `0x${'ab'.repeat(32)}`, logIndex: 0,
+    });
+    saveDiscoveryCheckpoint(db, { fromBlock: 100, toBlock: 110, blockHash: `0x${'aa'.repeat(32)}` });
+    const port = makePort({
+      async getBlockByNumber() {
+        return { number: 110, hash: `0x${'bb'.repeat(32)}` as `0x${string}`, parentHash: `0x${'cd'.repeat(32)}` as `0x${string}`, timestamp: Math.floor(Date.now() / 1000) };
+      },
+      async getLogs() {
+        throw new Error('provider broke the replay');
+      },
+    });
+    const verdict = await verifyDiscoveryCheckpoint({ db, chain: port, correlationId: 't' });
+    expect(verdict).toBe('frozen');
+    expect(countDiscoveredPools(db)).toBe(1); // no deletion on partial evidence
+    expect(getDiscoveryCheckpoint(db)!.toBlock).toBe(110); // checkpoint untouched
   });
 
   it('freezes discovery instead of deleting when the checkpoint block is unresolvable', async () => {
