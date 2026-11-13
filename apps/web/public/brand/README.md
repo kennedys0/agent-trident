@@ -16,7 +16,7 @@ Windows drive/ADS names.
 The bytes are identical to the archive (SHA-256 of each source entry matches its
 copy). The transparent variants are the ones in the interface: the artwork
 carries no background, so it sits on the page surface instead of punching a
-foreign block of colour through the neo-brutalist tokens.
+foreign block of colour through the surface tokens.
 
 `logo_bg_white.png`, `logo_bg_black.png` and `logo_bg_robinhood.png` are not
 shipped: each bakes in a background, which would either duplicate or contradict

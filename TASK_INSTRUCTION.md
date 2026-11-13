@@ -5,7 +5,7 @@
 - Atlas: runtime and repository audit.
 - Nexus: verify network, tokens, Uniswap v3 deployment, pool, quote, and RPC constraints.
 - Nova: architecture and domain contracts.
-- Pixel: neo-brutalist design contract.
+- Pixel: design contract (now the Soft Bento direction, see `DESIGN.md`).
 - Forge: frontend/toolchain feasibility.
 - Probe: acceptance-test matrix.
 - Sentinel: threat and deployment register.
