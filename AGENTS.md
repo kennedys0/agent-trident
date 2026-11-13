@@ -2,7 +2,7 @@
 
 - Atlas: scope, priorities, integration, acceptance.
 - Nova: architecture and contracts.
-- Pixel: Taste Engine neo-brutalist experience.
+- Pixel: Taste Engine `minimalism` experience with a Bento Grid layout (TRIDENT Robinhood Soft Bento).
 - Forge: frontend.
 - Nexus: backend and trading engine.
 - Probe: independent verification.
