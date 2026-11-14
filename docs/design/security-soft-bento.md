@@ -420,3 +420,26 @@ Cara cek (jalankan sendiri di HEAD rev3, jangan terima klaim):
 - BELUM TERVERIFIKASI yang sudah diketahui dan akan tetap dilaporkan apa adanya kecuali ada
   cara bukti baru: screen reader nyata (VoiceOver/NVDA), sentuhan perangkat fisik, persepsi
   pemisahan layer dark (1,06–1,14:1), review frame-by-frame rekaman.
+
+### 6.10 Hasil verifikasi invariant di head implementasi Forge (`7ddca0c`, oleh Sentinel)
+
+Dieksekusi setelah Forge push (`7ddca0c feat(web): implement soft bento revision 3`, PR #45
+DRAFT). Semua angka hasil pengukuran/jalankan sendiri.
+
+| Invariant | Status | Bukti |
+|---|---|---|
+| INV-1 PAPER-only, tanpa signing/dependensi trading baru | **CLOSED** | `git diff 2769c11..HEAD -- apps/api packages pnpm-lock.yaml audit-gate` kosong; grep `signTransaction\|sendRawTransaction\|eth_sendTransaction\|privateKey\|mnemonic` nol hasil di apps/packages; nol perubahan `package.json`; contract 29/29. |
+| INV-2 STOP NEW ENTRIES non-optimistic | **CLOSED** | `StopControl.tsx` & `useWatchlist.ts` **nol diff sama sekali** vs `2769c11` (bentuk terkuat: alur state pasti utuh); tetap `<button type="button">` dengan `data-testid="stop-new-entries"`; dirender di `Shell.tsx:134`. |
+| INV-3 Label darurat/status + kontras | **CLOSED** | Label utuh: STOP NEW ENTRIES (`StopControl.tsx`), HALTED (`OverviewPage.tsx`), SIMULATED (Shell/OverviewPage/PortfolioView), MANUAL REVIEW REQUIRED + teks reorg "quarantined by a chain reorg" (`IntentAction.tsx:183,187` — file nol diff), reasons risk (`RiskDecisionView.tsx` nol diff), stale/unavailable/pending/offline tersebar di file yang tidak berubah. `tokens.css` **nol diff** → pemisahan lime/lavender/feature-fg Rev 2 utuh. Pasangan baru dihitung ulang: `#171717` on `#D2FF00` = **15,40:1** (panel equity lime, kedua tema; deviasi terotorisasi Atlas) dan `#171717` on `#B9AEF4` (badge PAPER) = **8,90:1**. Catatan non-blocking: token `--feature-positive-fg`/`--feature-negative-fg` kini dead token (tak terpakai setelah equity jadi lime) — boleh dibersihkan. |
+| INV-4 BUY ≠ posisi (brief §4) | **CLOSED** | Kartu Strategy signal memuat disclaimer eksplisit "Evaluation only — not an order, fill, or open position." (`OverviewPage.tsx:252`); "Filled quantity"/"Execution price" hanya di seksi PAPER execution result dari `result.execution.fill` API (`IntentAction.tsx:265+`) — state ke-5 yang sah, bukan signal; nol wording "filled/position opened/bought/owned" di konteks signal; tes baru "labels BUY as an evaluation signal, never an order, fill, or position"; PnL pakai `signed: true` (± terbaca tanpa warna). |
+| INV-5 Motion jujur + sukses setelah konfirmasi | **PARTIAL — 1 Minor** | Sukses non-optimistic utuh: semua komponen ber-mutasi (StopControl/useWatchlist/IntentAction) nol diff; diff file lain hanya filter UI/indikator berbasis status API; `prefers-reduced-motion` utuh (base.css:1498, discover.css:257, tokens.css:187). **Minor (misleading affordance):** `bento-tile--interactive` (baru di `7ddca0c`, `base.css:583-596`) memberi hover lift + active press pada SELURUH tile overview-risk/discovery/activity yang hanya punya sub-link kecil ("Open risk/Discover/journal"); klik badan tile tidak melakukan apa-apa — brief §8 "Do not animate static cards as though they are clickable". Tanpa `cursor:pointer` pada tile (memperkecil dampak). Perbaikan terkecil: scope hover ke link, atau buat seluruh tile target klik. Keputusan desain milik Pixel/Forge; non-blocking. |
+| INV-6 File terlarang nol diff | **CLOSED** | Delta `2769c11..HEAD` hanya `apps/web/src`, `apps/web/test`, `apps/web/e2e`, `docs/design/` (33 file); `apps/api`, `packages`, `pnpm-lock.yaml`, audit-gate kosong. |
+| INV-7 Tanpa data karangan | **CLOSED** | Grep `chart\|sparkline\|polyline` nol di TSX; nol angka hard-coded baru di JSX diff; "Unavailable" dan provenance tetap (DiscoverPage:226 scope label "Search runs on the backend · Filters apply only to this loaded page." masih eksplisit). |
+| INV-8 Gate tak menyusut | **CLOSED** | Dijalankan sendiri di `7ddca0c`: typecheck OK · contract **29/29** · API **195 passed + 5 skipped** · web **165/165** (sama dengan baseline Rev 2) · build OK. Diff tes menghapus kontrak komposisi Rev 2 (grid charcoal) dan mengganti dengan padanan Rev 3 (grid 5/4/3, foreground brand); asersi keselamatan (retry terlihat, error state, kontras fg, PnL readability, BUY-evaluation) semua punya padanan — nol tes keselamatan dihapus tanpa pengganti. |
+
+**Ringkasan: 7 dari 8 invariant CLOSED; INV-5 PARTIAL dengan 1 temuan Minor (misleading
+affordance hover tile non-klik) — bukan regresi keselamatan kritis, tidak memblokir dari sisi
+operasional, tapi melanggar baris eksplisit brief §8 dan sebaiknya diperbaiki atau dijustifikasi
+tertulis sebelum merge. Nol temuan Critical/High. BELUM TERVERIFIKASI (tetap): screen reader
+nyata, sentuhan perangkat fisik, persepsi layer dark 1,06–1,14:1, frame-by-frame rekaman;
+kontras diverifikasi via token math + tes kontrak, bukan pembacaan piksel live di browser.**
