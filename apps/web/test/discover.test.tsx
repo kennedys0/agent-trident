@@ -282,7 +282,7 @@ describe('DiscoverPage', () => {
     await screen.findByTestId(`pool-row-${POOL}`);
     const before = calls.filter((call) => call.includes('/api/v1/pools?')).length;
 
-    await userEvent.click(screen.getByTestId('filter-quality-STALE'));
+    await userEvent.selectOptions(screen.getByTestId('filter-quality'), 'STALE');
 
     await waitFor(() => expect(screen.queryByTestId(`pool-row-${POOL}`)).toBeNull());
     expect(screen.getByTestId(`pool-row-${POOL_B}`)).toBeInTheDocument();

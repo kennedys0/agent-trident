@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
  */
 export function BrandMark(): ReactNode {
   return (
-    <span className="brand-mark" role="img" aria-label="TRIDENT" data-testid="brand-mark">
+    <span className="brand-mark" data-testid="brand-mark">
       <img
         className="brand-mark__img brand-mark__img--light"
         src="/brand/logo-black-transparent.png"

@@ -73,8 +73,9 @@ function rulesFor(css: string, selector: string): string[] {
 
 /** Slices the inner declarations of a media block: the prelude is skipped so
  * its first rule still parses as a normal selector block. */
-function mediaBody(css: string, opener: string): string {
-  const start = css.indexOf(opener);
+function mediaBody(css: string, opener: string, occurrence = 0): string {
+  let start = -1;
+  for (let index = 0; index <= occurrence; index += 1) start = css.indexOf(opener, start + 1);
   if (start === -1) {
     throw new Error(`media block ${opener} not found`);
   }
@@ -90,27 +91,24 @@ function renderPage(node: Parameters<typeof render>[0]): ReturnType<typeof rende
   );
 }
 
-describe('R-1: the charcoal feature panel reads in the feature muted pair', () => {
-  it('scopes muted text and controls inside the panel to --feature-muted', () => {
+describe('Rev 3: the lime equity panel keeps a high-contrast foreground', () => {
+  it('scopes text and controls to the brand foreground', () => {
     for (const selector of [
       '.bento-tile--portfolio .state__text',
       '.bento-tile--portfolio .btn--quiet',
       '.bento-tile--portfolio .meta',
-      '.bento-tile--portfolio .muted',
-      '.bento-tile--portfolio .row__label',
-      '.bento-tile--portfolio .fact dt',
     ]) {
-      expect(rulesFor(baseCss, selector).join('\n'), selector).toMatch(/color:\s*var\(--feature-muted\)/);
+      expect(rulesFor(baseCss, selector).join('\n'), selector).toMatch(/color:\s*var\(--brand-on-accent\)/);
     }
   });
 
-  it('keeps the quiet retry button on the feature hairline, not the dark border', () => {
+  it('keeps the quiet retry button on a visible border', () => {
     const blocks = rulesFor(baseCss, '.bento-tile--portfolio .btn--quiet').join('\n');
-    expect(blocks).toMatch(/color:\s*var\(--feature-muted\)/);
-    expect(blocks).toMatch(/border-color:\s*var\(--feature-line\)/);
+    expect(blocks).toMatch(/color:\s*var\(--brand-on-accent\)/);
+    expect(blocks).toMatch(/border-color:\s*var\(--border-strong\)/);
   });
 
-  it('renders the portfolio error state inside the charcoal panel (fixture)', async () => {
+  it('renders the portfolio error state inside the lime equity panel (fixture)', async () => {
     setTransport(async () =>
       new Response(JSON.stringify({ error: { code: 'UNAVAILABLE', message: 'fixture: endpoint off' } }), {
         status: 500,
@@ -139,7 +137,7 @@ describe('R-3: heading order is valid on every touched page', () => {
       expect(screen.getByTestId('overview-strip')).toBeInTheDocument();
     });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole('heading', { level: 2, name: /Last strategy decision/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Strategy signal/ })).toBeInTheDocument();
     expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0);
   });
 
@@ -162,7 +160,7 @@ describe('R-2: interactive targets reach the 48px tap minimum', () => {
 });
 
 describe('R-4: Discover first paint clears the fixed bottom-nav band', () => {
-  it('renders h1, then the search toolbar, then the intro, then the panel', async () => {
+  it('renders h1, then compact search/filter controls and the table panel', async () => {
     setTransport(async () =>
       new Response(JSON.stringify({ error: { code: 'UNAVAILABLE', message: 'fixture: endpoint off' } }), {
         status: 500,
@@ -170,17 +168,13 @@ describe('R-4: Discover first paint clears the fixed bottom-nav band', () => {
       }),
     );
     renderPage(<DiscoverPage />);
-    await waitFor(() => {
-      expect(screen.getByTestId('discover-search-input')).toBeInTheDocument();
-    });
-    const h1 = screen.getByRole('heading', { level: 1, name: 'Discover' });
-    const toolbar = screen.getByTestId('discover-search-input').closest('section');
-    const intro = screen.getByText(/Pools indexed from Robinhood Chain 4663/);
-    expect(toolbar).not.toBeNull();
-    expect(h1.compareDocumentPosition(toolbar as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect((toolbar as Node).compareDocumentPosition(intro) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // The honesty note still renders, unchanged, below the toolbar.
-    expect(screen.getByText(/Read-only discovery/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('discover-search-input')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { level: 1, name: 'Discover' })).toBeInTheDocument();
+    expect(screen.getByTestId('filter-quality')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-venue')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-watched')).toBeInTheDocument();
+    expect(screen.getByText(/Search runs on the backend · Filters apply only to this loaded page/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Indexed pools' })).toBeInTheDocument();
   });
 
   it('resets the stacked-form flex basis so Search follows the input at 320', () => {
@@ -188,36 +182,26 @@ describe('R-4: Discover first paint clears the fixed bottom-nav band', () => {
     expect(rulesFor(media, '.discover-field').join('\n')).toMatch(/flex:\s*0 0 auto/);
   });
 
-  it('tightens the mobile topbar row gap and toolbar vertical padding', () => {
-    const baseMedia = mediaBody(baseCss, '@media (max-width: 767px)');
+  it('keeps compact mobile topbar and toolbar padding', () => {
+    const baseMedia = mediaBody(baseCss, '@media (max-width: 767px)', 1);
     expect(rulesFor(baseMedia, '.topbar').join('\n')).toMatch(/gap:\s*var\(--space-1\)/);
     const discoverMedia = mediaBody(discoverCss, '@media (max-width: 767px)');
     expect(rulesFor(discoverMedia, '.discover-toolbar').join('\n')).toMatch(/padding:\s*var\(--space-1\)\s+var\(--space-2\)/);
   });
 });
 
-describe('P-1: PnL fg inside the charcoal feature panel holds AA', () => {
+describe('Rev 3: equity PnL contrast on lime', () => {
   const panelPositive = '.bento-tile--portfolio .bento-figure__value--positive';
   const panelNegative = '.bento-tile--portfolio .bento-figure__value--negative';
 
-  it('defines the feature-scoped status fg tokens in both themes', () => {
-    expect(tokenRaw('feature-positive-fg', 'light')).toBe('#6ee7b7');
-    expect(tokenRaw('feature-negative-fg', 'light')).toBe('#fca5a5');
-    expect(tokenRaw('feature-positive-fg', 'dark')).toBe('#34d399');
-    expect(tokenRaw('feature-negative-fg', 'dark')).toBe('#f87171');
+  it('uses the dark brand foreground for both PnL directions', () => {
+    expect(rulesFor(baseCss, panelPositive).join('\n')).toMatch(/color:\s*var\(--brand-on-accent\)/);
+    expect(rulesFor(baseCss, panelNegative).join('\n')).toMatch(/color:\s*var\(--brand-on-accent\)/);
   });
 
-  it('binds the panel scope to the feature pair, never the light semantic fg', () => {
-    expect(rulesFor(baseCss, panelPositive).join('\n')).toMatch(/color:\s*var\(--feature-positive-fg\)/);
-    expect(rulesFor(baseCss, panelNegative).join('\n')).toMatch(/color:\s*var\(--feature-negative-fg\)/);
-  });
-
-  it('never encodes status with the lime accent', () => {
-    const accent = tokenRaw('brand-accent', 'light');
-    for (const theme of ['light', 'dark'] as const) {
-      expect(tokenRaw('feature-positive-fg', theme)).not.toBe(accent);
-      expect(tokenRaw('feature-negative-fg', theme)).not.toBe(accent);
-    }
+  it('keeps both PnL directions readable instead of using status colours on lime', () => {
+    expect(tokenRaw('brand-on-accent', 'light')).toBe('#171717');
+    expect(tokenRaw('brand-on-accent', 'dark')).toBe('#171717');
   });
 
   it('leaves the semantic status fg (outside the panel) untouched', () => {
@@ -225,7 +209,7 @@ describe('P-1: PnL fg inside the charcoal feature panel holds AA', () => {
     expect(tokenRaw('status-negative-fg', 'light')).toBe('#991b1b');
   });
 
-  it('renders realised/unrealised PnL with the tint classes inside the charcoal panel (fixture)', async () => {
+  it('renders realised/unrealised PnL with the tint classes inside the lime equity panel (fixture)', async () => {
     const portfolio = portfolioSchema.parse({
       mode: 'PAPER',
       asOf: '2026-11-13T04:00:00Z',

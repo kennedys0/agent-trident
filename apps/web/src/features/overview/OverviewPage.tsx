@@ -3,24 +3,17 @@ import { Link } from 'react-router-dom';
 import { endpoints } from '../../lib/api/endpoints.js';
 import { useResource } from '../../lib/api/hooks.js';
 import { readFlag, readNumber, readString } from '../../lib/api/system.js';
-import { ageSeconds, formatAge, formatMoney, formatScaled, formatUtc } from '../../lib/format.js';
+import { ageSeconds, formatAge, formatMoney, formatScaled, formatStrength, formatUtc } from '../../lib/format.js';
 import { PAIR } from '../../lib/pair.js';
 import { useStatus } from '../../app/StatusProvider.js';
+import { ActionBadge } from '../../components/ActionBadge.js';
 import { Badge } from '../../components/Badge.js';
 import { SnapshotBadge } from '../../components/SnapshotBadge.js';
 import { StateView, isOfflineError } from '../../components/StateView.js';
-import { CandidateDecisionView } from '../candidates/CandidateDecisionView.js';
 import { scanWindowText, useIntentDecision, useRiskDecisionScan } from '../risk/useIntentDecision.js';
 import { poolsEndpoint } from '../discover/discoverApi.js';
 
-/**
- * Bento dashboard (issue #39, "Robinhood Soft Bento", Revision 2). Every
- * figure is read from the backend endpoints that already exist — nothing is
- * generated in the browser, and when data is missing the tile says so instead
- * of inventing a number. Layout follows docs/design/soft-bento-tokens.md §6
- * (Revision 2): one dominant charcoal portfolio module, one visually distinct
- * market/strategy module, then compact risk/discovery/activity support tiles.
- */
+/** Backend-backed Soft Bento dashboard. Missing data stays unavailable. */
 export function OverviewPage(): ReactNode {
   const { health, now, online } = useStatus();
   const snapshot = useResource(endpoints.snapshot(), { intervalMs: 10_000 });
@@ -40,11 +33,8 @@ export function OverviewPage(): ReactNode {
     snapshotData === undefined || snapshotData === null
       ? null
       : ageSeconds(snapshotData.sourceTime, now);
-  const strategyId = readString(candidates.meta, 'strategyId');
-  const configVersion = readString(candidates.meta, 'configVersion');
   const killSwitch = readFlag(health.meta, 'killSwitchEngaged');
   const latency = readNumber(health.meta, 'rpcLatencyMs');
-  const scanAge = candidates.receivedAt === null ? null : Math.max(0, Math.floor((now - candidates.receivedAt) / 1000));
 
   const portfolioData = portfolio.data;
   const quoteBalance =
@@ -59,7 +49,7 @@ export function OverviewPage(): ReactNode {
 
   return (
     <>
-      <header className="stack stack--tight">
+      <header className="stack stack--tight page-heading">
         <h1>Overview</h1>
         <p className="meta">
           PAPER-only operational state · chain {PAIR.chainId} · {PAIR.base.symbol}/{PAIR.quote.symbol} 0.01% pool. Every value
@@ -75,7 +65,7 @@ export function OverviewPage(): ReactNode {
         </p>
       ) : null}
 
-      <div className="status-strip" data-testid="overview-strip">
+      <section className="status-strip" data-testid="overview-strip" aria-label="Operational status">
         <div className="status-strip__item">
           <span className="status-strip__label">Execution</span>
           <span className="status-strip__value">
@@ -92,15 +82,17 @@ export function OverviewPage(): ReactNode {
                 RPC {healthData.rpcStatus.toLowerCase()}
               </Badge>
             )}
-            <span className="mono">{healthData === null ? 'chain unknown' : `chain ${healthData.chainId}`}</span>
+            <span className="meta">{healthData === null ? 'chain unknown' : `chain ${healthData.chainId}`}</span>
           </span>
         </div>
         <div className="status-strip__item">
           <span className="status-strip__label">Head block</span>
-          <span className="status-strip__value">
+          <span className="status-strip__value status-strip__value--block">
             {healthData?.headBlock ?? 'Unavailable'}
-            {healthData?.lagSeconds === null || healthData === null ? '' : ` · lag ${healthData.lagSeconds}s`}
-            {latency === null ? '' : ` · ${latency} ms`}
+          </span>
+          <span className="meta">
+            {healthData === null || healthData.lagSeconds === null ? '' : `lag ${healthData.lagSeconds}s`}
+            {latency === null ? '' : `${healthData === null || healthData.lagSeconds === null ? '' : ' · '}${latency} ms`}
           </span>
         </div>
         <div className="status-strip__item">
@@ -137,23 +129,17 @@ export function OverviewPage(): ReactNode {
             )}
           </span>
         </div>
-        <div className="status-strip__item">
-          <span className="status-strip__label">Sync</span>
-          <span className="status-strip__value">
-            <button type="button" className="btn btn--quiet" onClick={() => health.refresh()}>
-              Refresh
-            </button>
-          </span>
+        <div className="status-strip__refresh">
+          <button type="button" className="btn btn--quiet" onClick={() => health.refresh()}>
+            Refresh
+          </button>
         </div>
-      </div>
+      </section>
 
       <div className="bento">
-        {/* Dominant module (Revision 2): charcoal feature panel, 7×2 on desktop.
-            Portfolio equity is the hero figure; the brand accent is a fill-only
-            colour for it and never encodes a status. */}
         <section className="bento-tile bento-tile--portfolio" data-testid="overview-portfolio">
           <div className="bento-tile__title">
-            <span>Simulated equity</span>
+            <h2>Simulated equity</h2>
             <Badge tone="testnet">SIMULATED</Badge>
           </div>
           {portfolio.isLoading ? (
@@ -170,158 +156,107 @@ export function OverviewPage(): ReactNode {
             <StateView kind="empty" title="No portfolio projection yet" testId="portfolio-empty" />
           ) : (
             <>
-              <div className="bento-figure">
-                <span className="bento-figure__label">Equity</span>
-                <span
-                  className="bento-figure__value bento-figure__value--hero bento-figure__value--accent"
-                  data-testid="overview-equity-value"
-                >
-                  {formatMoney(portfolioData.equityQuote, { maxFrac: 2 })} {PAIR.quote.symbol}
-                </span>
-              </div>
+              <span
+                className="bento-figure__value bento-figure__value--hero"
+                data-testid="overview-equity-value"
+              >
+                {formatMoney(portfolioData.equityQuote, { maxFrac: 2 })} {PAIR.quote.symbol}
+              </span>
               <div className="bento-figures-row">
                 <div className="bento-figure">
                   <span className="bento-figure__label">Cash (quote)</span>
                   <span className="bento-figure__value" data-testid="overview-cash-value">
                     {quoteBalance === null
                       ? 'Unavailable'
-                      : `${formatMoney(quoteBalance.available, { maxFrac: 2 })} ${PAIR.quote.symbol}`}
+                      : formatMoney(quoteBalance.available, { maxFrac: 2 })}
                   </span>
                 </div>
                 <div className="bento-figure">
-                  <span className="bento-figure__label">Realised</span>
+                  <span className="bento-figure__label">Realised PnL</span>
                   <span
                     className={`bento-figure__value ${pnlTint(portfolioData.realizedPnlQuote)}`}
                     data-testid="overview-pnl-realized"
                   >
-                    {formatMoney(portfolioData.realizedPnlQuote, { maxFrac: 2, signed: true })} {PAIR.quote.symbol}
+                    {formatMoney(portfolioData.realizedPnlQuote, { maxFrac: 2, signed: true })}
                   </span>
                 </div>
                 <div className="bento-figure">
-                  <span className="bento-figure__label">Unrealised</span>
+                  <span className="bento-figure__label">Unrealised PnL</span>
                   <span
                     className={`bento-figure__value ${pnlTint(unvaluable ? null : portfolioData.unrealizedPnlQuote)}`}
                     data-testid="overview-pnl-unrealized"
                   >
                     {unvaluable
                       ? 'Unavailable'
-                      : `${formatMoney(portfolioData.unrealizedPnlQuote, { maxFrac: 2, signed: true })} ${PAIR.quote.symbol}`}
+                      : formatMoney(portfolioData.unrealizedPnlQuote, { maxFrac: 2, signed: true })}
                   </span>
                 </div>
               </div>
               <p className="meta">
                 {unvaluable
-                  ? 'unrealised PnL cannot be valued without a complete canonical snapshot'
-                  : 'valued by the backend with the canonical snapshot'}
+                  ? 'Unrealised PnL cannot be valued without a complete canonical snapshot.'
+                  : `Backend valuation · ${formatUtc(portfolioData.asOf)} · ${portfolioData.mode}`}
               </p>
-              <div className="bento-tile__foot">
-                <span className="mono">as of {formatUtc(portfolioData.asOf)}</span>
-                <span>mode {portfolioData.mode}</span>
-              </div>
             </>
           )}
         </section>
 
-        {/* Visually distinct counterpart (Revision 2): tinted well, 5×2 on
-            desktop — market freshness and the last strategy decision share the
-            module but keep their own data sources and honest states. */}
-        <section className="bento-tile bento-tile--market" data-testid="overview-market">
+        <section className="bento-tile bento-tile--strategy" data-testid="overview-strategy">
           <div className="bento-tile__title">
-            <span>Market & strategy</span>
+            <h2>Strategy signal</h2>
+            <Link to="/candidates">All candidates</Link>
           </div>
-          {snapshot.isLoading ? (
-            <StateView kind="loading" title="Loading the market snapshot…" testId="market-loading" />
-          ) : snapshot.error !== null || snapshotData === null ? (
+          {candidates.isLoading ? (
+            <StateView kind="loading" title="Loading the latest evaluation…" testId="candidates-loading" />
+          ) : candidates.error !== null ? (
             <StateView
-              kind={isOfflineError(snapshot.error ?? new Error('')) && !online ? 'offline' : 'error'}
-              title="Market snapshot unavailable"
-              text={snapshot.error?.message ?? 'No market snapshot has been recorded yet.'}
-              onRetry={snapshot.refresh}
-              testId="market-error"
+              kind={isOfflineError(candidates.error) && !online ? 'offline' : 'error'}
+              title="Evaluations could not be loaded"
+              text={candidates.error.message}
+              onRetry={candidates.refresh}
+              testId="candidates-error"
+            />
+          ) : latestCandidate === null ? (
+            <StateView
+              kind="empty"
+              title="No eligible candidates in the latest scan"
+              text="The backend returned an empty evaluation list."
+              testId="candidates-empty"
             />
           ) : (
             <>
-              <div className="bento-figure">
-                <span className="bento-figure__label">Snapshot</span>
-                <span className="bento-figure__value">
-                  <SnapshotBadge status={snapshotData.status} />
-                </span>
+              <div className="strategy-signal">
+                <ActionBadge action={latestCandidate.evaluation.action} />
+                <div className="bento-figure">
+                  <span className="bento-figure__label">Strength</span>
+                  <span className="bento-figure__value">
+                    {formatStrength(latestCandidate.evaluation.signalStrength)}
+                  </span>
+                </div>
               </div>
               <dl className="rows">
                 <div className="row">
-                  <dt className="row__label">Observed</dt>
+                  <dt className="row__label">Strategy</dt>
                   <dd className="row__value mono">
-                    block {snapshotData.blockNumber} · {formatAge(snapshotAge)}
+                    {latestCandidate.evaluation.strategyId} · {latestCandidate.evaluation.configVersion}
                   </dd>
                 </div>
                 <div className="row">
-                  <dt className="row__label">Source</dt>
-                  <dd className="row__value mono">{snapshotData.source}</dd>
-                </div>
-                <div className="row">
-                  <dt className="row__label">Reference price</dt>
+                  <dt className="row__label">Evaluated</dt>
                   <dd className="row__value mono">
-                    {snapshotData.status === 'INCOMPLETE' || snapshotData.status === 'UNAVAILABLE'
-                      ? 'Unavailable'
-                      : `${formatScaled(snapshotData.price)} ${PAIR.quote.symbol}/${PAIR.base.symbol}`}
+                    {formatUtc(latestCandidate.evaluation.evaluatedAt)} ·{' '}
+                    {formatAge(Math.max(0, Math.floor((now - new Date(latestCandidate.evaluation.evaluatedAt).getTime()) / 1000)))}
                   </dd>
                 </div>
               </dl>
-              {snapshotData.status === 'UNAVAILABLE' ? (
-                <p className="meta">{snapshotData.reason}</p>
-              ) : snapshotData.status === 'INCOMPLETE' ? (
-                <p className="meta">Missing inputs: {snapshotData.missingInputs.join(', ')}</p>
-              ) : null}
+              <p className="meta">Evaluation only — not an order, fill, or open position.</p>
             </>
           )}
-          <div className="bento-module" data-testid="overview-strategy">
-            {/* R-3 (QA rev2): module titles are h2 — the bento tiles are not
-                heading elements, so an h3 here would skip a level under h1. */}
-            <h2 className="bento-module__title">
-              <span>Last strategy decision</span>
-              <Link to="/candidates">All candidates</Link>
-            </h2>
-            {candidates.isLoading ? (
-              <StateView kind="loading" title="Loading the latest evaluation…" testId="candidates-loading" />
-            ) : candidates.error !== null ? (
-              <StateView
-                kind={isOfflineError(candidates.error) && !online ? 'offline' : 'error'}
-                title="Evaluations could not be loaded"
-                text={candidates.error.message}
-                onRetry={candidates.refresh}
-                testId="candidates-error"
-              />
-            ) : latestCandidate === null ? (
-              <StateView
-                kind="empty"
-                title="No eligible candidates in the latest scan"
-                text={
-                  scanAge === null
-                    ? 'The backend returned an empty evaluation list.'
-                    : `The scan completed ${formatAge(scanAge)}; no token passed the current filters.`
-                }
-                testId="candidates-empty"
-              />
-            ) : (
-              <>
-                <CandidateDecisionView candidate={latestCandidate} now={now} compact />
-                <div className="bento-module__foot">
-                  <span className="mono">
-                    {strategyId === null ? 'strategy unavailable' : strategyId} · {configVersion ?? 'version unavailable'}
-                  </span>
-                  <span className="mono">
-                    scan {scanAge === null ? 'Unavailable' : formatAge(scanAge)}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
         </section>
 
-        {/* Compact support row (Revision 2): risk, discovery, activity. */}
         <section className="bento-tile bento-tile--risk bento-tile--interactive" data-testid="overview-risk">
           <div className="bento-tile__title">
-            <span>Risk state</span>
+            <h2>Risk state</h2>
             {killSwitch === true ? <Badge tone="halted">HALTED</Badge> : null}
           </div>
           {riskScan.status === 'loading' ? (
@@ -368,12 +303,13 @@ export function OverviewPage(): ReactNode {
                   </Badge>
                 </span>
               </div>
-              <p className="meta mono">
-                {decision.data.riskDecision.policyVersion} · {formatUtc(decision.data.riskDecision.evaluatedAt)}
+              <p className="meta">
+                <span className="mono">{decision.data.riskDecision.policyVersion}</span> ·{' '}
+                <span className="mono">{formatUtc(decision.data.riskDecision.evaluatedAt)}</span>
               </p>
-              {decision.data.riskDecision.reasons.length > 0 ? (
-                <p className="meta">{decision.data.riskDecision.reasons[0]}</p>
-              ) : null}
+              <p className="meta">
+                {decision.data.riskDecision.reasons[0] ?? 'Approved intent; no PAPER fill is implied.'}
+              </p>
             </>
           )}
           <div className="bento-tile__foot">
@@ -381,10 +317,58 @@ export function OverviewPage(): ReactNode {
           </div>
         </section>
 
+        <section className="bento-tile bento-tile--market" data-testid="overview-market">
+          <div className="bento-tile__title">
+            <h2>Market & pool</h2>
+          </div>
+          {snapshot.isLoading ? (
+            <StateView kind="loading" title="Loading the market snapshot…" testId="market-loading" />
+          ) : snapshot.error !== null || snapshotData === null ? (
+            <StateView
+              kind={isOfflineError(snapshot.error ?? new Error('')) && !online ? 'offline' : 'error'}
+              title="Market snapshot unavailable"
+              text={snapshot.error?.message ?? 'No market snapshot has been recorded yet.'}
+              onRetry={snapshot.refresh}
+              testId="market-error"
+            />
+          ) : (
+            <>
+              <div className="row">
+                <span className="row__label">Snapshot</span>
+                <SnapshotBadge status={snapshotData.status} />
+              </div>
+              <dl className="rows">
+                <div className="row">
+                  <dt className="row__label">Observed</dt>
+                  <dd className="row__value mono">
+                    block {snapshotData.blockNumber} · {formatAge(snapshotAge)}
+                  </dd>
+                </div>
+                <div className="row">
+                  <dt className="row__label">Source</dt>
+                  <dd className="row__value mono">{snapshotData.source}</dd>
+                </div>
+                <div className="row">
+                  <dt className="row__label">Reference price</dt>
+                  <dd className="row__value">
+                    {snapshotData.status === 'INCOMPLETE' || snapshotData.status === 'UNAVAILABLE'
+                      ? 'Unavailable'
+                      : `${formatScaled(snapshotData.price)} ${PAIR.quote.symbol}/${PAIR.base.symbol}`}
+                  </dd>
+                </div>
+              </dl>
+              {snapshotData.status === 'UNAVAILABLE' ? (
+                <p className="meta">{snapshotData.reason}</p>
+              ) : snapshotData.status === 'INCOMPLETE' ? (
+                <p className="meta">Missing inputs: {snapshotData.missingInputs.join(', ')}</p>
+              ) : null}
+            </>
+          )}
+        </section>
+
         <section className="bento-tile bento-tile--discovery bento-tile--interactive" data-testid="overview-discovery">
           <div className="bento-tile__title">
-            <span>Discovery</span>
-            <Link to="/discover">Open Discover</Link>
+            <h2>Discovery</h2>
           </div>
           {discovery.isLoading ? (
             <StateView kind="loading" title="Loading the pool registry…" testId="discovery-loading" />
@@ -398,34 +382,36 @@ export function OverviewPage(): ReactNode {
             />
           ) : (
             <>
-              <div className="bento-figure">
-                <span className="bento-figure__label">Registry</span>
-                <span className="bento-figure__value">
-                  <Badge tone={registryStatus === 'OK' ? 'success' : 'muted'}>
-                    {registryStatus ?? 'Unavailable'}
-                  </Badge>
-                </span>
+              <div className="row">
+                <span className="row__label">Registry</span>
+                <Badge tone={registryStatus === 'OK' ? 'success' : 'muted'}>
+                  {registryStatus ?? 'Unavailable'}
+                </Badge>
               </div>
-              <div className="bento-figure">
-                <span className="bento-figure__label">Pools tracked</span>
-                <span className="bento-figure__value" data-testid="overview-tracked-pools">
-                  {trackedPools ?? 'Unavailable'}
-                </span>
-              </div>
-              <div className="bento-tile__foot">
-                <span className="meta">
-                  {watchlistEntries === null
-                    ? 'watchlist size unavailable'
-                    : `${watchlistEntries} watchlisted token${watchlistEntries === 1 ? '' : 's'}`}
-                </span>
+              <div className="bento-figures-row">
+                <div className="bento-figure">
+                  <span className="bento-figure__label">Pools tracked</span>
+                  <span className="bento-figure__value" data-testid="overview-tracked-pools">
+                    {trackedPools ?? 'Unavailable'}
+                  </span>
+                </div>
+                <div className="bento-figure">
+                  <span className="bento-figure__label">Watchlist</span>
+                  <span className="bento-figure__value" data-testid="overview-watchlist">
+                    {watchlistEntries ?? 'Unavailable'}
+                  </span>
+                </div>
               </div>
             </>
           )}
+          <div className="bento-tile__foot">
+            <Link to="/discover">Open Discover</Link>
+          </div>
         </section>
 
         <section className="bento-tile bento-tile--activity bento-tile--interactive" data-testid="overview-activity">
           <div className="bento-tile__title">
-            <span>Recent PAPER activity</span>
+            <h2>Recent PAPER activity</h2>
             <Link to="/journal">Open journal</Link>
           </div>
           {journal.isLoading ? (

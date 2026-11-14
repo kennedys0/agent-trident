@@ -18,7 +18,7 @@ const allCss = `${baseCss}\n${tokensCss}\n${discoverCss}`;
 
 function cssBlock(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+  const match = new RegExp(`${escaped}(?:\\s*,[^{}]*)?\\s*\\{([^}]*)\\}`).exec(css);
   if (match?.[1] === undefined) {
     throw new Error(`Missing CSS rule for ${selector}`);
   }
@@ -281,13 +281,13 @@ describe('charcoal feature panel PnL contrast (QA P-1)', () => {
     }
   });
 
-  it('binds the panel scope to the feature pair with a scoped override', () => {
-    for (const [modifier, token] of [
-      ['--positive', '--feature-positive-fg'],
-      ['--negative', '--feature-negative-fg'],
-    ] as const) {
+  it('binds the lime equity scope to its dark brand foreground', () => {
+    for (const modifier of ['--positive', '--negative'] as const) {
       const block = cssBlock(baseCss, `.bento-tile--portfolio .bento-figure__value${modifier}`);
-      expect(block).toMatch(new RegExp(`color:\\s*var\\(${token}\\)`));
+      expect(block).toMatch(/color:\s*var\(--brand-on-accent\)/);
+    }
+    for (const theme of ['light', 'dark'] as const) {
+      expect(themeContrast('brand-on-accent', 'brand-accent', theme)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
