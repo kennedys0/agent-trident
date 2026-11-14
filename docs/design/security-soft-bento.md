@@ -260,3 +260,186 @@ Cakupan: diff token `d8ac8ac..10c03f6`, hitung ulang kontras semua pasangan char
 (chip reachable via scroll). Belum terverifikasi (v1 & v2): screen reader nyata (VoiceOver/NVDA),
 sentuhan perangkat fisik, persepsi pemisahan layer dark 1,06–1,14:1, review frame-by-frame webm.
 Temuan di luar cakupan ini (N-1 raw RPC message, dsb.) tetap terbuka seperti laporan sebelumnya.**
+
+## 6. Revision 3 — invariant & metode verifikasi (branch `design/soft-bento-rev3`, oleh Sentinel)
+
+Tahap 1 (belum ada implementasi Forge): inventaris invariant keselamatan yang WAJIB utuh di
+Revision 3 + cara cek konkret masing-masing. Baseline: `main 2769c11`. Eksekusi perintah di
+bawah dilakukan setelah Forge push; label hasil saat re-check nanti: **CLOSED** (terbukti utuh)
+/ **REGRESSION** (invariant rusak — blocker) / **BELUM TERVERIFIKASI** (tidak bisa dibuktikan
+dengan cara cek yang tersedia, sebutkan alasannya). Rev 3 adalah polish pass presentation layer
+(brief §9: "Keep all backend integrations and safety invariants unchanged"); semua invariant di
+bawah tidak boleh berubah walau komposisi/typografi/density berubah.
+
+### 6.1 Invariant INV-1 — PAPER-only, tanpa signing/execution live, tanpa dependensi trading baru
+
+Pernyataan: aplikasi tetap simulasi PAPER; tidak ada signing, broadcast, atau eksekusi order
+live; tidak ada dependensi baru yang menambah jalur trading (brief §9 + aturan kontrak produk).
+
+Cara cek:
+- `git diff --name-only 2769c11..HEAD -- apps/api packages pnpm-lock.yaml` → WAJIB kosong
+  (backend/packages/lockfile tidak boleh tersentuh; dependensi baru = lockfile berubah).
+- `git diff 2769c11..HEAD -- package.json 'apps/*/package.json' 'packages/*/package.json'`
+  → tidak ada penambahan `dependencies`/`devDependencies`.
+- `grep -rniE "signTransaction|sendRawTransaction|eth_sendTransaction|privateKey|mnemonic" apps packages`
+  → tidak ada hasil baru (baseline nol; kalau muncul = REGRESSION).
+- `pnpm --filter './packages/*' test` → kontrak **29/29** tetap (PAPER-only, discovered pool
+  non-actionable 422 INTENT_NOT_ACTIONABLE, allowlist WETH/USDG, volume UNAVAILABLE).
+- Screenshot: badge `PAPER — SIMULATED` masih terlihat di chrome aplikasi.
+
+### 6.2 Invariant INV-2 — STOP NEW ENTRIES: ada, terlihat, keyboard, non-optimistic
+
+Pernyataan: kontrol emergency tetap ada dan menonjol, terjangkau keyboard, dan tampilannya hanya
+mencerminkan state backend terkonfirmasi — bukan optimistic update (brief §8 baris terakhir).
+
+Cara cek:
+- `git diff 2769c11..HEAD -- apps/web/src/components/StopControl.tsx apps/web/src/features/discover/useWatchlist.ts`
+  → boleh berubah untuk restyle (className), TAPI baca diff baris demi baris: perubahan pada
+  alur state (`pending`, `overrides`, `await`, pemicu dari respons server), handler, atau
+  penamaan = REGRESSION. Bukti non-optimistic: perubahan tampilan hanya terjadi setelah respons
+  server (lihat komentar kontrak `useWatchlist.ts:32-34` — "no optimistic update").
+- `grep -rnE "optimistic|onMutate|setQueryData" apps/web/src` → satu-satunya hasil adalah
+  komentar yang menyatakan TIDAK ada optimistic update; hasil tambahan = perlu dicek.
+- `grep -n "button" apps/web/src/components/StopControl.tsx` → tetap `<button type="button">`
+  (bukan div), sehingga keyboard reachable tanpa JS tambahan.
+- Tes web yang mengunci kontrak non-optimistic harus tetap lulus; jumlah tes tidak boleh turun.
+- Screenshot keyboard-run (e2e): fokus tab mencapai STOP NEW ENTRIES; label terbaca penuh.
+
+### 6.3 Invariant INV-3 — State darurat & status data tetap ada dan terbaca
+
+Pernyataan: HALTED, state stale/unavailable/pending/offline, verdict risk + reasons, dan reorg
+"MANUAL REVIEW REQUIRED" tetap ada, tidak disembunyikan/di-ringkas, dan kontrasnya lulus AA
+(brief §4 "Keep PAPER mode and emergency HALT prominently visible", §5 "Preserve accurate
+unavailable states", §6 "clearly differentiated status colors").
+
+Cara cek:
+- Label inventory sebelum/sesudah — `grep -rn "STOP NEW ENTRIES\|SIMULATED\|HALTED\|MANUAL REVIEW REQUIRED\|STALE\|UNAVAILABLE\|PENDING\|OFFLINE\|Unavailable" apps/web/src --include=*.tsx -l`
+  → daftar file hasil di `2769c11` (StopControl.tsx, OverviewPage.tsx, Shell.tsx,
+  IntentAction.tsx, PortfolioView.tsx, RiskPage.tsx, RiskDecisionView.tsx,
+  CandidateDetailPage.tsx, MorePage.tsx, PortfolioPage.tsx) tidak boleh menyusut di HEAD.
+  Restyle boleh; label hilang atau dipindah ke tooltip/hover = REGRESSION.
+- `grep -rn "MANUAL REVIEW REQUIRED\|Reasons\|reasons" apps/web/src/features/risk/RiskDecisionView.tsx`
+  → verdict + daftar reasons tetap dirender apa adanya (tanpa filter/ringkasan).
+- Kontras: setiap token warna BARU yang dipakai untuk teks status dihitung ulang WCAG
+  (≥4,5:1 teks normal; ≥3:1 non-teks). Keputusan Rev 2 yang berlaku: lime `#D2FF00` hanya fill
+  aksen (bukan makna status), lavender hanya badge PAPER, fg status khusus charcoal
+  (`--feature-positive-fg`/`--feature-negative-fg`) tidak boleh dipakai di luar panel —
+  `git diff 2769c11..HEAD -- apps/web/src/styles/tokens.css apps/web/src/styles/base.css`
+  dibaca penuh untuk memastikan tidak ada pemakaian baru yang menyalahi pemisahan ini.
+- Screenshot light+dark: semua label di atas terlihat tanpa perlu hover/interaksi.
+
+### 6.4 Invariant INV-4 — BUY signal ≠ posisi terbuka (brief §4)
+
+Pernyataan: UI tidak menyiratkan fill/posisi dari signal strategi. Lima state harus tetap
+terpisah: strategy signal / risk verdict / approved intent / PAPER order-fill status / portfolio
+position — dan hanya state yang benar-benar disediakan API yang ditampilkan.
+
+Cara cek:
+- `git diff 2769c11..HEAD -- apps/web/src/features/overview/OverviewPage.tsx apps/web/src/features/candidates apps/web/src/features/risk apps/web/src/features/intent apps/web/src/components/ActionBadge.tsx`
+  → baca semua perubahan teks label; kata yang menyiratkan eksekusi ("filled", "position
+  opened", "owned", "bought", "entry done") pada konteks signal = REGRESSION.
+- `grep -rn "BUY\|SELL\|HOLD" apps/web/src --include=*.tsx` → setiap kemunculan harus berada di
+  konteks "signal"/"evaluation"/"strategy", bukan "position"/"order".
+- Cek tipe data: field yang dirender untuk signal/position berasal dari tipe API
+  (`packages/` contract types) — `grep -rn "position\|fill" apps/web/src --include=*.tsx` tidak
+  boleh menampilkan field yang tidak ada di tipe respons API (cek silang dengan
+  `packages/` atau fixture).
+- Screenshot healthy-state: kartu strategy signal hanya memuat verdict + alasan + label
+  "signal"-an; PAPER order/intent terpisah dari portfolio position.
+
+### 6.5 Invariant INV-5 — Motion jujur & sukses hanya setelah konfirmasi backend (brief §8)
+
+Pernyataan: tidak ada animasi pada kartu statis yang membuatnya terlihat clickable; feedback
+success hanya muncul setelah konfirmasi backend (pending → success/error mengikuti respons).
+
+Cara cek:
+- `grep -nE "animation|@keyframes|transition|cursor: *pointer|:hover|:active" apps/web/src/styles/base.css apps/web/src/styles/*.css`
+  → audit setiap hasil: `cursor:pointer`/`:hover` interaktif hanya pada elemen yang benar-benar
+  punya handler (button/link/menu item); transisi kartu non-interaktif = REGRESSION
+  (brief §8 "Do not animate static cards as though they are clickable").
+- Alur sukses: `git diff 2769c11..HEAD` pada komponen dengan feedback (useWatchlist,
+  StopControl, IntentAction, Refresh) → status "success" hanya diset dari callback/onSuccess
+  setelah `await`/respons server; tidak ada setState success sebelum request selesai.
+  `grep -rn "setSuccess\|status: 'success'\|'success'" apps/web/src --include=*.tsx*` dibaca
+  kontekstual per hasil.
+- `prefers-reduced-motion` tetap dihormati (`grep -n "prefers-reduced-motion" apps/web/src/styles/*.css`).
+- Rekaman interaksi (webm milik Pixel/Probe) ditinjau: pastikan tidak ada feedback sukses
+  sebelum balasan API pada aksi watchlist/intent/stop. (Saya verifikasi dari kode + replay;
+  penilaian estetika motion milik Probe/Pixel.)
+
+### 6.6 Invariant INV-6 — File terlarang nol diff vs `main 2769c11`
+
+Pernyataan: `apps/api/src/chain/client.ts`, `apps/api/src/chain/rpc-guard.ts`,
+`apps/api/src/config.ts`, audit-gate, lockfile, backend (`apps/api`), `packages/` tidak berubah
+sama sekali (brief §9 "backend integrations ... unchanged").
+
+Cara cek:
+- `git diff --stat 2769c11..HEAD -- apps/api packages pnpm-lock.yaml audit-gate` → kosong.
+- `git diff --name-only 2769c11..HEAD` → seluruh delta harus berada di `apps/web/src`,
+  `apps/web/test`, `apps/web/e2e`, `docs/design/` (presentasi + evidence); selain itu = perlu
+  dicek, di luar batas presentation layer.
+- Perubahan konfigurasi build web diperbolehkan sejauh tidak menambah dependensi (lihat INV-1).
+
+### 6.7 Invariant INV-7 — Data jujur: tanpa metrik/chart/pool karangan (brief §1, §5)
+
+Pernyataan: tidak ada chart, metrik, pool, atau angka yang di-invent; semua nilai dari API;
+state Unavailable apa adanya (brief §1 "Never invent portfolio charts or artificial metrics",
+§5 "Do not invent pools when the API returns only one").
+
+Cara cek:
+- `grep -rnE "chart|sparkline|polyline|recharts|d3" apps/web/src --include=*.tsx` → nol hasil
+  chart library/dekoratif (baseline nol).
+- `git diff 2769c11..HEAD -- apps/web/src` → tidak ada komponen visualisasi data baru; angka
+  hard-coded pada JSX (bukan dari props/API) = REGRESSION.
+- Screenshot Discover dengan API 1 pool: jumlah baris tabel = jumlah data API (1), tanpa
+  placeholder pool; nilai volume tetap `UNAVAILABLE`, confidence `LOW`.
+- Evidence screenshots bukan fixture yang menyamar: bila harness memakai fixture berlabel,
+  disclosure tetap ada di `results.json` (praktik Rev 2).
+
+### 6.8 Invariant INV-8 — Gate tidak menyusut
+
+Pernyataan: kualitas gate minimum sama dengan baseline; jumlah tes tidak turun.
+
+Cara cek (jalankan sendiri di HEAD rev3, jangan terima klaim):
+- `pnpm -r typecheck` → bersih.
+- `pnpm --filter './packages/*' test` → contract **29/29**.
+- `pnpm --filter @trident/api test` → **195 passed + 5 skipped** (atau lebih; tidak kurang).
+- `pnpm --filter @trident/web test` → **≥165 passed** (baseline Rev 2: 165/165); tes yang
+  dihapus/di-skip harus punya alasan tertulis.
+- `pnpm -r build` → OK.
+- Bila Forge mengubah kelas/token: tes kontrak disesuaikan + red proof (mutasi → gagal →
+  pulih) seperti praktik Rev 2.
+
+### 6.9 Ringkasan metode & pembagian verifikasi
+
+- Saya (Sentinel) mengeksekusi INV-1..INV-8 di atas setelah Forge push, lalu menulis hasil per
+  invariant (CLOSED / REGRESSION / BELUM TERVERIFIKASI) di bagian ini.
+- Estetika komposisi, ketajaman motion, dan kualitas bukti visual = ranah Probe/Pixel; yang
+  saya nilai dari item itu hanya sisi keselamatannya (kejujuran data, keterbacaan kontrol,
+  tidak ada misleading affordance).
+- BELUM TERVERIFIKASI yang sudah diketahui dan akan tetap dilaporkan apa adanya kecuali ada
+  cara bukti baru: screen reader nyata (VoiceOver/NVDA), sentuhan perangkat fisik, persepsi
+  pemisahan layer dark (1,06–1,14:1), review frame-by-frame rekaman.
+
+### 6.10 Hasil verifikasi invariant di head implementasi Forge (`7ddca0c`, oleh Sentinel)
+
+Dieksekusi setelah Forge push (`7ddca0c feat(web): implement soft bento revision 3`, PR #45
+DRAFT). Semua angka hasil pengukuran/jalankan sendiri.
+
+| Invariant | Status | Bukti |
+|---|---|---|
+| INV-1 PAPER-only, tanpa signing/dependensi trading baru | **CLOSED** | `git diff 2769c11..HEAD -- apps/api packages pnpm-lock.yaml audit-gate` kosong; grep `signTransaction\|sendRawTransaction\|eth_sendTransaction\|privateKey\|mnemonic` nol hasil di apps/packages; nol perubahan `package.json`; contract 29/29. |
+| INV-2 STOP NEW ENTRIES non-optimistic | **CLOSED** | `StopControl.tsx` & `useWatchlist.ts` **nol diff sama sekali** vs `2769c11` (bentuk terkuat: alur state pasti utuh); tetap `<button type="button">` dengan `data-testid="stop-new-entries"`; dirender di `Shell.tsx:134`. |
+| INV-3 Label darurat/status + kontras | **CLOSED** | Label utuh: STOP NEW ENTRIES (`StopControl.tsx`), HALTED (`OverviewPage.tsx`), SIMULATED (Shell/OverviewPage/PortfolioView), MANUAL REVIEW REQUIRED + teks reorg "quarantined by a chain reorg" (`IntentAction.tsx:183,187` — file nol diff), reasons risk (`RiskDecisionView.tsx` nol diff), stale/unavailable/pending/offline tersebar di file yang tidak berubah. `tokens.css` **nol diff** → pemisahan lime/lavender/feature-fg Rev 2 utuh. Pasangan baru dihitung ulang: `#171717` on `#D2FF00` = **15,40:1** (panel equity lime, kedua tema; deviasi terotorisasi Atlas) dan `#171717` on `#B9AEF4` (badge PAPER) = **8,90:1**. Catatan non-blocking: token `--feature-positive-fg`/`--feature-negative-fg` kini dead token (tak terpakai setelah equity jadi lime) — boleh dibersihkan. |
+| INV-4 BUY ≠ posisi (brief §4) | **CLOSED** | Kartu Strategy signal memuat disclaimer eksplisit "Evaluation only — not an order, fill, or open position." (`OverviewPage.tsx:252`); "Filled quantity"/"Execution price" hanya di seksi PAPER execution result dari `result.execution.fill` API (`IntentAction.tsx:265+`) — state ke-5 yang sah, bukan signal; nol wording "filled/position opened/bought/owned" di konteks signal; tes baru "labels BUY as an evaluation signal, never an order, fill, or position"; PnL pakai `signed: true` (± terbaca tanpa warna). |
+| INV-5 Motion jujur + sukses setelah konfirmasi | **PARTIAL — 1 Minor** | Sukses non-optimistic utuh: semua komponen ber-mutasi (StopControl/useWatchlist/IntentAction) nol diff; diff file lain hanya filter UI/indikator berbasis status API; `prefers-reduced-motion` utuh (base.css:1498, discover.css:257, tokens.css:187). **Minor (misleading affordance):** `bento-tile--interactive` (baru di `7ddca0c`, `base.css:583-596`) memberi hover lift + active press pada SELURUH tile overview-risk/discovery/activity yang hanya punya sub-link kecil ("Open risk/Discover/journal"); klik badan tile tidak melakukan apa-apa — brief §8 "Do not animate static cards as though they are clickable". Tanpa `cursor:pointer` pada tile (memperkecil dampak). Perbaikan terkecil: scope hover ke link, atau buat seluruh tile target klik. Keputusan desain milik Pixel/Forge; non-blocking. |
+| INV-6 File terlarang nol diff | **CLOSED** | Delta `2769c11..HEAD` hanya `apps/web/src`, `apps/web/test`, `apps/web/e2e`, `docs/design/` (33 file); `apps/api`, `packages`, `pnpm-lock.yaml`, audit-gate kosong. |
+| INV-7 Tanpa data karangan | **CLOSED** | Grep `chart\|sparkline\|polyline` nol di TSX; nol angka hard-coded baru di JSX diff; "Unavailable" dan provenance tetap (DiscoverPage:226 scope label "Search runs on the backend · Filters apply only to this loaded page." masih eksplisit). |
+| INV-8 Gate tak menyusut | **CLOSED** | Dijalankan sendiri di `7ddca0c`: typecheck OK · contract **29/29** · API **195 passed + 5 skipped** · web **165/165** (sama dengan baseline Rev 2) · build OK. Diff tes menghapus kontrak komposisi Rev 2 (grid charcoal) dan mengganti dengan padanan Rev 3 (grid 5/4/3, foreground brand); asersi keselamatan (retry terlihat, error state, kontras fg, PnL readability, BUY-evaluation) semua punya padanan — nol tes keselamatan dihapus tanpa pengganti. |
+
+**Ringkasan: 7 dari 8 invariant CLOSED; INV-5 PARTIAL dengan 1 temuan Minor (misleading
+affordance hover tile non-klik) — bukan regresi keselamatan kritis, tidak memblokir dari sisi
+operasional, tapi melanggar baris eksplisit brief §8 dan sebaiknya diperbaiki atau dijustifikasi
+tertulis sebelum merge. Nol temuan Critical/High. BELUM TERVERIFIKASI (tetap): screen reader
+nyata, sentuhan perangkat fisik, persepsi layer dark 1,06–1,14:1, frame-by-frame rekaman;
+kontras diverifikasi via token math + tes kontrak, bukan pembacaan piksel live di browser.**

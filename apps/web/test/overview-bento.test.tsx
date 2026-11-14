@@ -204,7 +204,7 @@ describe('Overview bento binds backend values', () => {
     renderOverview();
     expect(await screen.findByText('OK')).toBeInTheDocument();
     expect(screen.getByTestId('overview-tracked-pools')).toHaveTextContent('2');
-    expect(screen.getByText('1 watchlisted token')).toBeInTheDocument();
+    expect(screen.getByTestId('overview-watchlist')).toHaveTextContent('1');
   });
 
   it('shows the latest strategy decision with its strategy id from meta', async () => {
@@ -213,6 +213,15 @@ describe('Overview bento binds backend values', () => {
     const tile = within(screen.getByTestId('overview-strategy'));
     expect((await tile.findAllByText('BUY')).length).toBeGreaterThan(0);
     expect((await tile.findAllByText(/paper-momentum · 1.0.0/)).length).toBeGreaterThan(0);
+  });
+
+  it('labels BUY as an evaluation signal, never an order, fill, or position', async () => {
+    useTransport();
+    renderOverview();
+    const tile = within(screen.getByTestId('overview-strategy'));
+    expect(await tile.findByText('BUY')).toBeInTheDocument();
+    expect(tile.getByText('Evaluation only — not an order, fill, or open position.')).toBeInTheDocument();
+    expect(tile.queryByText(/filled/i)).not.toBeInTheDocument();
   });
 
   it('lists recent PAPER activity from the journal', async () => {
@@ -248,7 +257,7 @@ describe('Overview bento states are honest', () => {
     useTransport({ discoveryMeta: {} });
     renderOverview();
     expect(await screen.findByTestId('overview-tracked-pools')).toHaveTextContent('Unavailable');
-    expect(screen.getByText('watchlist size unavailable')).toBeInTheDocument();
+    expect(screen.getByTestId('overview-watchlist')).toHaveTextContent('Unavailable');
   });
 
   it('labels an empty journal instead of implying activity', async () => {

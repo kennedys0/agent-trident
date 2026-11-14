@@ -60,7 +60,10 @@ export function Shell(): ReactNode {
 
       <aside className="sidebar" aria-label="Primary">
         <div className="brand">
-          <BrandMark />
+          <span className="brand__identity">
+            <BrandMark />
+            <span className="brand__wordmark">TRIDENT</span>
+          </span>
           <span className="brand__sub">PAPER</span>
         </div>
         {/* Revision 2 (CEO brief §6): ONE navigation element whose groups follow

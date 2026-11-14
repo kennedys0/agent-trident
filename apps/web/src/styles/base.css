@@ -38,6 +38,16 @@ h1 {
   letter-spacing: -0.025em;
 }
 
+.page-heading h1 {
+  font-size: 40px;
+}
+
+@media (max-width: 767px) {
+  .page-heading h1 {
+    font-size: var(--text-display);
+  }
+}
+
 h2 {
   font-size: var(--text-h2);
   font-weight: 600;
@@ -184,17 +194,35 @@ code,
 
 .brand {
   display: flex;
-  align-items: center;
-  gap: var(--space-1);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-05);
   min-width: 0;
   padding: 0 var(--space-1);
 }
 
-.brand__sub {
+.brand__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.brand__wordmark {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   color: var(--sidebar-ink);
-  opacity: 0.72;
-  font-size: var(--text-meta);
-  font-weight: 600;
+}
+
+.brand__sub {
+  margin-left: 48px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--brand-secondary);
+  color: var(--brand-on-secondary);
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.06em;
 }
 
@@ -220,11 +248,21 @@ code,
   display: none;
 }
 
-[data-theme='dark'] .brand-mark__img--light {
+/* Chrome is charcoal in both themes; the lime emblem never depends on theme. */
+.brand-mark__img--light {
+  filter: brightness(0) saturate(100%) invert(96%) sepia(100%) saturate(4641%) hue-rotate(23deg) brightness(105%) contrast(103%);
+}
+
+.topbar .brand-mark__img--dark,
+.sidebar .brand-mark__img--dark {
   display: none;
 }
 
-[data-theme='dark'] .brand-mark__img--dark {
+[data-theme='dark'] .topbar .brand-mark__img--light {
+  display: none;
+}
+
+[data-theme='dark'] .topbar .brand-mark__img--dark {
   display: block;
 }
 
@@ -523,14 +561,13 @@ code,
   align-items: center;
   justify-content: space-between;
   gap: var(--space-1);
-  font-size: var(--text-meta);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--muted);
+  font-size: var(--text-h2);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .bento-tile__foot {
-  margin-top: auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -557,29 +594,33 @@ code,
   transition-duration: var(--motion-fast);
 }
 
-/* HUD status strip: a hairline strip spanning the grid, not a raised tile. */
+.bento-tile:not(.bento-tile--interactive) {
+  transition: none;
+}
+
+/* One operational card: five labelled cells plus its refresh action. */
 .status-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--surface);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .status-strip__item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: var(--space-05);
   min-width: 0;
 }
 
 .status-strip__label {
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
@@ -588,120 +629,83 @@ code,
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-05);
-  font-family: var(--font-mono);
   font-size: var(--text-mono-num);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
-/* Revision 2 composition (CEO brief §2): vary span AND height — one dominant
-   portfolio module (charcoal feature panel), one visually distinct market
-   module (tinted well), then a compact row for risk + discovery + activity. */
+.status-strip__value--block {
+  font-size: var(--text-h2);
+  font-weight: 700;
+}
+
+.status-strip__refresh {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Revision 3: two asymmetric rows, content-sized tracks, no vertical stretching
+   across rows. The CEO-approved lime fill belongs only to the equity module. */
+.bento {
+  grid-auto-rows: min-content;
+  align-items: start;
+}
+
+.bento-tile {
+  height: fit-content;
+}
+
+.bento-tile__title h2 {
+  font: inherit;
+}
+
 .bento-tile--portfolio {
-  background: var(--feature-bg);
-  border-color: var(--feature-line);
-  color: var(--feature-ink);
-  box-shadow: var(--shadow-md);
+  background: var(--brand-accent);
+  border-color: var(--border-strong);
+  color: var(--brand-on-accent);
+  box-shadow: var(--shadow-sm);
 }
 
-.bento-tile--portfolio .bento-tile__title {
-  color: var(--feature-muted);
-}
-
-.bento-tile--portfolio .bento-figure__label {
-  color: var(--feature-muted);
-}
-
-.bento-tile--portfolio .bento-figure__value {
-  color: var(--feature-ink);
-}
-
-/* P-1 (QA rev2): PnL values inside the charcoal feature panel use the
-   feature-scoped status fg — the semantic --status-{positive,negative}-fg is
-   calibrated to the light canvas and fails AA on #222123 (2.09:1 / 1.93:1),
-   while --feature-{positive,negative}-fg hold AA in both themes
-   (light 10.5:1 / 8.4:1; dark unchanged 7.7:1 / 5.35:1). */
-.bento-tile--portfolio .bento-figure__value--positive {
-  color: var(--feature-positive-fg);
-}
-
-.bento-tile--portfolio .bento-figure__value--negative {
-  color: var(--feature-negative-fg);
-}
-
-/* Meta text inside the charcoal panel reads in the feature muted pair. */
-.bento-tile--portfolio .meta {
-  color: var(--feature-muted);
-}
-
-/* R-1 (QA rev2): every muted-text and quiet-control class inside the charcoal
-   panel reads in the feature pair — --muted is calibrated to the light canvas
-   and fails on #222123 (2.07:1), while --feature-muted holds AA in both
-   themes (6.3:1 light / 5.8:1 dark). Enumerated explicitly so each rule
-   outranks its single-class definition later in the file. */
+.bento-tile--portfolio .bento-tile__title,
+.bento-tile--portfolio .bento-figure__label,
+.bento-tile--portfolio .bento-figure__value,
+.bento-tile--portfolio .meta,
 .bento-tile--portfolio .state__text,
 .bento-tile--portfolio .btn--quiet,
-.bento-tile--portfolio .muted,
-.bento-tile--portfolio .row__label,
-.bento-tile--portfolio .fact dt,
-.bento-tile--portfolio .metric__prov,
-.bento-tile--portfolio .provenance,
-.bento-tile--portfolio .bento-module__title,
-.bento-tile--portfolio .bento-module__foot,
-.bento-tile--portfolio .status-strip__label {
-  color: var(--feature-muted);
+.bento-tile--portfolio .bento-figure__value--positive,
+.bento-tile--portfolio .bento-figure__value--negative {
+  color: var(--brand-on-accent);
 }
 
 .bento-tile--portfolio .btn--quiet {
-  border-color: var(--feature-line);
+  border-color: var(--border-strong);
 }
 
-/* Balance the tall module: the figure group breathes between the title and
-   the foot instead of leaving one big void — empty space stays deliberate. */
-.bento-tile--portfolio > .bento-figure {
-  margin-top: auto;
-}
-
-.bento-tile--portfolio > .bento-figures-row {
-  margin-bottom: auto;
-}
-
-/* Signature look: the hero equity figure reads in the brand accent on
-   charcoal (13.8:1 in light, 12.7:1 in dark). Accent never encodes status. */
-.bento-tile--portfolio .bento-figure__value--accent {
-  color: var(--brand-accent);
-}
-
-.bento-tile--portfolio .bento-tile__foot {
-  border-top-color: var(--feature-line);
-  color: var(--feature-muted);
-}
-
-.bento-tile--market {
-  background: var(--surface-well);
-  border-color: var(--hairline);
-  box-shadow: none;
-}
-
-/* Tablet: 6-column bento. Mobile (<768px) collapses to one column (base rule). */
+/* Tablet: six columns. Mobile stays one column, in the same content order. */
 @media (min-width: 768px) {
   .bento {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
-  .bento-tile--strip,
+  .bento-tile--portfolio,
+  .bento-tile--strategy,
   .bento-tile--market,
   .bento-tile--activity {
-    grid-column: span 6;
-  }
-
-  .bento-tile--portfolio {
     grid-column: span 6;
   }
 
   .bento-tile--risk,
   .bento-tile--discovery {
     grid-column: span 3;
+  }
+
+  .status-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .status-strip__refresh {
+    justify-content: flex-start;
   }
 }
 
@@ -710,25 +714,20 @@ code,
     grid-template-columns: repeat(12, minmax(0, 1fr));
   }
 
-  .bento-tile--strip {
-    grid-column: span 12;
-  }
-
-  /* Dominant module: 7 columns, two rows tall. */
   .bento-tile--portfolio {
-    grid-column: span 7;
-    grid-row: span 2;
-  }
-
-  /* Visually distinct counterpart: 5 columns, two rows tall. */
-  .bento-tile--market {
     grid-column: span 5;
-    grid-row: span 2;
   }
 
-  /* Compact support row. */
+  .bento-tile--strategy {
+    grid-column: span 4;
+  }
+
   .bento-tile--risk {
     grid-column: span 3;
+  }
+
+  .bento-tile--market {
+    grid-column: span 4;
   }
 
   .bento-tile--discovery {
@@ -736,7 +735,22 @@ code,
   }
 
   .bento-tile--activity {
-    grid-column: span 6;
+    grid-column: span 5;
+  }
+
+  .status-strip {
+    grid-template-columns: 1.05fr 1.25fr 0.85fr 1.65fr 1.2fr auto;
+    gap: var(--space-2);
+  }
+
+  .status-strip__item {
+    padding-inline: var(--space-2);
+    border-left: var(--border-width) solid var(--hairline);
+  }
+
+  .status-strip__item:first-child {
+    padding-left: 0;
+    border-left: 0;
   }
 }
 
@@ -751,13 +765,10 @@ code,
 .bento-figure__label {
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
 .bento-figure__value {
-  /* Financial figures read in the UI sans with tabular numerals; mono is
-     reserved for addresses, hashes and technical identifiers (CEO brief §3). */
   font-family: var(--font-sans);
   font-size: 22px;
   font-weight: 700;
@@ -765,7 +776,6 @@ code,
   overflow-wrap: anywhere;
 }
 
-/* Dominant portfolio figure inside the charcoal feature panel. */
 .bento-figure__value--hero {
   font-size: var(--text-hero);
   line-height: 1.1;
@@ -780,44 +790,24 @@ code,
   color: var(--status-negative-fg);
 }
 
-/* Revision 2: side-by-side support figures inside the dominant module. */
 .bento-figures-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: var(--space-2);
 }
 
-/* A named sub-section inside a tile (market & strategy module). */
-.bento-module {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: auto;
-  padding-top: var(--space-2);
-  border-top: var(--border-width) solid var(--hairline);
-}
-
-.bento-module__title {
+.strategy-signal {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-1);
-  margin: 0;
-  font-size: var(--text-meta);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--muted);
+  gap: var(--space-2);
 }
 
-.bento-module__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1);
-  font-size: var(--text-meta);
-  color: var(--muted);
+.strategy-signal .badge {
+  min-height: 48px;
+  padding-inline: var(--space-2);
+  font-size: var(--text-h2);
 }
 
 .bento-list {

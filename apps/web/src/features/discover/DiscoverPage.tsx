@@ -154,7 +154,7 @@ export function DiscoverPage(): ReactNode {
             <span className="discover-field__label">Search address or symbol</span>
             <input
               type="search"
-              className="discover-input mono"
+              className="discover-input"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="0x… or USDG"
@@ -183,39 +183,35 @@ export function DiscoverPage(): ReactNode {
           ) : null}
         </form>
 
-        <div className="discover-filters" role="group" aria-label="Quality filter, on this page">
-          <span className="discover-filters__label">Quality · on this page</span>
-          {QUALITIES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className="filter-chip"
-              aria-pressed={quality === value}
-              onClick={() => navigate({ quality: value, offset: 0 })}
-              data-testid={`filter-quality-${value}`}
+        <div className="discover-filters">
+          <label className="discover-select">
+            <span>Quality</span>
+            <select
+              className="discover-input"
+              value={quality}
+              onChange={(event) => navigate({ quality: firstOf(QUALITIES, event.target.value), offset: 0 })}
+              data-testid="filter-quality"
             >
-              {value === 'ANY' ? 'All' : value === 'AVAILABLE' ? 'Available' : value === 'STALE' ? 'Stale' : 'Unavailable'}
-            </button>
-          ))}
-        </div>
-
-        <div className="discover-filters" role="group" aria-label="Venue filter, on this page">
-          <span className="discover-filters__label">Venue · on this page</span>
-          {VENUES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className="filter-chip"
-              aria-pressed={venue === value}
-              onClick={() => navigate({ venue: value, offset: 0 })}
-              data-testid={`filter-venue-${value}`}
+              {QUALITIES.map((value) => (
+                <option key={value} value={value} data-testid={`filter-quality-${value}`}>
+                  {value === 'ANY' ? 'All qualities' : value === 'AVAILABLE' ? 'Available' : value === 'STALE' ? 'Stale' : 'Unavailable'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="discover-select">
+            <span>Venue</span>
+            <select
+              className="discover-input"
+              value={venue}
+              onChange={(event) => navigate({ venue: firstOf(VENUES, event.target.value), offset: 0 })}
+              data-testid="filter-venue"
             >
-              {VENUE_LABEL[value]}
-            </button>
-          ))}
-        </div>
-
-        <div className="discover-filters" role="group" aria-label="Watchlist filter, on this page">
+              {VENUES.map((value) => (
+                <option key={value} value={value}>{VENUE_LABEL[value]}</option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             className="filter-chip"
@@ -223,23 +219,12 @@ export function DiscoverPage(): ReactNode {
             onClick={() => navigate({ watched: !watchedOnly, offset: 0 })}
             data-testid="filter-watched"
           >
-            Watched only · on this page
+            Watched only
           </button>
         </div>
 
-        <p className="meta">
-          Search runs on the backend. Quality, venue and watchlist filters apply only to the page already loaded, so the
-          totals below keep describing what the API returned.
-        </p>
+        <p className="discover-scope">Search runs on the backend · Filters apply only to this loaded page.</p>
       </section>
-
-      {/* R-4 (QA rev2): Discover intro, moved below the search toolbar — the
-          text is unchanged and still rendered on every width. */}
-      <p className="meta">
-        Pools indexed from Robinhood Chain 4663. Price and liquidity each carry their own status and provenance; anything
-        the backend could not verify is marked unavailable, never zero.
-      </p>
-      <p className="provenance">Read-only discovery. No trading control exists on this page.</p>
 
       {pools.error !== null && pools.data !== null ? (
         <p className="banner banner--danger" role="alert" data-testid="discover-refresh-error">
@@ -342,8 +327,8 @@ export function DiscoverPage(): ReactNode {
       </Panel>
 
       <p className="meta discover-contract-note">
-        Frontend fields are parsed by <span className="mono">@trident/api-contract</span>. A payload that does not match
-        the S3-02 contract is reported as a contract mismatch instead of being displayed partially.
+        Pools indexed from Robinhood Chain 4663. Read-only discovery; no trading control exists on this page. Unverified
+        values remain unavailable, never zero. Invalid API payloads are rejected instead of displayed partially.
       </p>
     </>
   );

@@ -29,9 +29,9 @@ function tokenRaw(name: string, theme: 'light' | 'dark'): string {
 
 function cssBlock(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Anchor at line start (indented media blocks allowed) so compound selectors
-  // like `.bento-tile--portfolio .bento-figure__value` do not shadow the plain one.
-  const match = new RegExp(`(?:^|\\n)[ \\t]*${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+  // Anchor at line start (indented media blocks allowed), while allowing the
+  // requested selector to be one member of a comma-separated rule.
+  const match = new RegExp(`(?:^|\\n)[ \\t]*${escaped}(?:\\s*,[^{}]*)?\\s*\\{([^}]*)\\}`).exec(css);
   if (match === null || match[1] === undefined) {
     throw new Error(`selector ${selector} not found`);
   }
@@ -105,26 +105,30 @@ describe('Revision 2: motion fidelity', () => {
   });
 });
 
-describe('Revision 2: bento composition', () => {
-  it('desktop grid: dominant portfolio 7×2, market 5×2, compact 3/3/6 row', () => {
+describe('Revision 3: bento composition', () => {
+  it('desktop grid: equity 5, strategy 4, risk 3; secondary row is 4/3/5 and content-sized', () => {
     const wideBlock = baseCss.slice(baseCss.indexOf('@media (min-width: 1280px)'));
-    expect(cssBlock(wideBlock, '.bento-tile--portfolio')).toMatch(/grid-column:\s*span 7/);
-    expect(cssBlock(wideBlock, '.bento-tile--portfolio')).toMatch(/grid-row:\s*span 2/);
-    expect(cssBlock(wideBlock, '.bento-tile--market')).toMatch(/grid-column:\s*span 5/);
-    expect(cssBlock(wideBlock, '.bento-tile--market')).toMatch(/grid-row:\s*span 2/);
+    expect(cssBlock(wideBlock, '.bento-tile--portfolio')).toMatch(/grid-column:\s*span 5/);
+    expect(cssBlock(wideBlock, '.bento-tile--strategy')).toMatch(/grid-column:\s*span 4/);
     expect(cssBlock(wideBlock, '.bento-tile--risk')).toMatch(/grid-column:\s*span 3/);
+    expect(cssBlock(wideBlock, '.bento-tile--market')).toMatch(/grid-column:\s*span 4/);
     expect(cssBlock(wideBlock, '.bento-tile--discovery')).toMatch(/grid-column:\s*span 3/);
-    expect(cssBlock(wideBlock, '.bento-tile--activity')).toMatch(/grid-column:\s*span 6/);
+    expect(cssBlock(wideBlock, '.bento-tile--activity')).toMatch(/grid-column:\s*span 5/);
+    expect(wideBlock).not.toMatch(/grid-row:/);
+    const revision3 = baseCss.slice(baseCss.indexOf('/* Revision 3:'));
+    expect(cssBlock(revision3, '.bento')).toMatch(/grid-auto-rows:\s*min-content/);
+    expect(cssBlock(revision3, '.bento')).toMatch(/align-items:\s*start/);
   });
 
-  it('feature tile binds the charcoal package; market tile binds the well', () => {
+  it('CEO-approved lime belongs to equity only; every tile follows content height', () => {
     const featureBlock = cssBlock(baseCss, '.bento-tile--portfolio');
-    expect(featureBlock).toMatch(/background:\s*var\(--feature-bg\)/);
-    expect(featureBlock).toMatch(/color:\s*var\(--feature-ink\)/);
-    expect(cssBlock(baseCss, '.bento-tile--market')).toMatch(/background:\s*var\(--surface-well\)/);
+    expect(featureBlock).toMatch(/background:\s*var\(--brand-accent\)/);
+    expect(featureBlock).toMatch(/color:\s*var\(--brand-on-accent\)/);
+    expect(cssBlock(baseCss.slice(baseCss.indexOf('/* Revision 3:')), '.bento-tile')).toMatch(/height:\s*fit-content/);
+    expect(cssBlock(baseCss, '.bento-tile')).not.toMatch(/min-height:/);
   });
 
-  it('renders strip, then portfolio, market (with strategy), risk, discovery, activity', async () => {
+  it('renders strip, then equity, strategy, risk, market, discovery and activity', async () => {
     setTransport(async () =>
       new Response(JSON.stringify({ error: { code: 'UNAVAILABLE', message: 'fixture: endpoint off' } }), {
         status: 500,
@@ -138,29 +142,17 @@ describe('Revision 2: bento composition', () => {
         </MemoryRouter>
       </StatusProvider>,
     );
-    await waitFor(() => {
-      expect(screen.getByTestId('overview-strip')).toBeInTheDocument();
-    });
-    const strip = screen.getByTestId('overview-strip');
-    const portfolio = screen.getByTestId('overview-portfolio');
-    const market = screen.getByTestId('overview-market');
-    const risk = screen.getByTestId('overview-risk');
-    const discovery = screen.getByTestId('overview-discovery');
-    const activity = screen.getByTestId('overview-activity');
-    // DOM order encodes the composition: strip first, then the two feature
-    // modules, then the compact support row.
-    const order: readonly HTMLElement[] = [strip, portfolio, market, risk, discovery, activity];
+    await waitFor(() => expect(screen.getByTestId('overview-strip')).toBeInTheDocument());
+    const order = ['strip', 'portfolio', 'strategy', 'risk', 'market', 'discovery', 'activity'].map((name) =>
+      screen.getByTestId(`overview-${name}`),
+    );
     for (let i = 1; i < order.length; i += 1) {
       const prev = order[i - 1];
       const next = order[i];
-      if (prev === undefined || next === undefined) {
-        throw new Error('composition order array is shorter than expected');
-      }
+      if (prev === undefined || next === undefined) throw new Error('missing composition module');
       expect(prev.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
-    // The strategy decision lives inside the market module (testid preserved).
-    expect(market.contains(screen.getByTestId('overview-strategy'))).toBe(true);
-    // Honest failure: with every endpoint down, no figures are invented.
+    expect(screen.getByTestId('overview-strategy')).not.toBe(screen.getByTestId('overview-market'));
     expect(screen.queryByTestId('overview-equity-value')).not.toBeInTheDocument();
   });
 });
